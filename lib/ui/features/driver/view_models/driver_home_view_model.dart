@@ -1,0 +1,366 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
+
+import '../../../../data/services/geo_api.dart';
+import '../../../../data/services/location_service.dart';
+import '../../../../data/services/places_service.dart';
+import '../../../../data/services/realtime_client.dart';
+import '../../../../data/services/routing_service.dart';
+import '../../../../data/services/trip_api.dart';
+import '../../../../domain/models/geo_place.dart';
+import '../../../../domain/models/ride_offer.dart';
+import '../../../../domain/models/session_user.dart';
+
+enum DriverStage { home, locked, driving }
+
+class DriverHomeViewModel extends ChangeNotifier {
+  DriverHomeViewModel({
+    required LocationService locationService,
+    required PlacesService placesService,
+    required RoutingService routingService,
+    required GeoApi geoApi,
+    required TripApi tripApi,
+    required RealtimeClient realtime,
+    required this.user,
+  })  : _location = locationService,
+        _places = placesService,
+        _routing = routingService,
+        _geo = geoApi,
+        _trips = tripApi,
+        _realtime = realtime;
+
+  final LocationService _location;
+  final PlacesService _places;
+  final RoutingService _routing;
+  final GeoApi _geo;
+  final TripApi _trips;
+  final RealtimeClient _realtime;
+  final SessionUser user;
+
+  DriverStage stage = DriverStage.home;
+  bool online = false;
+  bool hideEarnings = true;
+  bool busy = false;
+  String? errorMessage;
+  DriverStats stats = const DriverStats();
+  List<DriverQuest> quests = const [];
+  List<RideOffer> offers = const [];
+  final Map<String, int> localFares = {};
+  ActiveRide? ride;
+  List<LatLng> routePoints = const [];
+  int? etaMinutes;
+  LatLng? driverPoint;
+  Position? _fix;
+
+  Timer? _inboxPoll;
+  Timer? _pingTimer;
+  StreamSubscription<Position>? _gps;
+  StreamSubscription<RealtimeMessage>? _ws;
+
+  bool get onTrip => stage != DriverStage.home;
+
+  String get etaChip {
+    final minutes = etaMinutes;
+    if (minutes == null) return 'On the way';
+    return '$minutes min to pickup';
+  }
+
+  int fareFor(RideOffer offer) =>
+      localFares[offer.requestId] ?? offer.offeredPrice;
+
+  Future<void> bootstrap() async {
+    await _location.ensureLocationPermission();
+    _fix = await _location.currentPosition();
+    if (_fix != null) {
+      driverPoint = LatLng(_fix!.latitude, _fix!.longitude);
+    }
+    stats = await _trips.stats();
+    quests = await _trips.quests();
+    final active = await _trips.activeRide();
+    if (active != null && active.rideId.isNotEmpty) {
+      await _enterRide(active);
+    }
+    _ws = _realtime.messages.listen(_onRealtime);
+    unawaited(_realtime.connect());
+    unawaited(_realtime.subscribe('driver:${user.id}'));
+    _gps = _location.positionStream().listen((position) {
+      _fix = position;
+      driverPoint = LatLng(position.latitude, position.longitude);
+      if (online || onTrip) {
+        unawaited(_geo.ping(
+          lat: position.latitude,
+          lng: position.longitude,
+          rideId: ride?.rideId,
+        ));
+      }
+      notifyListeners();
+    });
+    notifyListeners();
+  }
+
+  Future<void> toggleOnline(bool value) async {
+    final fix = _fix ?? await _location.currentPosition();
+    if (value && fix == null) {
+      errorMessage = 'Turn on location to go online.';
+      notifyListeners();
+      return;
+    }
+    final ok = await _geo.setOnline(
+      online: value,
+      lat: fix?.latitude,
+      lng: fix?.longitude,
+    );
+    if (!ok) {
+      errorMessage = 'Could not update online status.';
+      notifyListeners();
+      return;
+    }
+    online = value;
+    errorMessage = null;
+    if (online) {
+      _inboxPoll?.cancel();
+      _inboxPoll = Timer.periodic(const Duration(seconds: 4), (_) {
+        unawaited(refreshInbox());
+      });
+      _pingTimer?.cancel();
+      _pingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+        final pos = _fix;
+        if (pos == null) return;
+        unawaited(_geo.ping(lat: pos.latitude, lng: pos.longitude));
+      });
+      await refreshInbox();
+    } else {
+      _inboxPoll?.cancel();
+      _pingTimer?.cancel();
+      offers = const [];
+    }
+    notifyListeners();
+  }
+
+  void toggleEarningsHidden() {
+    hideEarnings = !hideEarnings;
+    notifyListeners();
+  }
+
+  Future<void> refreshInbox() async {
+    if (!online || onTrip) return;
+    final next = await _trips.inbox();
+    for (final offer in next) {
+      if (offer.fromName.isEmpty) {
+        final place =
+            await _places.reverse(offer.from.latitude, offer.from.longitude);
+        offer.fromName = place.name;
+      }
+      if (offer.toName.isEmpty) {
+        final place =
+            await _places.reverse(offer.to.latitude, offer.to.longitude);
+        offer.toName = place.name;
+      }
+      if (offer.suggestedPrice <= 0) {
+        offer.suggestedPrice = _routing.suggestFare(
+          GeoPlace(
+            name: offer.fromName,
+            latitude: offer.from.latitude,
+            longitude: offer.from.longitude,
+          ),
+          GeoPlace(
+            name: offer.toName,
+            latitude: offer.to.latitude,
+            longitude: offer.to.longitude,
+          ),
+        );
+      }
+    }
+    offers = next;
+    notifyListeners();
+  }
+
+  /// Pull-to-refresh: clear sticky errors and reload stats / offers / active ride.
+  Future<void> reload() async {
+    errorMessage = null;
+    notifyListeners();
+    try {
+      stats = await _trips.stats();
+      quests = await _trips.quests();
+      final active = await _trips.activeRide();
+      if (active != null && active.rideId.isNotEmpty) {
+        await _enterRide(active);
+        return;
+      }
+      if (online) {
+        await refreshInbox();
+      }
+    } catch (_) {
+      errorMessage = 'Could not refresh. Pull down to try again.';
+    }
+    notifyListeners();
+  }
+
+  void adjustFare(RideOffer offer, int delta) {
+    final current = fareFor(offer);
+    localFares[offer.requestId] = (current + delta).clamp(500, 50000);
+    notifyListeners();
+  }
+
+  Future<void> skip(RideOffer offer) async {
+    await _trips.decline(offer.requestId);
+    offers = offers.where((item) => item.requestId != offer.requestId).toList();
+    notifyListeners();
+  }
+
+  Future<void> accept(RideOffer offer) async {
+    if (busy) return;
+    busy = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      final price = fareFor(offer);
+      if (price > offer.offeredPrice) {
+        await _trips.counter(offer.requestId, price);
+        busy = false;
+        errorMessage = 'Counter sent. Waiting for the passenger.';
+        notifyListeners();
+        return;
+      }
+      final locked = await _trips.accept(offer.requestId);
+      if (locked.rideId.isEmpty) {
+        throw StateError('missing ride');
+      }
+      await _enterRide(
+        ActiveRide(
+          rideId: locked.rideId,
+          requestId: offer.requestId,
+          passengerId: offer.passengerId,
+          status: locked.status,
+          fare: locked.fare == 0 ? offer.offeredPrice : locked.fare,
+          from: offer.from,
+          to: offer.to,
+          paymentMethod: offer.paymentMethod,
+          passengerName: offer.displayName,
+          passengerPhone: offer.passengerPhone,
+          fromName: offer.fromName,
+          toName: offer.toName,
+        ),
+      );
+    } catch (_) {
+      errorMessage = 'Offer was taken or expired.';
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> startTrip() async {
+    final current = ride;
+    if (current == null || busy) return;
+    busy = true;
+    notifyListeners();
+    try {
+      for (final next in ['en_route', 'arrived', 'in_progress']) {
+        try {
+          await _trips.updateStatus(current.rideId, next);
+        } catch (_) {}
+      }
+      ride = ActiveRide(
+        rideId: current.rideId,
+        requestId: current.requestId,
+        passengerId: current.passengerId,
+        status: 'in_progress',
+        fare: current.fare,
+        from: current.from,
+        to: current.to,
+        paymentMethod: current.paymentMethod,
+        passengerName: current.passengerName,
+        passengerPhone: current.passengerPhone,
+        fromName: current.fromName,
+        toName: current.toName,
+      );
+      stage = DriverStage.driving;
+      await _refreshRoute(toDropoff: true);
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> cancelTrip() async {
+    final current = ride;
+    if (current == null) return;
+    await _trips.cancelRide(current.rideId);
+    ride = null;
+    stage = DriverStage.home;
+    routePoints = const [];
+    if (online) await refreshInbox();
+    notifyListeners();
+  }
+
+  Future<void> _enterRide(ActiveRide next) async {
+    ride = next;
+    offers = const [];
+    stage = next.isDriving ? DriverStage.driving : DriverStage.locked;
+    if (next.status == 'matched') {
+      try {
+        await _trips.updateStatus(next.rideId, 'en_route');
+      } catch (_) {}
+    }
+    await _realtime.subscribe('ride:${next.rideId}');
+    await _refreshRoute(toDropoff: next.isDriving);
+    final origin = driverPoint ?? next.from;
+    final dest = next.isDriving ? next.to : next.from;
+    final quote = await _geo.pickupEta(driver: origin, pickup: dest);
+    etaMinutes = quote?.minutes;
+  }
+
+  Future<void> _refreshRoute({required bool toDropoff}) async {
+    final current = ride;
+    if (current == null) return;
+    final start = driverPoint ?? current.from;
+    final end = toDropoff ? current.to : current.from;
+    final result = await _routing.route(
+      GeoPlace(
+        name: 'You',
+        latitude: start.latitude,
+        longitude: start.longitude,
+      ),
+      GeoPlace(
+        name: toDropoff ? current.toName : current.fromName,
+        latitude: end.latitude,
+        longitude: end.longitude,
+      ),
+    );
+    routePoints = result.points;
+    if (result.durationMin > 0) {
+      etaMinutes = result.durationMin;
+    }
+    notifyListeners();
+  }
+
+  void _onRealtime(RealtimeMessage message) {
+    if (message.event == 'incoming_request' && online && !onTrip) {
+      unawaited(refreshInbox());
+    }
+    if (message.event == 'status') {
+      final status = '${message.data['status'] ?? ''}';
+      if (status == 'cancelled') {
+        ride = null;
+        stage = DriverStage.home;
+        notifyListeners();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _inboxPoll?.cancel();
+    _pingTimer?.cancel();
+    _gps?.cancel();
+    _ws?.cancel();
+    if (online) {
+      unawaited(_geo.setOnline(online: false));
+    }
+    super.dispose();
+  }
+}
