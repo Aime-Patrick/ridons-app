@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/theme/ridons_colors.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../../domain/models/ride_stage.dart';
+import '../../../../domain/models/ride_bid.dart';
 import '../view_models/home_map_view_model.dart';
 
 class RideFlowPanel extends StatelessWidget {
@@ -654,6 +655,17 @@ class _OfferingSheet extends StatelessWidget {
             onDecrement: () {},
             onIncrement: () {},
           ),
+          if (viewModel.counterOffers.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _CounterOffersPanel(viewModel: viewModel),
+          ],
+          if (viewModel.bidError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              viewModel.bidError!,
+              style: TextStyle(color: context.ridonsMuted, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 12),
           const RidonsButton(
             label: 'Confirm',
@@ -663,6 +675,205 @@ class _OfferingSheet extends StatelessWidget {
           _RouteSummary(viewModel: viewModel),
         ],
       ),
+    );
+  }
+}
+
+class _CounterOffersPanel extends StatelessWidget {
+  const _CounterOffersPanel({required this.viewModel});
+
+  final HomeMapViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final offers = viewModel.counterOffers;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.ridonsFill,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: RidonsColors.primary.withValues(alpha: 0.35)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: const BoxDecoration(
+                    color: RidonsColors.navy,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.two_wheeler,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        offers.length == 1
+                            ? 'A driver sent a counter-offer'
+                            : '${offers.length} drivers sent counter-offers',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'Choose one before the request expires',
+                        style: TextStyle(
+                          color: context.ridonsMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.forum_outlined, color: RidonsColors.primary),
+              ],
+            ),
+            const SizedBox(height: 10),
+            for (var index = 0; index < offers.length; index++) ...[
+              if (index > 0) Divider(color: context.ridonsLine, height: 20),
+              _CounterOfferTile(
+                bid: offers[index],
+                originalPrice: viewModel.offeredPrice,
+                busy: viewModel.bidBusy,
+                onAccept: () => viewModel.acceptCounterOffer(offers[index]),
+                onDecline: () => viewModel.rejectCounterOffer(offers[index]),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CounterOfferTile extends StatelessWidget {
+  const _CounterOfferTile({
+    required this.bid,
+    required this.originalPrice,
+    required this.busy,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  final RideBid bid;
+  final int originalPrice;
+  final bool busy;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                bid.driverLabel,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            Text(
+              bid.proximityLabel,
+              style: TextStyle(color: context.ridonsMuted, fontSize: 11),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _CounterPrice(
+                label: 'Your offer',
+                value: '$originalPrice Rwf',
+              ),
+            ),
+            const Icon(Icons.arrow_forward, size: 16),
+            Expanded(
+              child: _CounterPrice(
+                label: 'Driver asks',
+                value: '${bid.price} Rwf',
+                emphasized: true,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: busy ? null : onDecline,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(42),
+                  side: BorderSide(color: context.ridonsLine),
+                ),
+                child: const Text('Decline'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: busy ? null : onAccept,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: RidonsColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(42),
+                ),
+                child: const Text('Accept'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _CounterPrice extends StatelessWidget {
+  const _CounterPrice({
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+          emphasized ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(color: context.ridonsMuted, fontSize: 10),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            color: emphasized ? RidonsColors.primary : context.ridonsInk,
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -728,7 +939,7 @@ class _MatchedSheet extends StatelessWidget {
               Expanded(
                 child: _Fact(
                   label: 'Agreed fare',
-                  value: '${viewModel.offeredPrice} Rwf',
+                  value: '${viewModel.payableFare} Rwf',
                 ),
               ),
               const Expanded(
@@ -817,7 +1028,7 @@ class _PaymentSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           RidonsButton(
-            label: "I've paid ${viewModel.offeredPrice} RWF",
+            label: "I've paid ${viewModel.payableFare} RWF",
             onPressed: viewModel.confirmPayment,
           ),
         ],
@@ -915,7 +1126,7 @@ class _TripReceiptCard extends StatelessWidget {
           _ReceiptLine(
             label: 'Paid to the driver',
             trailing: Text(
-              '${viewModel.offeredPrice} Rwf',
+              '${viewModel.payableFare} Rwf',
               style: TextStyle(
                 color: ink,
                 fontWeight: FontWeight.w800,

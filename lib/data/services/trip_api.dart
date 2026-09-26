@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../domain/models/geo_place.dart';
+import '../../domain/models/ride_bid.dart';
 import '../../domain/models/ride_offer.dart';
 import 'api_client.dart';
 
@@ -94,6 +95,30 @@ class TripApi {
     await _api.dio.post<Map<String, dynamic>>(
       '/driver/requests/$requestId/counter',
       data: {'price': price},
+    );
+  }
+
+  Future<RideAssignment> acceptBid({
+    required String requestId,
+    required String bidId,
+  }) async {
+    final response = await _api.dio.post<Map<String, dynamic>>(
+      '/rides/$requestId/accept-bid',
+      data: {'bidId': bidId},
+    );
+    return RideAssignment.fromJson(
+      response.data ?? const {},
+      requestId: requestId,
+    );
+  }
+
+  Future<void> rejectBid({
+    required String requestId,
+    required String bidId,
+  }) async {
+    await _api.dio.post<Map<String, dynamic>>(
+      '/rides/$requestId/reject-bid',
+      data: {'bidId': bidId},
     );
   }
 

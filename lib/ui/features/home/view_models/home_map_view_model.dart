@@ -14,6 +14,7 @@ import '../../../../data/services/trip_api.dart';
 import '../../../../data/services/support_api.dart';
 import '../../../../domain/models/geo_place.dart';
 import '../../../../domain/models/live_driver.dart';
+import '../../../../domain/models/ride_bid.dart';
 import '../../../../domain/models/ride_stage.dart';
 
 class MatchedDriver {
@@ -68,6 +69,9 @@ class HomeMapViewModel extends ChangeNotifier {
   final String passengerName;
 
   MatchedDriver? matchedDriver;
+  List<RideBid> counterOffers = const [];
+  bool bidBusy = false;
+  String? bidError;
 
   RideStage stage = RideStage.route;
   bool locationPromptNeeded = false;
@@ -83,6 +87,7 @@ class HomeMapViewModel extends ChangeNotifier {
   List<RouteStep> routeSteps = const [];
   List<LiveMapMarker> nearbyDrivers = const [];
   int offeredPrice = 1900;
+  int agreedFare = 0;
   int driversViewing = 0;
   Duration offerTimer = const Duration(seconds: 60);
   String paymentMethod = 'Cash';
@@ -144,9 +149,11 @@ class HomeMapViewModel extends ChangeNotifier {
     return driver.plate.trim().isEmpty ? short : '$short - ${driver.plate}';
   }
 
+  int get payableFare => agreedFare > 0 ? agreedFare : offeredPrice;
+
   String get receiptSummary {
     return 'Ridons $recordNumber\n'
-        'Paid to the driver  $offeredPrice Rwf\n'
+        'Paid to the driver  $payableFare Rwf\n'
         '$pickupLabel → $dropoffLabel  $tripDistanceLabel\n'
         'Driver  $driverReceiptLabel';
   }
@@ -490,6 +497,27 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   void _onRealtime(RealtimeMessage message) {
+    if (message.event == 'bid' && stage == RideStage.offering) {
+      final requestId = '${message.data['requestId'] ?? ''}';
+      if (requestId.isNotEmpty && requestId != liveRequestId) return;
+      final raw = message.data['bid'];
+      if (raw is! Map) return;
+      final bid = RideBid.fromJson(
+        Map<String, dynamic>.from(raw),
+        requestId: requestId.isEmpty ? liveRequestId : requestId,
+      );
+      if (bid.bidId.isEmpty || bid.price <= 0) return;
+      final updated = [
+        ...counterOffers.where(
+          (item) => item.bidId != bid.bidId && item.driverId != bid.driverId,
+        ),
+        bid,
+      ]..sort((a, b) => a.price.compareTo(b.price));
+      counterOffers = List.unmodifiable(updated);
+      bidError = null;
+      notifyListeners();
+      return;
+    }
     if (message.event == 'location') {
       final id = (message.data['driverId'] ?? '').toString();
       final coords = message.data['coords'];
@@ -530,15 +558,21 @@ class HomeMapViewModel extends ChangeNotifier {
       final id = '${message.data['rideId'] ?? ''}';
       if (id.isNotEmpty) liveRideId = id;
       final driverId = '${message.data['driverId'] ?? ''}';
+      final driverName = '${message.data['driverName'] ?? ''}';
+      final vehiclePlate = '${message.data['vehiclePlate'] ?? ''}';
+      final driverRating =
+          (message.data['driverRating'] as num?)?.toDouble() ?? 0;
       matchedDriver = MatchedDriver(
-        name: '${message.data['driverName'] ?? ''}',
-        plate: '${message.data['vehiclePlate'] ?? ''}',
-        rating: (message.data['driverRating'] as num?)?.toDouble() ?? 0,
+        name: driverName.isEmpty ? matchedDriver?.name ?? '' : driverName,
+        plate: vehiclePlate.isEmpty ? matchedDriver?.plate ?? '' : vehiclePlate,
+        rating: driverRating > 0 ? driverRating : matchedDriver?.rating ?? 0,
       );
+      final fare = (message.data['fare'] as num?)?.toInt() ?? 0;
+      if (fare > 0) agreedFare = fare;
       if (driverId.isNotEmpty && !_tracked.containsKey(driverId)) {
         focusedDriverId = driverId;
       }
-      showMatch();
+      showMatch(driverId: driverId, fare: fare);
       return;
     }
     if (message.event == 'dispatch' && stage == RideStage.offering) {
@@ -716,6 +750,9 @@ class HomeMapViewModel extends ChangeNotifier {
 
   Future<void> confirmOffer() async {
     stage = RideStage.offering;
+    counterOffers = const [];
+    bidError = null;
+    agreedFare = 0;
     lastOfferMissed = false;
     driversViewing = 0;
     lastOfferHadRiders = false;
@@ -751,13 +788,78 @@ class HomeMapViewModel extends ChangeNotifier {
     }
   }
 
-  void showMatch() {
+  Future<void> acceptCounterOffer(RideBid bid) async {
+    final requestId = liveRequestId;
+    final api = _tripApi;
+    if (bidBusy || requestId == null || requestId.isEmpty || api == null) {
+      return;
+    }
+    bidBusy = true;
+    bidError = null;
+    notifyListeners();
+    try {
+      final assignment = await api.acceptBid(
+        requestId: requestId,
+        bidId: bid.bidId,
+      );
+      final driverId = assignment.driverId.isEmpty
+          ? bid.driverId
+          : assignment.driverId;
+      agreedFare = assignment.fare > 0 ? assignment.fare : bid.price;
+      liveRideId = assignment.rideId.isEmpty ? liveRideId : assignment.rideId;
+      matchedDriver = MatchedDriver(
+        name: bid.driverLabel,
+        plate: '',
+        rating: 0,
+      );
+      counterOffers = const [];
+      unawaited(_realtime.unsubscribe('request:$requestId'));
+      showMatch(driverId: driverId, fare: agreedFare);
+    } catch (_) {
+      bidError = 'That offer is no longer available. Choose another one.';
+      counterOffers = counterOffers
+          .where((item) => item.bidId != bid.bidId)
+          .toList(growable: false);
+      notifyListeners();
+    } finally {
+      bidBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> rejectCounterOffer(RideBid bid) async {
+    final requestId = liveRequestId;
+    final api = _tripApi;
+    if (bidBusy || requestId == null || requestId.isEmpty || api == null) {
+      return;
+    }
+    bidBusy = true;
+    bidError = null;
+    notifyListeners();
+    try {
+      await api.rejectBid(requestId: requestId, bidId: bid.bidId);
+      counterOffers = counterOffers
+          .where((item) => item.bidId != bid.bidId)
+          .toList(growable: false);
+    } catch (_) {
+      bidError = 'Could not remove that offer. Please try again.';
+    } finally {
+      bidBusy = false;
+      notifyListeners();
+    }
+  }
+
+  void showMatch({String? driverId, int? fare}) {
     stage = RideStage.matched;
+    if (fare != null && fare > 0) agreedFare = fare;
     _ticker?.cancel();
     _matchTimer?.cancel();
-    if (_tracked.isNotEmpty) {
+    if (driverId != null && driverId.isNotEmpty) {
+      focusedDriverId = driverId;
+    } else if (_tracked.isNotEmpty) {
       focusedDriverId = _tracked.keys.first;
     }
+    counterOffers = const [];
     unawaited(_refreshEta());
     notifyListeners();
   }
@@ -823,6 +925,9 @@ class HomeMapViewModel extends ChangeNotifier {
     routeAlternatives = const [];
     routeSteps = const [];
     offeredPrice = 1900;
+    agreedFare = 0;
+    counterOffers = const [];
+    bidError = null;
     rating = 0;
     paymentMethod = 'Cash';
     searchQuery = '';
@@ -874,6 +979,8 @@ class HomeMapViewModel extends ChangeNotifier {
     unawaited(_cancelLiveRequest());
     _ticker?.cancel();
     offerTimer = Duration.zero;
+    counterOffers = const [];
+    bidError = null;
     stage = RideStage.estimate;
     _startTimer(const Duration(seconds: 60));
     notifyListeners();
