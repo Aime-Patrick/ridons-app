@@ -128,9 +128,16 @@ class _TripSheet extends StatelessWidget {
     return Material(
       color: context.ridonsSheet,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Column(
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 8),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.78,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
@@ -195,6 +202,8 @@ class _TripSheet extends StatelessWidget {
               ),
             ],
           ],
+            ),
+          ),
         ),
       ),
     );
@@ -274,6 +283,8 @@ class _PassengerCard extends StatelessWidget {
                     ),
                     Text(
                       '${_pax(ride.passengerId)}  ${ride.passengerPhone}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: context.ridonsMuted,
                         fontSize: 12,
@@ -310,6 +321,8 @@ class _PassengerCard extends StatelessWidget {
                   ),
                 ],
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(height: 10),
@@ -324,6 +337,7 @@ class _PassengerCard extends StatelessWidget {
                   label: const Text('Call'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     shape: const StadiumBorder(),
                   ),
                 ),
@@ -341,6 +355,7 @@ class _PassengerCard extends StatelessWidget {
                   label: const Text('Message'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     shape: const StadiumBorder(),
                   ),
                 ),

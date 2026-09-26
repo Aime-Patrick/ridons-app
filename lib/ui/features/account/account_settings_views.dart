@@ -17,10 +17,12 @@ class AccountSubpage extends StatelessWidget {
     super.key,
     required this.title,
     required this.child,
+    this.showBack = true,
   });
 
   final String title;
   final Widget child;
+  final bool showBack;
 
   @override
   Widget build(BuildContext context) {
@@ -31,8 +33,15 @@ class AccountSubpage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 16, 8),
-              child: RidonsBackHeader(title: title),
+              padding: EdgeInsets.fromLTRB(showBack ? 8 : 20, 12, 16, 12),
+              child: showBack
+                  ? RidonsBackHeader(title: title)
+                  : Text(
+                      title,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
             ),
             Expanded(child: child),
           ],

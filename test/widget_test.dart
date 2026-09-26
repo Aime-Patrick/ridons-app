@@ -58,11 +58,7 @@ class FakeAuthRepository implements AuthRepository {
     }
     return AuthSession(
       token: 'test-token',
-      user: SessionUser(
-        id: 'pax_test',
-        phone: phone,
-        role: role,
-      ),
+      user: SessionUser(id: 'pax_test', phone: phone, role: role),
     );
   }
 
@@ -102,6 +98,9 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthSession?> refreshSession() async => null;
+
+  @override
   Future<AuthSession?> restore() async => null;
 
   @override
@@ -123,14 +122,14 @@ void main() {
 
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(
-    const MethodChannel('plugins.flutter.io/shared_preferences'),
-    (MethodCall methodCall) async {
-      if (methodCall.method == 'getAll') {
-        return <String, dynamic>{};
-      }
-      return true;
-    },
-  );
+        const MethodChannel('plugins.flutter.io/shared_preferences'),
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'getAll') {
+            return <String, dynamic>{};
+          }
+          return true;
+        },
+      );
 
   testWidgets('Ridons app boots to splash and renders', (tester) async {
     await EasyLocalization.ensureInitialized();
@@ -155,21 +154,18 @@ void main() {
     expect(find.byType(RidonsApp), findsOneWidget);
   });
 
-  testWidgets('role selection renders the two roles and navigates',
-      (tester) async {
+  testWidgets('role selection renders the two roles and navigates', (
+    tester,
+  ) async {
     await EasyLocalization.ensureInitialized();
     final router = GoRouter(
       initialLocation: '/',
       routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) => const OnboardingView(),
-        ),
+        GoRoute(path: '/', builder: (context, state) => const OnboardingView()),
         GoRoute(
           path: '/widgets',
-          builder: (context, state) => const Scaffold(
-            body: Text('Widgets Lab'),
-          ),
+          builder: (context, state) =>
+              const Scaffold(body: Text('Widgets Lab')),
         ),
         GoRoute(
           path: '/sign-in/phone',
@@ -193,9 +189,7 @@ void main() {
         fallbackLocale: const Locale('en'),
         assetLoader: const _MockAssetLoader(),
         saveLocale: false,
-        child: ProviderScope(
-          child: MaterialApp.router(routerConfig: router),
-        ),
+        child: ProviderScope(child: MaterialApp.router(routerConfig: router)),
       ),
     );
 
@@ -213,10 +207,7 @@ void main() {
       find.text('Offer your price, pick from the drivers'),
       findsOneWidget,
     );
-    expect(
-      find.text('Get offers, pick from the passengers'),
-      findsOneWidget,
-    );
+    expect(find.text('Get offers, pick from the passengers'), findsOneWidget);
     final roleTitle = tester.widget<Text>(find.text('Get a ride'));
     expect(roleTitle.style?.fontFamily, contains('Inter'));
     expect(roleTitle.style?.fontSize, 20);
@@ -246,8 +237,9 @@ void main() {
     expect(find.text('Continue with phone'), findsOneWidget);
   });
 
-  testWidgets('phone sign-in sends OTP then shows the code step',
-      (tester) async {
+  testWidgets('phone sign-in sends OTP then shows the code step', (
+    tester,
+  ) async {
     await EasyLocalization.ensureInitialized();
     final fake = FakeAuthRepository();
     final router = GoRouter(
@@ -272,9 +264,7 @@ void main() {
         assetLoader: const _MockAssetLoader(),
         saveLocale: false,
         child: ProviderScope(
-          overrides: [
-            authRepositoryProvider.overrideWithValue(fake),
-          ],
+          overrides: [authRepositoryProvider.overrideWithValue(fake)],
           child: MaterialApp.router(routerConfig: router),
         ),
       ),
@@ -291,8 +281,9 @@ void main() {
     expect(find.byType(RidonsOtpField), findsOneWidget);
   });
 
-  testWidgets('role card stays within a tight height constraint',
-      (tester) async {
+  testWidgets('role card stays within a tight height constraint', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

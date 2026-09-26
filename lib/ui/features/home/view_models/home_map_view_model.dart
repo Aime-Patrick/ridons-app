@@ -11,6 +11,7 @@ import '../../../../data/services/places_service.dart';
 import '../../../../data/services/realtime_client.dart';
 import '../../../../data/services/routing_service.dart';
 import '../../../../data/services/trip_api.dart';
+import '../../../../data/services/support_api.dart';
 import '../../../../domain/models/geo_place.dart';
 import '../../../../domain/models/live_driver.dart';
 import '../../../../domain/models/ride_stage.dart';
@@ -52,8 +53,10 @@ class HomeMapViewModel extends ChangeNotifier {
     required GeoApi this._geoApi,
     required RealtimeClient this._realtime,
     TripApi? tripApi,
+    SupportApi? supportApi,
     this.passengerName = '',
-  }) : _tripApi = tripApi;
+  }) : _tripApi = tripApi,
+       _supportApi = supportApi;
 
   final LocationService _locationService;
   final PlacesService _placesService;
@@ -61,6 +64,7 @@ class HomeMapViewModel extends ChangeNotifier {
   final GeoApi _geoApi;
   final RealtimeClient _realtime;
   final TripApi? _tripApi;
+  final SupportApi? _supportApi;
   final String passengerName;
 
   static const matchedDriver = MatchedDriver(
@@ -732,6 +736,30 @@ class HomeMapViewModel extends ChangeNotifier {
   void goToPayment() {
     stage = RideStage.payment;
     notifyListeners();
+  }
+
+  /// Opens a support ticket for the current ride (or general help).
+  /// Returns the ticket id on success, or null if support is unavailable / failed.
+  Future<String?> requestHelp({
+    required String subject,
+    String? body,
+    String category = 'ride',
+  }) async {
+    final api = _supportApi;
+    if (api == null) return null;
+    try {
+      final created = await api.createTicket(
+        subject: subject.trim(),
+        body: body?.trim(),
+        rideId: liveRideId ?? liveRequestId,
+        category: category,
+        userName: passengerName.isEmpty ? null : passengerName,
+      );
+      final id = created.ticketId.trim();
+      return id.isEmpty ? null : id;
+    } catch (_) {
+      return null;
+    }
   }
 
   void selectPayment(String method) {

@@ -755,7 +755,7 @@ class _MatchedSheet extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _openNeedHelpDialog(context, viewModel),
                   icon: const Icon(Icons.help_outline, size: 16),
                   label: const Text('Need help?'),
                   style: OutlinedButton.styleFrom(
@@ -877,13 +877,12 @@ class _SuccessSheet extends StatelessWidget {
               RidonsButton(
                 label: 'Report a problem',
                 variant: RidonsButtonVariant.secondary,
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Support is coming soon.'),
-                    ),
-                  );
-                },
+                onPressed: () => _openNeedHelpDialog(
+                  context,
+                  viewModel,
+                  defaultSubject: 'Problem with completed trip',
+                  category: 'ride',
+                ),
               ),
             ],
           ),
@@ -1406,6 +1405,125 @@ class _StackedAvatars extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+Future<void> _openNeedHelpDialog(
+  BuildContext context,
+  HomeMapViewModel viewModel, {
+  String defaultSubject = 'Need help with my ride',
+  String category = 'ride',
+}) async {
+  final subject = TextEditingController(text: defaultSubject);
+  final body = TextEditingController();
+  var submitting = false;
+
+  final sent = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Need help?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RidonsTextField(
+                  controller: subject,
+                  label: 'Subject',
+                  hint: 'What do you need help with?',
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Details',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: context.ridonsInk,
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: body,
+                  maxLines: 4,
+                  minLines: 3,
+                  textInputAction: TextInputAction.newline,
+                  decoration: const InputDecoration(
+                    hintText: 'Describe what happened (optional)',
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: submitting
+                    ? null
+                    : () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: submitting
+                    ? null
+                    : () async {
+                        final subj = subject.text.trim();
+                        if (subj.length < 3) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Please enter a short subject (3+ characters).',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() => submitting = true);
+                        final id = await viewModel.requestHelp(
+                          subject: subj,
+                          body: body.text.trim().isEmpty
+                              ? null
+                              : body.text.trim(),
+                          category: category,
+                        );
+                        if (!dialogContext.mounted) return;
+                        if (id == null) {
+                          setState(() => submitting = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Could not reach support. Try again shortly.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        Navigator.pop(dialogContext, true);
+                      },
+                child: submitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Send'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  subject.dispose();
+  body.dispose();
+
+  if (sent == true && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Support ticket sent. Our team will follow up.'),
       ),
     );
   }

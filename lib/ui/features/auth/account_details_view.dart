@@ -38,7 +38,11 @@ class _AccountDetailsViewState extends ConsumerState<AccountDetailsView> {
     if (!mounted || session == null) return;
     await ref.read(authSessionProvider.notifier).setSession(session);
     if (!mounted) return;
-    context.go(AppRoutes.home);
+    context.go(
+      session.user.role.isDriver && !session.user.isVerified
+          ? AppRoutes.driverVerification
+          : AppRoutes.home,
+    );
   }
 
   @override

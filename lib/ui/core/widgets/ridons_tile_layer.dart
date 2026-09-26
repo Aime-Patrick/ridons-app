@@ -14,8 +14,9 @@ import 'package:flutter_map/flutter_map.dart';
 abstract final class RidonsMapTiles {
   static const _userAgent = 'app.ridons.mobile';
 
+  // Google Maps raster tiles (No API key needed — lush green parks, clean roads, authentic Google styling)
   static const _light =
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+      'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
   static const _lightFallback =
       'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
   static const _darkBase =

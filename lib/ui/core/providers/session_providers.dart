@@ -4,13 +4,17 @@ import '../../../data/config/api_config.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/api_client.dart';
 import '../../../data/services/geo_api.dart';
+import '../../../data/services/driver_documents_service.dart';
 import '../../../data/services/prefs_store.dart';
 import '../../../data/services/realtime_client.dart';
 import '../../../data/services/token_store.dart';
 import '../../../data/services/trip_api.dart';
+import '../../../data/services/support_api.dart';
 import '../../../domain/models/app_role.dart';
 import '../../../domain/models/session_user.dart';
 import '../../features/auth/view_models/auth_view_model.dart';
+import '../../features/account/view_models/driver_documents_view_model.dart';
+import '../../../data/repositories/driver_documents_repository.dart';
 import 'app_role_provider.dart';
 
 final tokenStoreProvider = Provider<TokenStore>((ref) => TokenStore());
@@ -29,6 +33,23 @@ final geoApiProvider = Provider<GeoApi>((ref) {
 
 final tripApiProvider = Provider<TripApi>((ref) {
   return TripApi(ref.watch(apiClientProvider));
+});
+
+final supportApiProvider = Provider<SupportApi>((ref) {
+  return SupportApi(ref.watch(apiClientProvider));
+});
+
+final driverDocumentsRepositoryProvider = Provider<DriverDocumentsRepository>((ref) {
+  return DriverDocumentsRepository(
+    DriverDocumentsService(ref.watch(apiClientProvider)),
+  );
+});
+
+final driverDocumentsViewModelProvider =
+    ChangeNotifierProvider<DriverDocumentsViewModel>((ref) {
+  return DriverDocumentsViewModel(
+    ref.watch(driverDocumentsRepositoryProvider),
+  );
 });
 
 final realtimeClientProvider = Provider<RealtimeClient>((ref) {

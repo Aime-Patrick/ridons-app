@@ -122,7 +122,7 @@ class GeoApi {
     }
   }
 
-  Future<bool> setOnline({
+  Future<String?> setOnline({
     required bool online,
     double? lat,
     double? lng,
@@ -135,9 +135,17 @@ class GeoApi {
           if (lat != null && lng != null) 'location': [lat, lng],
         },
       );
-      return true;
-    } on DioException {
-      return false;
+      return null; // success
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      final error = e.response?.data?['error']?.toString();
+      if (status == 403 && error == 'driver_verification_required') {
+        return 'verification_required';
+      }
+      if (status == 401) {
+        return 'unauthorized';
+      }
+      return 'network_error';
     }
   }
 }

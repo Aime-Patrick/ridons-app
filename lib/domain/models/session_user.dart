@@ -1,5 +1,7 @@
 import '../models/app_role.dart';
 
+enum VerificationStatus { pending, approved, rejected, suspended }
+
 class SessionUser {
   const SessionUser({
     required this.id,
@@ -11,6 +13,8 @@ class SessionUser {
     this.locale = 'en',
     this.avatarKey = 'passenger',
     this.avatarUrl,
+    this.verificationStatus = VerificationStatus.approved,
+    this.rejectReason,
   });
 
   final String id;
@@ -22,6 +26,11 @@ class SessionUser {
   final String locale;
   final String avatarKey;
   final String? avatarUrl;
+  final VerificationStatus verificationStatus;
+  final String? rejectReason;
+
+  bool get isVerified =>
+      !role.isDriver || verificationStatus == VerificationStatus.approved;
 
   bool get hasUploadedPhoto =>
       avatarKey == 'upload' && (avatarUrl ?? '').isNotEmpty;
@@ -73,6 +82,13 @@ class SessionUser {
       locale: '${json['locale'] ?? 'en'}',
       avatarKey: '${json['avatarKey'] ?? 'passenger'}',
       avatarUrl: json['avatarUrl']?.toString(),
+      verificationStatus: VerificationStatus.values.firstWhere(
+        (value) => value.name == '${json['verificationStatus'] ?? (roleRaw == 'driver' ? 'pending' : 'approved')}',
+        orElse: () => roleRaw == 'driver'
+            ? VerificationStatus.pending
+            : VerificationStatus.approved,
+      ),
+      rejectReason: json['rejectReason']?.toString(),
       role: roleRaw == 'driver' ? AppRole.driver : AppRole.passenger,
     );
   }

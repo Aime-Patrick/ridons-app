@@ -22,6 +22,7 @@ abstract class AuthRepository {
   });
   Future<AuthSession> uploadAvatar(String filePath);
   Future<AuthSession?> restore();
+  Future<AuthSession?> refreshSession();
   Future<void> logout();
 }
 
@@ -29,8 +30,8 @@ class RemoteAuthRepository implements AuthRepository {
   RemoteAuthRepository({
     required ApiClient apiClient,
     required TokenStore tokenStore,
-  })  : _api = apiClient,
-        _tokens = tokenStore;
+  }) : _api = apiClient,
+       _tokens = tokenStore;
 
   final ApiClient _api;
   final TokenStore _tokens;
@@ -93,7 +94,8 @@ class RemoteAuthRepository implements AuthRepository {
         },
       );
       final token = await _tokens.readAccess();
-      final userMap = (response.data?['user'] as Map<String, dynamic>?) ??
+      final userMap =
+          (response.data?['user'] as Map<String, dynamic>?) ??
           response.data ??
           const {};
       return AuthSession(
@@ -118,7 +120,8 @@ class RemoteAuthRepository implements AuthRepository {
         data: form,
       );
       final token = await _tokens.readAccess();
-      final userMap = (response.data?['user'] as Map<String, dynamic>?) ??
+      final userMap =
+          (response.data?['user'] as Map<String, dynamic>?) ??
           response.data ??
           const {};
       return AuthSession(
@@ -140,10 +143,7 @@ class RemoteAuthRepository implements AuthRepository {
       final response = await _api.dio.get<Map<String, dynamic>>('/me');
       final userMap =
           (response.data?['user'] as Map<String, dynamic>?) ?? const {};
-      return AuthSession(
-        token: access,
-        user: SessionUser.fromJson(userMap),
-      );
+      return AuthSession(token: access, user: SessionUser.fromJson(userMap));
     } on DioException catch (e) {
       // Only drop the session on auth failure — keep tokens on network/5xx.
       if (e.response?.statusCode == 401) {
@@ -163,6 +163,29 @@ class RemoteAuthRepository implements AuthRepository {
       );
     } catch (_) {}
     await _tokens.clear();
+  }
+
+  /// Re-issue a JWT with fresh claims from the DB (e.g. after verification
+  /// status changes). Returns the updated session or null on failure.
+  @override
+  Future<AuthSession?> refreshSession() async {
+    final refresh = await _tokens.readRefresh();
+    if (refresh == null || refresh.isEmpty) return null;
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/refresh',
+        data: {'refreshToken': refresh},
+      );
+      final json = response.data ?? const {};
+      final token = '${json['token'] ?? ''}';
+      final newRefresh = json['refreshToken']?.toString();
+      if (token.isEmpty) return null;
+      await _tokens.save(access: token, refresh: newRefresh ?? refresh);
+      final userMap = (json['user'] as Map<String, dynamic>?) ?? const {};
+      return AuthSession(token: token, user: SessionUser.fromJson(userMap));
+    } on DioException {
+      return null;
+    }
   }
 
   Future<AuthSession> _sessionFrom(Map<String, dynamic> json) async {

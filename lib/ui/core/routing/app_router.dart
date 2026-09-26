@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/account_details_view.dart';
 import '../../features/auth/sign_in_view.dart';
 import '../../features/auth/sign_up_view.dart';
+import '../../features/account/driver_documents_view.dart';
 import '../../features/onboarding/onboarding_view.dart';
 import '../../features/shell/main_shell_view.dart';
 import '../../features/splash/splash_view.dart';
@@ -20,6 +21,7 @@ abstract final class AppRoutes {
   static const signUpPhone = '/sign-up/phone';
   static const signUpCode = '/sign-up/code';
   static const signUpAccount = '/sign-up/account';
+  static const driverVerification = '/driver/verification';
   static const widgetsLab = '/widgets';
   static const home = '/home';
 }
@@ -45,18 +47,36 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final loggedIn = session.asData?.value != null;
       final needsProfile = session.asData?.value?.needsProfile ?? false;
+      final user = session.asData?.value?.user;
+      final needsDriverVerification =
+          user?.role.isDriver == true && !user!.isVerified;
       final onAccount = loc == AppRoutes.signUpAccount;
+      final onDriverVerification = loc == AppRoutes.driverVerification;
       final onAuth = loc.startsWith('/sign-in') ||
           loc.startsWith('/sign-up') ||
           loc == AppRoutes.onboarding;
 
-      if (loggedIn && needsProfile && !onAccount) {
-        return AppRoutes.signUpAccount;
+      // Profile completion is the first authenticated onboarding step. Keep
+      // the driver verification guard behind it so an incomplete driver
+      // session cannot bounce between the account and verification routes.
+      if (loggedIn && needsProfile) {
+        return onAccount ? null : AppRoutes.signUpAccount;
       }
-      if (loggedIn && !needsProfile && onAuth) {
+      if (loggedIn && needsDriverVerification && !onDriverVerification) {
+        return AppRoutes.driverVerification;
+      }
+      if (loggedIn && !needsDriverVerification && onDriverVerification) {
         return AppRoutes.home;
       }
+      if (loggedIn && !needsProfile && onAuth) {
+        return needsDriverVerification
+            ? AppRoutes.driverVerification
+            : AppRoutes.home;
+      }
       if (!loggedIn && loc == AppRoutes.home) {
+        return AppRoutes.onboarding;
+      }
+      if (!loggedIn && onDriverVerification) {
         return AppRoutes.onboarding;
       }
       return null;
@@ -111,6 +131,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.signUpAccount,
         builder: (context, state) => const AccountDetailsView(),
+      ),
+      GoRoute(
+        path: AppRoutes.driverVerification,
+        builder: (context, state) =>
+            const DriverDocumentsView(onboarding: true),
       ),
       GoRoute(
         path: AppRoutes.home,

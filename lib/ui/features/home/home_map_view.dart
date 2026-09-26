@@ -47,6 +47,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
       geoApi: ref.read(geoApiProvider),
       realtime: ref.read(realtimeClientProvider),
       tripApi: ref.read(tripApiProvider),
+      supportApi: ref.read(supportApiProvider),
       passengerName:
           ref.read(authSessionProvider).asData?.value?.user.displayName ?? '',
     )..addListener(_onViewModel);

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../../data/repositories/auth_repository.dart';
 import '../../../../data/services/geo_api.dart';
 import '../../../../data/services/location_service.dart';
 import '../../../../data/services/places_service.dart';
@@ -24,13 +25,16 @@ class DriverHomeViewModel extends ChangeNotifier {
     required GeoApi geoApi,
     required TripApi tripApi,
     required RealtimeClient realtime,
+    required AuthRepository authRepository,
     required this.user,
-  })  : _location = locationService,
-        _places = placesService,
-        _routing = routingService,
-        _geo = geoApi,
-        _trips = tripApi,
-        _realtime = realtime;
+    required this.onSessionRefreshed,
+  }) : _location = locationService,
+       _places = placesService,
+       _routing = routingService,
+       _geo = geoApi,
+       _trips = tripApi,
+       _realtime = realtime,
+       _auth = authRepository;
 
   final LocationService _location;
   final PlacesService _places;
@@ -38,10 +42,13 @@ class DriverHomeViewModel extends ChangeNotifier {
   final GeoApi _geo;
   final TripApi _trips;
   final RealtimeClient _realtime;
+  final AuthRepository _auth;
   final SessionUser user;
+  final void Function(AuthSession session) onSessionRefreshed;
 
   DriverStage stage = DriverStage.home;
   bool online = false;
+  bool onlineBusy = false;
   bool hideEarnings = true;
   bool busy = false;
   String? errorMessage;
@@ -57,6 +64,7 @@ class DriverHomeViewModel extends ChangeNotifier {
 
   Timer? _inboxPoll;
   Timer? _pingTimer;
+  bool _inboxRefreshing = false;
   StreamSubscription<Position>? _gps;
   StreamSubscription<RealtimeMessage>? _ws;
 
@@ -90,11 +98,13 @@ class DriverHomeViewModel extends ChangeNotifier {
       _fix = position;
       driverPoint = LatLng(position.latitude, position.longitude);
       if (online || onTrip) {
-        unawaited(_geo.ping(
-          lat: position.latitude,
-          lng: position.longitude,
-          rideId: ride?.rideId,
-        ));
+        unawaited(
+          _geo.ping(
+            lat: position.latitude,
+            lng: position.longitude,
+            rideId: ride?.rideId,
+          ),
+        );
       }
       notifyListeners();
     });
@@ -102,42 +112,77 @@ class DriverHomeViewModel extends ChangeNotifier {
   }
 
   Future<void> toggleOnline(bool value) async {
-    final fix = _fix ?? await _location.currentPosition();
-    if (value && fix == null) {
-      errorMessage = 'Turn on location to go online.';
-      notifyListeners();
-      return;
-    }
-    final ok = await _geo.setOnline(
-      online: value,
-      lat: fix?.latitude,
-      lng: fix?.longitude,
-    );
-    if (!ok) {
-      errorMessage = 'Could not update online status.';
-      notifyListeners();
-      return;
-    }
+    if (onlineBusy || value == online) return;
+    final previous = online;
+    onlineBusy = true;
     online = value;
     errorMessage = null;
-    if (online) {
-      _inboxPoll?.cancel();
-      _inboxPoll = Timer.periodic(const Duration(seconds: 4), (_) {
-        unawaited(refreshInbox());
-      });
-      _pingTimer?.cancel();
-      _pingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-        final pos = _fix;
-        if (pos == null) return;
-        unawaited(_geo.ping(lat: pos.latitude, lng: pos.longitude));
-      });
-      await refreshInbox();
-    } else {
-      _inboxPoll?.cancel();
-      _pingTimer?.cancel();
-      offers = const [];
-    }
     notifyListeners();
+    try {
+      final fix = _fix ?? await _location.currentPosition();
+      if (value && fix == null) {
+        online = previous;
+        errorMessage = 'Turn on location to go online.';
+        return;
+      }
+      var error = await _geo.setOnline(
+        online: value,
+        lat: fix?.latitude,
+        lng: fix?.longitude,
+      );
+
+      // If verification required, try refreshing the token — documents may
+      // have been approved since the current JWT was issued.
+      if (error == 'verification_required' && value) {
+        final refreshed = await _auth.refreshSession();
+        if (refreshed != null) {
+          onSessionRefreshed(refreshed);
+          error = await _geo.setOnline(
+            online: value,
+            lat: fix?.latitude,
+            lng: fix?.longitude,
+          );
+        }
+      }
+
+      if (error != null) {
+        online = previous;
+        switch (error) {
+          case 'verification_required':
+            errorMessage = 'Your documents need admin approval.';
+            break;
+          case 'unauthorized':
+            errorMessage = 'Session expired. Please log in again.';
+            break;
+          default:
+            errorMessage = 'Could not update online status.';
+        }
+        notifyListeners();
+        return;
+      }
+      online = value;
+      errorMessage = null;
+      if (online) {
+        _inboxPoll?.cancel();
+        _inboxPoll = Timer.periodic(const Duration(seconds: 4), (_) {
+          unawaited(refreshInbox());
+        });
+        _pingTimer?.cancel();
+        _pingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+          final pos = _fix;
+          if (pos == null) return;
+          unawaited(_geo.ping(lat: pos.latitude, lng: pos.longitude));
+        });
+        unawaited(refreshInbox());
+      } else {
+        _inboxPoll?.cancel();
+        _pingTimer?.cancel();
+        offers = const [];
+      }
+    } finally {
+      onlineBusy = false;
+      notifyListeners();
+    }
   }
 
   void toggleEarningsHidden() {
@@ -146,36 +191,49 @@ class DriverHomeViewModel extends ChangeNotifier {
   }
 
   Future<void> refreshInbox() async {
-    if (!online || onTrip) return;
-    final next = await _trips.inbox();
-    for (final offer in next) {
-      if (offer.fromName.isEmpty) {
-        final place =
-            await _places.reverse(offer.from.latitude, offer.from.longitude);
-        offer.fromName = place.name;
+    if (!online || onTrip || _inboxRefreshing) return;
+    _inboxRefreshing = true;
+    try {
+      final next = await _trips.inbox();
+      for (final offer in next) {
+        if (offer.fromName.isEmpty) {
+          final place = await _places.reverse(
+            offer.from.latitude,
+            offer.from.longitude,
+          );
+          offer.fromName = place.name;
+        }
+        if (offer.toName.isEmpty) {
+          final place = await _places.reverse(
+            offer.to.latitude,
+            offer.to.longitude,
+          );
+          offer.toName = place.name;
+        }
+        if (offer.suggestedPrice <= 0) {
+          offer.suggestedPrice = _routing.suggestFare(
+            GeoPlace(
+              name: offer.fromName,
+              latitude: offer.from.latitude,
+              longitude: offer.from.longitude,
+            ),
+            GeoPlace(
+              name: offer.toName,
+              latitude: offer.to.latitude,
+              longitude: offer.to.longitude,
+            ),
+          );
+        }
       }
-      if (offer.toName.isEmpty) {
-        final place =
-            await _places.reverse(offer.to.latitude, offer.to.longitude);
-        offer.toName = place.name;
+      offers = next;
+    } catch (_) {
+      if (online && !onTrip) {
+        errorMessage = 'Could not load offers. We will keep trying.';
       }
-      if (offer.suggestedPrice <= 0) {
-        offer.suggestedPrice = _routing.suggestFare(
-          GeoPlace(
-            name: offer.fromName,
-            latitude: offer.from.latitude,
-            longitude: offer.from.longitude,
-          ),
-          GeoPlace(
-            name: offer.toName,
-            latitude: offer.to.latitude,
-            longitude: offer.to.longitude,
-          ),
-        );
-      }
+    } finally {
+      _inboxRefreshing = false;
+      notifyListeners();
     }
-    offers = next;
-    notifyListeners();
   }
 
   /// Pull-to-refresh: clear sticky errors and reload stats / offers / active ride.

@@ -71,7 +71,11 @@ class _SignInViewState extends ConsumerState<SignInView> {
     ref.read(appRoleProvider.notifier).state = session.user.role;
     if (!mounted) return;
     context.go(
-      session.needsProfile ? AppRoutes.signUpAccount : AppRoutes.home,
+      session.needsProfile
+          ? AppRoutes.signUpAccount
+          : (session.user.role.isDriver && !session.user.isVerified
+              ? AppRoutes.driverVerification
+              : AppRoutes.home),
     );
   }
 

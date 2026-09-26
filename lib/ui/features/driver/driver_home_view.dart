@@ -40,7 +40,11 @@ class DriverHomeViewState extends ConsumerState<DriverHomeView> {
       geoApi: ref.read(geoApiProvider),
       tripApi: ref.read(tripApiProvider),
       realtime: ref.read(realtimeClientProvider),
+      authRepository: ref.read(authRepositoryProvider),
       user: user,
+      onSessionRefreshed: (session) {
+        ref.read(authSessionProvider.notifier).setSession(session);
+      },
     )..addListener(_onVm);
     _vm!.bootstrap();
   }
@@ -52,7 +56,9 @@ class DriverHomeViewState extends ConsumerState<DriverHomeView> {
 
   @override
   void dispose() {
-    _vm?..removeListener(_onVm)..dispose();
+    _vm
+      ?..removeListener(_onVm)
+      ..dispose();
     super.dispose();
   }
 
@@ -95,164 +101,165 @@ class _DriverIdleHome extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
-            Row(
-              children: [
-                PassengerAvatar(user: user, radius: 28, token: session.token),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user.displayName,
-                        style: const TextStyle(
-                          color: RidonsColors.navy,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
+              Row(
+                children: [
+                  PassengerAvatar(user: user, radius: 28, token: session.token),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.displayName,
+                          style: const TextStyle(
+                            color: RidonsColors.navy,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Driver ID · ${user.driverIdLabel}',
-                        style: const TextStyle(
-                          color: RidonsColors.textSecondary,
-                          fontSize: 13,
+                        Text(
+                          'Driver ID · ${user.driverIdLabel}',
+                          style: const TextStyle(
+                            color: RidonsColors.textSecondary,
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
-                      if (stats.hasTierBadge)
-                        Row(
-                          children: [
-                            Icon(
-                              stats.tier == 'platinum'
-                                  ? Icons.workspace_premium_rounded
-                                  : Icons.star_rounded,
-                              color: RidonsColors.accent,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              stats.priorityDispatch
-                                  ? '${stats.tierLabel} · Priority dispatch'
-                                  : stats.tierLabel,
-                              style: const TextStyle(
+                        if (stats.hasTierBadge)
+                          Row(
+                            children: [
+                              Icon(
+                                stats.tier == 'platinum'
+                                    ? Icons.workspace_premium_rounded
+                                    : Icons.star_rounded,
                                 color: RidonsColors.accent,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
+                                size: 16,
                               ),
+                              const SizedBox(width: 4),
+                              Text(
+                                stats.priorityDispatch
+                                    ? '${stats.tierLabel} · Priority dispatch'
+                                    : stats.tierLabel,
+                                style: const TextStyle(
+                                  color: RidonsColors.accent,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      IconButton(
+                        onPressed: () {},
+                        icon: const Icon(Icons.notifications_none_rounded),
+                      ),
+                      if (badge > 0)
+                        const Positioned(
+                          right: 10,
+                          top: 10,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: RidonsColors.primary,
+                              shape: BoxShape.circle,
                             ),
-                          ],
+                            child: SizedBox(width: 8, height: 8),
+                          ),
                         ),
                     ],
                   ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _EarningsCard(
+                stats: stats,
+                hidden: viewModel.hideEarnings,
+                online: viewModel.online,
+                onlineBusy: viewModel.onlineBusy,
+                onToggleHidden: viewModel.toggleEarningsHidden,
+                onToggleOnline: viewModel.toggleOnline,
+              ),
+              if (viewModel.quests.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                const Text(
+                  'Quests',
+                  style: TextStyle(
+                    color: RidonsColors.navy,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.notifications_none_rounded),
-                    ),
-                    if (badge > 0)
-                      const Positioned(
-                        right: 10,
-                        top: 10,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: RidonsColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: SizedBox(width: 8, height: 8),
-                        ),
-                      ),
-                  ],
+                const SizedBox(height: 10),
+                for (final quest in viewModel.quests) ...[
+                  _QuestCard(quest: quest),
+                  const SizedBox(height: 10),
+                ],
+              ],
+              if (viewModel.errorMessage != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  viewModel.errorMessage!,
+                  style: const TextStyle(color: RidonsColors.primary),
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            _EarningsCard(
-              stats: stats,
-              hidden: viewModel.hideEarnings,
-              online: viewModel.online,
-              onToggleHidden: viewModel.toggleEarningsHidden,
-              onToggleOnline: viewModel.toggleOnline,
-            ),
-            if (viewModel.quests.isNotEmpty) ...[
-              const SizedBox(height: 18),
+              const SizedBox(height: 22),
               const Text(
-                'Quests',
+                'Available offers',
                 style: TextStyle(
                   color: RidonsColors.navy,
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 10),
-              for (final quest in viewModel.quests) ...[
-                _QuestCard(quest: quest),
-                const SizedBox(height: 10),
-              ],
-            ],
-            if (viewModel.errorMessage != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                viewModel.errorMessage!,
-                style: const TextStyle(color: RidonsColors.primary),
-              ),
-            ],
-            const SizedBox(height: 22),
-            const Text(
-              'Available offers',
-              style: TextStyle(
-                color: RidonsColors.navy,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (!viewModel.online)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Text(
-                  'Go online to receive passenger offers.',
-                  style: TextStyle(color: RidonsColors.textSecondary),
-                ),
-              )
-            else if (viewModel.offers.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Column(
-                  children: [
-                    const Text(
-                      'No offers nearby yet.',
-                      style: TextStyle(color: RidonsColors.textSecondary),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      stats.priorityDispatch
-                          ? 'Gold and Platinum riders see new offers first.'
-                          : 'Keep rating high to see offers before nearby riders.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: RidonsColors.textSecondary,
-                        fontSize: 13,
+              const SizedBox(height: 12),
+              if (!viewModel.online)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    'Go online to receive passenger offers.',
+                    style: TextStyle(color: RidonsColors.textSecondary),
+                  ),
+                )
+              else if (viewModel.offers.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'No offers nearby yet.',
+                        style: TextStyle(color: RidonsColors.textSecondary),
                       ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              for (final offer in viewModel.offers) ...[
-                _OfferCard(
-                  offer: offer,
-                  fare: viewModel.fareFor(offer),
-                  busy: viewModel.busy,
-                  onAdjust: (delta) => viewModel.adjustFare(offer, delta),
-                  onSkip: () => viewModel.skip(offer),
-                  onAccept: () => viewModel.accept(offer),
-                ),
-                const SizedBox(height: 12),
-              ],
-          ],
-        ),
+                      const SizedBox(height: 6),
+                      Text(
+                        stats.priorityDispatch
+                            ? 'Gold and Platinum riders see new offers first.'
+                            : 'Keep rating high to see offers before nearby riders.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: RidonsColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                for (final offer in viewModel.offers) ...[
+                  _OfferCard(
+                    offer: offer,
+                    fare: viewModel.fareFor(offer),
+                    busy: viewModel.busy,
+                    onAdjust: (delta) => viewModel.adjustFare(offer, delta),
+                    onSkip: () => viewModel.skip(offer),
+                    onAccept: () => viewModel.accept(offer),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+            ],
+          ),
         ),
       ),
     );
@@ -264,6 +271,7 @@ class _EarningsCard extends StatelessWidget {
     required this.stats,
     required this.hidden,
     required this.online,
+    required this.onlineBusy,
     required this.onToggleHidden,
     required this.onToggleOnline,
   });
@@ -271,6 +279,7 @@ class _EarningsCard extends StatelessWidget {
   final DriverStats stats;
   final bool hidden;
   final bool online;
+  final bool onlineBusy;
   final VoidCallback onToggleHidden;
   final ValueChanged<bool> onToggleOnline;
 
@@ -278,98 +287,120 @@ class _EarningsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF7A1014), RidonsColors.primaryDark, Color(0xFF4A0A0C)],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF8D1D2D), Color(0xFF5D1C2A), Color(0xFF241A2B)],
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Text(
-                'RWF Earned',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              IconButton(
-                onPressed: onToggleHidden,
-                icon: Icon(
-                  hidden ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                  color: Colors.white70,
-                  size: 18,
-                ),
-              ),
-              const Spacer(),
-              const Text(
-                'Online',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-              ),
-              Switch(
-                value: online,
-                onChanged: onToggleOnline,
-                activeThumbColor: Colors.white,
-                activeTrackColor: RidonsColors.primary,
-              ),
-            ],
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              hidden ? '**********' : '${_money.format(stats.total)} RWF',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (stats.goalDaily > 0) ...[
-            Row(
+        child: CustomPaint(
+          foregroundPainter: const _EarningsPatternPainter(),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
+            child: Column(
               children: [
-                const Text(
-                  'Today’s goal',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.start,
+                  runSpacing: 16,
+                  children: [
+                    SizedBox(
+                      width: 160,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'RWF Earned',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  height: 1.1,
+                                ),
+                              ),
+                              const SizedBox(width: 9),
+                              Semantics(
+                                button: true,
+                                label: hidden
+                                    ? 'Show earnings'
+                                    : 'Hide earnings',
+                                child: GestureDetector(
+                                  onTap: onToggleHidden,
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(2),
+                                    child: Icon(
+                                      hidden
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined,
+                                      color: Colors.white,
+                                      size: 26,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            hidden ? '********' : _money.format(stats.total),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 27,
+                              height: 1,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          'Online',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 9),
+                        _OnlineToggle(
+                          value: online,
+                          busy: onlineBusy,
+                          onChanged: onToggleOnline,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const Spacer(),
-                Text(
-                  hidden
-                      ? '—'
-                      : '${_money.format(stats.todayEarnings)} / ${_money.format(stats.goalDaily)}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
+                const SizedBox(height: 21),
+                Container(height: 2, color: Colors.white24),
+                const SizedBox(height: 23),
+                Row(
+                  children: [
+                    _Stat(
+                      'Rating',
+                      stats.avgRating == 0
+                          ? '—'
+                          : stats.avgRating.toStringAsFixed(1),
+                    ),
+                    _Stat('Trips', '${stats.trips}'),
+                    _Stat('Accept', '${stats.acceptanceRate}%'),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(99),
-              child: LinearProgressIndicator(
-                value: stats.goalFraction,
-                minHeight: 6,
-                backgroundColor: Colors.white24,
-                color: RidonsColors.accent,
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-          Row(
-            children: [
-              _Stat('Rating', stats.avgRating == 0 ? '—' : stats.avgRating.toStringAsFixed(1)),
-              _Stat('Trips', '${stats.trips}'),
-              _Stat('Accept', '${stats.acceptanceRate}%'),
-            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -384,22 +415,162 @@ class _Stat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Column(
+      child: Row(
         children: [
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
+          if (label != 'Rating') const _StatDivider(),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: label == 'Rating' ? 0 : 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                      height: 1.05,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      height: 1,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 1,
+      height: 53,
+      child: CustomPaint(painter: _DottedLinePainter()),
+    );
+  }
+}
+
+class _OnlineToggle extends StatelessWidget {
+  const _OnlineToggle({
+    required this.value,
+    required this.busy,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final bool busy;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      toggled: value,
+      label: busy ? 'Updating online status' : (value ? 'Online' : 'Offline'),
+      child: GestureDetector(
+        onTap: busy ? null : () => onChanged(!value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          width: 66,
+          height: 36,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: value ? RidonsColors.primary : Colors.white24,
+            borderRadius: BorderRadius.circular(99),
+          ),
+          child: busy
+              ? const Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                )
+              : Align(
+                  alignment: value
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EarningsPatternPainter extends CustomPainter {
+  const _EarningsPatternPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.035)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    for (var x = -size.height; x < size.width + size.height; x += 92) {
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x + size.height, size.height),
+        paint,
+      );
+      canvas.drawLine(
+        Offset(x + 46, 0),
+        Offset(x - size.height + 46, size.height),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _EarningsPatternPainter oldDelegate) => false;
+}
+
+class _DottedLinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.7)
+      ..strokeWidth = 1;
+    for (var y = 0.0; y < size.height; y += 5) {
+      canvas.drawLine(Offset(0, y), Offset(0, y + 2.5), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DottedLinePainter oldDelegate) => false;
 }
 
 class _QuestCard extends StatelessWidget {
@@ -535,6 +706,8 @@ class _OfferCard extends StatelessWidget {
                     children: [
                       Text(
                         offer.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: RidonsColors.navy,
                           fontWeight: FontWeight.w800,
@@ -543,6 +716,8 @@ class _OfferCard extends StatelessWidget {
                       ),
                       Text(
                         '${offer.passengerIdLabel}  ${offer.passengerPhone}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: RidonsColors.textSecondary,
                           fontSize: 12,
@@ -551,11 +726,16 @@ class _OfferCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Text(
-                  offer.timerLabel,
-                  style: const TextStyle(
-                    color: RidonsColors.primary,
-                    fontWeight: FontWeight.w800,
+                Flexible(
+                  child: Text(
+                    offer.timerLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      color: RidonsColors.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ],
@@ -584,12 +764,17 @@ class _OfferCard extends StatelessWidget {
                   ),
                 ],
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
-                  child: _PriceCol('Passenger offer', '${_money.format(offer.offeredPrice)} Rwf'),
+                  child: _PriceCol(
+                    'Passenger offer',
+                    '${_money.format(offer.offeredPrice)} Rwf',
+                  ),
                 ),
                 Expanded(
                   child: _PriceCol(
@@ -651,16 +836,28 @@ class _PriceCol extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment:
-          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: alignEnd
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: RidonsColors.textSecondary, fontSize: 12)),
         Text(
-          value,
+          label,
           style: const TextStyle(
-            color: RidonsColors.navy,
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
+            color: RidonsColors.textSecondary,
+            fontSize: 12,
+          ),
+        ),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: alignEnd ? Alignment.centerRight : Alignment.centerLeft,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: const TextStyle(
+              color: RidonsColors.navy,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+            ),
           ),
         ),
       ],
