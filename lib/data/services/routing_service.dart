@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../domain/models/geo_place.dart';
+import '../../domain/models/fare_policy.dart';
 
 /// Road geometry + metrics from OSRM (OpenStreetMap).
 ///
@@ -177,7 +178,10 @@ class RoutingService {
   /// Suggested offer from **road** km when available.
   int suggestFareFromKm(double distanceKm) {
     final raw = 1500 + distanceKm * 120;
-    return ((raw / 50).round() * 50).clamp(800, 50000).toInt();
+    return FarePolicy.normalize(
+      raw.round(),
+      minimum: FarePolicy.suggestedMinRwf,
+    );
   }
 
   /// Sync suggest using haversine — prefer [suggestFareFromKm] after route().
@@ -407,7 +411,10 @@ class RouteResult {
 
   int get suggestedFare {
     final raw = 1500 + distanceKm * 120;
-    return ((raw / 50).round() * 50).clamp(800, 50000).toInt();
+    return FarePolicy.normalize(
+      raw.round(),
+      minimum: FarePolicy.suggestedMinRwf,
+    );
   }
 
   LatLng? get midpoint => RoutingService.midpointAlong(points);

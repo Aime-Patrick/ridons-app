@@ -13,6 +13,7 @@ import '../../../../data/services/routing_service.dart';
 import '../../../../data/services/trip_api.dart';
 import '../../../../data/services/support_api.dart';
 import '../../../../domain/models/geo_place.dart';
+import '../../../../domain/models/fare_policy.dart';
 import '../../../../domain/models/live_driver.dart';
 import '../../../../domain/models/ride_bid.dart';
 import '../../../../domain/models/ride_stage.dart';
@@ -744,7 +745,7 @@ class HomeMapViewModel extends ChangeNotifier {
 
   void adjustPrice(int delta) {
     if (stage != RideStage.estimate) return;
-    offeredPrice = (offeredPrice + delta).clamp(500, 50000);
+    offeredPrice = FarePolicy.normalize(offeredPrice + delta);
     notifyListeners();
   }
 

@@ -12,6 +12,7 @@ import '../../../../data/services/realtime_client.dart';
 import '../../../../data/services/routing_service.dart';
 import '../../../../data/services/trip_api.dart';
 import '../../../../domain/models/geo_place.dart';
+import '../../../../domain/models/fare_policy.dart';
 import '../../../../domain/models/ride_offer.dart';
 import '../../../../domain/models/session_user.dart';
 
@@ -77,7 +78,9 @@ class DriverHomeViewModel extends ChangeNotifier {
   }
 
   int fareFor(RideOffer offer) =>
-      localFares[offer.requestId] ?? offer.offeredPrice;
+      FarePolicy.normalize(
+        localFares[offer.requestId] ?? offer.offeredPrice,
+      );
 
   Future<void> bootstrap() async {
     await _location.ensureLocationPermission();
@@ -293,7 +296,7 @@ class DriverHomeViewModel extends ChangeNotifier {
 
   void adjustFare(RideOffer offer, int delta) {
     final current = fareFor(offer);
-    localFares[offer.requestId] = (current + delta).clamp(500, 50000);
+    localFares[offer.requestId] = FarePolicy.normalize(current + delta);
     notifyListeners();
   }
 

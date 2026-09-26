@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../domain/models/geo_place.dart';
+import '../../domain/models/fare_policy.dart';
 import '../../domain/models/ride_bid.dart';
 import '../../domain/models/ride_offer.dart';
 import 'api_client.dart';
@@ -38,8 +39,11 @@ class TripApi {
         'fromName': pickup.name,
         'toName': dropoff.name,
         'passengerName': passengerName,
-        'offeredPrice': offeredPrice,
-        'suggestedPrice': suggestedPrice,
+        'offeredPrice': FarePolicy.normalize(offeredPrice),
+        'suggestedPrice': FarePolicy.normalize(
+          suggestedPrice,
+          minimum: FarePolicy.suggestedMinRwf,
+        ),
         'paymentMethod': paymentMethod.toLowerCase(),
         'vehicleType': 'bike',
         'offerTtlSec': offerTtlSec,
@@ -94,7 +98,7 @@ class TripApi {
   Future<void> counter(String requestId, int price) async {
     await _api.dio.post<Map<String, dynamic>>(
       '/driver/requests/$requestId/counter',
-      data: {'price': price},
+      data: {'price': FarePolicy.normalize(price)},
     );
   }
 

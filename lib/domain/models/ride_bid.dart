@@ -1,3 +1,5 @@
+import 'fare_policy.dart';
+
 class RideBid {
   const RideBid({
     required this.bidId,
@@ -43,7 +45,7 @@ class RideBid {
       bidId: '${json['bidId'] ?? json['id'] ?? ''}',
       requestId: '${json['requestId'] ?? requestId ?? ''}',
       driverId: '${json['driverId'] ?? ''}',
-      price: (json['price'] as num?)?.toInt() ?? 0,
+      price: FarePolicy.normalize((json['price'] as num?)?.toInt() ?? 0),
       isCounter: json['isCounter'] as bool? ?? true,
       etaMin: (json['etaMin'] as num?)?.toInt() ?? 0,
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0,
