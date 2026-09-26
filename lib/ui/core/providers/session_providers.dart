@@ -5,6 +5,7 @@ import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/api_client.dart';
 import '../../../data/services/geo_api.dart';
 import '../../../data/services/driver_documents_service.dart';
+import '../../../data/services/notification_api.dart';
 import '../../../data/services/prefs_store.dart';
 import '../../../data/services/realtime_client.dart';
 import '../../../data/services/token_store.dart';
@@ -14,6 +15,7 @@ import '../../../domain/models/app_role.dart';
 import '../../../domain/models/session_user.dart';
 import '../../features/auth/view_models/auth_view_model.dart';
 import '../../features/account/view_models/driver_documents_view_model.dart';
+import '../../features/notifications/view_models/notification_center_view_model.dart';
 import '../../../data/repositories/driver_documents_repository.dart';
 import 'app_role_provider.dart';
 
@@ -39,7 +41,13 @@ final supportApiProvider = Provider<SupportApi>((ref) {
   return SupportApi(ref.watch(apiClientProvider));
 });
 
-final driverDocumentsRepositoryProvider = Provider<DriverDocumentsRepository>((ref) {
+final notificationApiProvider = Provider<NotificationApi>((ref) {
+  return NotificationApi(ref.watch(apiClientProvider));
+});
+
+final driverDocumentsRepositoryProvider = Provider<DriverDocumentsRepository>((
+  ref,
+) {
   return DriverDocumentsRepository(
     DriverDocumentsService(ref.watch(apiClientProvider)),
   );
@@ -47,10 +55,10 @@ final driverDocumentsRepositoryProvider = Provider<DriverDocumentsRepository>((r
 
 final driverDocumentsViewModelProvider =
     ChangeNotifierProvider<DriverDocumentsViewModel>((ref) {
-  return DriverDocumentsViewModel(
-    ref.watch(driverDocumentsRepositoryProvider),
-  );
-});
+      return DriverDocumentsViewModel(
+        ref.watch(driverDocumentsRepositoryProvider),
+      );
+    });
 
 final realtimeClientProvider = Provider<RealtimeClient>((ref) {
   final client = RealtimeClient(
@@ -70,8 +78,8 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 final authSessionProvider =
     AsyncNotifierProvider<AuthSessionNotifier, AuthSession?>(
-  AuthSessionNotifier.new,
-);
+      AuthSessionNotifier.new,
+    );
 
 class AuthSessionNotifier extends AsyncNotifier<AuthSession?> {
   @override
@@ -97,8 +105,10 @@ class AuthSessionNotifier extends AsyncNotifier<AuthSession?> {
     final current = state.asData?.value;
     if (current == null) return;
     try {
-      final response =
-          await ref.read(apiClientProvider).dio.get<Map<String, dynamic>>('/me');
+      final response = await ref
+          .read(apiClientProvider)
+          .dio
+          .get<Map<String, dynamic>>('/me');
       final userMap =
           (response.data?['user'] as Map<String, dynamic>?) ?? const {};
       final session = AuthSession(
@@ -130,6 +140,13 @@ final authViewModelProvider = ChangeNotifierProvider<AuthViewModel>((ref) {
   return AuthViewModel(authRepository: ref.watch(authRepositoryProvider));
 });
 
-final notificationBadgeProvider = FutureProvider<int>((ref) {
-  return ref.watch(prefsStoreProvider).notificationBadge();
-});
+final notificationCenterProvider =
+    ChangeNotifierProvider<NotificationCenterViewModel>((ref) {
+      final session = ref.watch(authSessionProvider).asData?.value;
+      final viewModel = NotificationCenterViewModel(
+        api: ref.watch(notificationApiProvider),
+        realtime: ref.watch(realtimeClientProvider),
+        userId: session?.user.id ?? '',
+      );
+      return viewModel;
+    });

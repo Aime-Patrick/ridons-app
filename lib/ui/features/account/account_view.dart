@@ -15,20 +15,19 @@ class AccountView extends ConsumerWidget {
   const AccountView({super.key});
 
   void _open(BuildContext context, Widget page) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => page),
-    );
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(authSessionProvider).asData?.value;
     final user = session?.user;
-    final name = user?.displayName ?? (user?.role.isDriver == true ? 'Driver' : 'Passenger');
+    final name =
+        user?.displayName ??
+        (user?.role.isDriver == true ? 'Driver' : 'Passenger');
     final idLabel = user == null
         ? 'Passenger ID · PAX-0000'
         : user.roleIdCaption;
-    final badge = ref.watch(notificationBadgeProvider).asData?.value ?? 0;
 
     return ColoredBox(
       color: context.ridonsPage,
@@ -38,166 +37,162 @@ class AccountView extends ConsumerWidget {
           color: RidonsColors.primary,
           onRefresh: () async {
             await ref.read(authSessionProvider.notifier).refreshProfile();
-            ref.invalidate(notificationBadgeProvider);
           },
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
-            Text(
-              'Account',
-              style: TextStyle(
-                color: context.ridonsInk,
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: TextStyle(
-                          color: context.ridonsInk,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        idLabel,
-                        style: TextStyle(
-                          color: context.ridonsMuted,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
+              Text(
+                'Account',
+                style: TextStyle(
+                  color: context.ridonsInk,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
                 ),
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    PassengerAvatar(
-                      user: user,
-                      radius: 32,
-                      token: session?.token,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            color: context.ridonsInk,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          idLabel,
+                          style: TextStyle(
+                            color: context.ridonsMuted,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
-                    Positioned(
-                      right: -2,
-                      bottom: -2,
-                      child: Material(
-                        color: context.ridonsSheet,
-                        shape: const CircleBorder(),
-                        elevation: 2,
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: () => showProfilePhotoSheet(context, ref),
-                          child: Padding(
-                            padding: const EdgeInsets.all(6),
-                            child: Icon(
-                              Icons.photo_camera_outlined,
-                              size: 16,
-                              color: context.ridonsInk,
+                  ),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      PassengerAvatar(
+                        user: user,
+                        radius: 32,
+                        token: session?.token,
+                      ),
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Material(
+                          color: context.ridonsSheet,
+                          shape: const CircleBorder(),
+                          elevation: 2,
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () => showProfilePhotoSheet(context, ref),
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: Icon(
+                                Icons.photo_camera_outlined,
+                                size: 16,
+                                color: context.ridonsInk,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _OutlineTile(
-              icon: Icons.person_outline_rounded,
-              label: 'Profile',
-              onTap: () => _open(context, const ProfileSettingsView()),
-            ),
-            const SizedBox(height: 10),
-            _OutlineTile(
-              icon: Icons.notifications_none_rounded,
-              label: 'Notifications',
-              badge: badge == 0 ? null : badge,
-              showDot: badge > 0,
-              showChevron: false,
-              onTap: () => _open(context, const NotificationsSettingsView()),
-            ),
-            const SizedBox(height: 10),
-            _OutlineTile(
-              icon: Icons.language_rounded,
-              label: 'Language',
-              onTap: () => _open(context, const LanguageSettingsView()),
-            ),
-            const SizedBox(height: 10),
-            _OutlineTile(
-              icon: Icons.dark_mode_outlined,
-              label: 'Appearance',
-              subtitle: switch (
-                  ref.watch(themeModeProvider).asData?.value ??
-                      ThemeMode.system) {
-                ThemeMode.light => 'Light',
-                ThemeMode.dark => 'Dark',
-                ThemeMode.system => 'System',
-              },
-              onTap: () => _open(context, const AppearanceSettingsView()),
-            ),
-            const SizedBox(height: 10),
-            _OutlineTile(
-              icon: Icons.lock_outline_rounded,
-              label: 'Privacy & security',
-              onTap: () => _open(context, const PrivacySettingsView()),
-            ),
-            const SizedBox(height: 10),
-            _OutlineTile(
-              icon: Icons.info_outline_rounded,
-              label: 'About Ridons',
-              onTap: () => _open(context, const AboutRidonsView()),
-            ),
-            const SizedBox(height: 18),
-            _OutlineTile(
-              icon: Icons.health_and_safety_outlined,
-              label: 'Safety toolkit',
-              subtitle: 'SOS · Trip share · Contacts',
-              onTap: () => _open(context, const SafetyToolkitView()),
-            ),
-            const SizedBox(height: 10),
-            _OutlineTile(
-              icon: Icons.help_outline_rounded,
-              label: 'Help center',
-              onTap: () => _open(context, const HelpCenterView()),
-            ),
-            const SizedBox(height: 10),
-            _OutlineTile(
-              icon: Icons.headset_mic_outlined,
-              label: 'Contact support',
-              onTap: () => _open(context, const ContactSupportView()),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () async {
-                  await ref.read(authSessionProvider.notifier).clear();
-                  if (!context.mounted) return;
-                  context.go(AppRoutes.onboarding);
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _OutlineTile(
+                icon: Icons.person_outline_rounded,
+                label: 'Profile',
+                onTap: () => _open(context, const ProfileSettingsView()),
+              ),
+              const SizedBox(height: 10),
+              _OutlineTile(
+                icon: Icons.notifications_none_rounded,
+                label: 'Notification settings',
+                showChevron: false,
+                onTap: () => _open(context, const NotificationsSettingsView()),
+              ),
+              const SizedBox(height: 10),
+              _OutlineTile(
+                icon: Icons.language_rounded,
+                label: 'Language',
+                onTap: () => _open(context, const LanguageSettingsView()),
+              ),
+              const SizedBox(height: 10),
+              _OutlineTile(
+                icon: Icons.dark_mode_outlined,
+                label: 'Appearance',
+                subtitle: switch (ref.watch(themeModeProvider).asData?.value ??
+                    ThemeMode.system) {
+                  ThemeMode.light => 'Light',
+                  ThemeMode.dark => 'Dark',
+                  ThemeMode.system => 'System',
                 },
-                icon: const Icon(Icons.logout_rounded, size: 18),
-                label: const Text('Sign out'),
-                style: TextButton.styleFrom(
-                  foregroundColor: RidonsColors.primary,
-                  textStyle: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
+                onTap: () => _open(context, const AppearanceSettingsView()),
+              ),
+              const SizedBox(height: 10),
+              _OutlineTile(
+                icon: Icons.lock_outline_rounded,
+                label: 'Privacy & security',
+                onTap: () => _open(context, const PrivacySettingsView()),
+              ),
+              const SizedBox(height: 10),
+              _OutlineTile(
+                icon: Icons.info_outline_rounded,
+                label: 'About Ridons',
+                onTap: () => _open(context, const AboutRidonsView()),
+              ),
+              const SizedBox(height: 18),
+              _OutlineTile(
+                icon: Icons.health_and_safety_outlined,
+                label: 'Safety toolkit',
+                subtitle: 'SOS · Trip share · Contacts',
+                onTap: () => _open(context, const SafetyToolkitView()),
+              ),
+              const SizedBox(height: 10),
+              _OutlineTile(
+                icon: Icons.help_outline_rounded,
+                label: 'Help center',
+                onTap: () => _open(context, const HelpCenterView()),
+              ),
+              const SizedBox(height: 10),
+              _OutlineTile(
+                icon: Icons.headset_mic_outlined,
+                label: 'Contact support',
+                onTap: () => _open(context, const ContactSupportView()),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await ref.read(authSessionProvider.notifier).clear();
+                    if (!context.mounted) return;
+                    context.go(AppRoutes.onboarding);
+                  },
+                  icon: const Icon(Icons.logout_rounded, size: 18),
+                  label: const Text('Sign out'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: RidonsColors.primary,
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -299,10 +294,7 @@ class _OutlineTile extends StatelessWidget {
                   ),
                 )
               else if (showChevron)
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: context.ridonsInk,
-                ),
+                Icon(Icons.chevron_right_rounded, color: context.ridonsInk),
             ],
           ),
         ),

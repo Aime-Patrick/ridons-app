@@ -9,7 +9,6 @@ class PrefsStore {
   static const _notifRides = 'ridons.notif.rides';
   static const _notifOffers = 'ridons.notif.offers';
   static const _notifSafety = 'ridons.notif.safety';
-  static const _notifBadge = 'ridons.notif.badge';
   static const _emergency = 'ridons.emergency.contacts';
   static const _themeMode = 'ridons.themeMode';
 
@@ -68,16 +67,6 @@ class PrefsStore {
     await prefs.setBool(_notifSafety, value);
   }
 
-  Future<int> notificationBadge() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_notifBadge) ?? 2;
-  }
-
-  Future<void> clearNotificationBadge() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_notifBadge, 0);
-  }
-
   Future<List<String>> emergencyContacts() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList(_emergency) ?? const [];
@@ -99,13 +88,10 @@ class PrefsStore {
 
   Future<void> setThemeMode(ThemeMode mode) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _themeMode,
-      switch (mode) {
-        ThemeMode.light => 'light',
-        ThemeMode.dark => 'dark',
-        ThemeMode.system => 'system',
-      },
-    );
+    await prefs.setString(_themeMode, switch (mode) {
+      ThemeMode.light => 'light',
+      ThemeMode.dark => 'dark',
+      ThemeMode.system => 'system',
+    });
   }
 }

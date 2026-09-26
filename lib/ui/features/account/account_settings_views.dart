@@ -38,9 +38,8 @@ class AccountSubpage extends StatelessWidget {
                   ? RidonsBackHeader(title: title)
                   : Text(
                       title,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
             ),
             Expanded(child: child),
@@ -157,14 +156,12 @@ class _ProfileSettingsViewState extends ConsumerState<ProfileSettingsView> {
             textInputAction: TextInputAction.done,
           ),
           const SizedBox(height: 12),
-          RidonsTextField(
-            label: 'Phone',
-            hint: phone,
-            enabled: false,
-          ),
+          RidonsTextField(label: 'Phone', hint: phone, enabled: false),
           const SizedBox(height: 12),
           _InfoCard(
-            label: session?.user.role.isDriver == true ? 'Driver ID' : 'Passenger ID',
+            label: session?.user.role.isDriver == true
+                ? 'Driver ID'
+                : 'Passenger ID',
             value: session?.user.publicIdLabel ?? 'PAX-0000',
           ),
           const SizedBox(height: 24),
@@ -206,8 +203,6 @@ class _NotificationsSettingsViewState
     final rides = await _prefs.rideNotifications();
     final offers = await _prefs.offerNotifications();
     final safety = await _prefs.safetyNotifications();
-    await _prefs.clearNotificationBadge();
-    ref.invalidate(notificationBadgeProvider);
     if (!mounted) return;
     setState(() {
       _rides = rides;
@@ -435,10 +430,7 @@ class PrivacySettingsView extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
-          _InfoCard(
-            label: 'Phone number',
-            value: user?.phone ?? '—',
-          ),
+          _InfoCard(label: 'Phone number', value: user?.phone ?? '—'),
           const SizedBox(height: 10),
           _InfoCard(
             label: user?.role.isDriver == true ? 'Driver ID' : 'Passenger ID',
@@ -478,10 +470,7 @@ class AboutRidonsView extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'Set your price, ride smart. Ridons connects passengers and moto drivers in Kigali with a negotiated fare — not a take-it-or-leave-it meter.',
-            style: TextStyle(
-              color: context.ridonsMuted,
-              height: 1.45,
-            ),
+            style: TextStyle(color: context.ridonsMuted, height: 1.45),
           ),
         ],
       ),
@@ -598,7 +587,9 @@ class _SafetyToolkitViewState extends ConsumerState<SafetyToolkitView> {
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () async {
                     final next = [..._contacts]..remove(contact);
-                    await ref.read(prefsStoreProvider).setEmergencyContacts(next);
+                    await ref
+                        .read(prefsStoreProvider)
+                        .setEmergencyContacts(next);
                     setState(() => _contacts = next);
                   },
                 ),
@@ -623,15 +614,15 @@ class HelpCenterView extends StatelessWidget {
     const faqs = [
       (
         'How do I set my fare?',
-        'On Home, choose pickup and dropoff, then Continue. Adjust the offer before you send it to drivers.'
+        'On Home, choose pickup and dropoff, then Continue. Adjust the offer before you send it to drivers.',
       ),
       (
         'How do I pay?',
-        'Pay the driver in cash or Mobile Money, then confirm “I’ve paid” in the app.'
+        'Pay the driver in cash or Mobile Money, then confirm “I’ve paid” in the app.',
       ),
       (
         'How do I rebook?',
-        'Open Activities and tap Rebook. Ridons loads the same trip the other way around.'
+        'Open Activities and tap Rebook. Ridons loads the same trip the other way around.',
       ),
     ];
     return AccountSubpage(
@@ -657,10 +648,7 @@ class HelpCenterView extends StatelessWidget {
                   children: [
                     Text(
                       faq.$2,
-                      style: TextStyle(
-                        color: context.ridonsMuted,
-                        height: 1.4,
-                      ),
+                      style: TextStyle(color: context.ridonsMuted, height: 1.4),
                     ),
                   ],
                 ),
@@ -689,11 +677,13 @@ class ContactSupportView extends StatelessWidget {
               leading: Icon(Icons.mail_outline, color: context.ridonsInk),
               title: const Text('Email'),
               subtitle: const Text('support@ridons.app'),
-              onTap: () => _launch(Uri(
-                scheme: 'mailto',
-                path: 'support@ridons.app',
-                query: 'subject=Ridons support',
-              )),
+              onTap: () => _launch(
+                Uri(
+                  scheme: 'mailto',
+                  path: 'support@ridons.app',
+                  query: 'subject=Ridons support',
+                ),
+              ),
             ),
           ),
           Material(
@@ -771,10 +761,7 @@ class _InfoCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: TextStyle(
-              color: context.ridonsMuted,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: context.ridonsMuted, fontSize: 12),
           ),
           const SizedBox(height: 4),
           Text(

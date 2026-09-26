@@ -13,7 +13,9 @@ import '../../../domain/models/geo_place.dart';
 import '../../../domain/models/ride_stage.dart';
 import '../../../domain/models/session_user.dart';
 import '../account/passenger_avatar.dart';
+import '../notifications/notification_inbox_view.dart';
 import '../../core/widgets/map_marker_info_sheet.dart';
+import '../../core/widgets/ridons_notification_bell.dart';
 import 'view_models/home_map_view_model.dart';
 import 'widgets/ride_flow_panels.dart';
 
@@ -136,8 +138,8 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
   double get _sheetInitialSize {
     return switch (_viewModel.stage) {
       RideStage.pickOnMap => 0.28,
-      RideStage.route || RideStage.preview =>
-        _viewModel.dropoff == null ? 0.24 : 0.34,
+      RideStage.route ||
+      RideStage.preview => _viewModel.dropoff == null ? 0.24 : 0.34,
       RideStage.estimate => 0.40,
       RideStage.offering => 0.38,
       RideStage.matched => 0.52,
@@ -162,11 +164,10 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
       return;
     }
     final target = _sheetInitialSize.clamp(_sheetMinSize, _sheetMaxSize);
-    final tooFar = _sheetController.isAttached &&
+    final tooFar =
+        _sheetController.isAttached &&
         (_sheetController.size - target).abs() > 0.03;
-    if (_sheetStage == stage &&
-        _sheetHasDropoff == hasDropoff &&
-        !tooFar) {
+    if (_sheetStage == stage && _sheetHasDropoff == hasDropoff && !tooFar) {
       return;
     }
     _sheetStage = stage;
@@ -196,8 +197,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
     if (!_sheetController.isAttached) return;
     final size = _sheetController.size;
     final collapsed = size <= _sheetMinSize + 0.06;
-    if (collapsed == _sheetCollapsed &&
-        (size - _sheetFraction).abs() < 0.005) {
+    if (collapsed == _sheetCollapsed && (size - _sheetFraction).abs() < 0.005) {
       return;
     }
     // Defer — controller can notify while DraggableScrollableSheet updates.
@@ -224,15 +224,16 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
         final searching = _viewModel.stage == RideStage.search;
         final success = _viewModel.stage == RideStage.success;
         final askingLocation = _viewModel.locationPromptNeeded;
-        final showRideSheet = _viewModel.bootstrapped &&
+        final showRideSheet =
+            _viewModel.bootstrapped &&
             !askingLocation &&
             !searching &&
             !success;
-        final showDestinationChip = _sheetCollapsed &&
+        final showDestinationChip =
+            _sheetCollapsed &&
             showRideSheet &&
             _viewModel.dropoffLabel.isNotEmpty;
-        final sheetFraction =
-            showRideSheet ? _sheetFraction : 0.0;
+        final sheetFraction = showRideSheet ? _sheetFraction : 0.0;
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -256,6 +257,27 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
               child: RouteHeaderChip(
                 viewModel: _viewModel,
                 visible: showDestinationChip,
+              ),
+            ),
+            Positioned(
+              top:
+                  MediaQuery.paddingOf(context).top +
+                  (showDestinationChip ? 64 : 8),
+              right: 12,
+              child: Material(
+                color: context.ridonsSheet,
+                elevation: 4,
+                shape: const CircleBorder(),
+                child: RidonsNotificationBell(
+                  unreadCount: ref
+                      .watch(notificationCenterProvider)
+                      .unreadCount,
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NotificationInboxView(),
+                    ),
+                  ),
+                ),
               ),
             ),
             if (showRideSheet)
@@ -282,12 +304,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
                       child: SingleChildScrollView(
                         controller: scrollController,
                         physics: const ClampingScrollPhysics(),
-                        padding: EdgeInsets.fromLTRB(
-                          0,
-                          4,
-                          0,
-                          4 + bottomInset,
-                        ),
+                        padding: EdgeInsets.fromLTRB(0, 4, 0, 4 + bottomInset),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -319,9 +336,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
                 onPressed: _recenterOnYou,
               ),
             if (searching || success)
-              Positioned.fill(
-                child: RideFlowPanel(viewModel: _viewModel),
-              ),
+              Positioned.fill(child: RideFlowPanel(viewModel: _viewModel)),
             _AnimatedLocationSheet(
               visible: askingLocation,
               locating: _viewModel.locating,
@@ -365,16 +380,14 @@ class _AnimatedLocationSheetState extends State<_AnimatedLocationSheet>
       duration: const Duration(milliseconds: 480),
       reverseDuration: const Duration(milliseconds: 320),
     );
-    _offset = Tween<Offset>(
-      begin: const Offset(0, 1),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
-      ),
-    );
+    _offset = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+        );
     if (widget.visible) {
       _controller.forward();
     }
@@ -446,7 +459,8 @@ class _PassengerMap extends StatelessWidget {
     final dropoff = viewModel.dropoff;
     final candidate = viewModel.pickCandidate;
     final you = viewModel.userPoint;
-    final showPickupPin = pickup != null &&
+    final showPickupPin =
+        pickup != null &&
         !viewModel.pickupIsUser &&
         (you == null ||
             pickup.latitude != you.latitude ||
@@ -562,9 +576,12 @@ class _PassengerMap extends StatelessWidget {
                 ),
               ),
             if (showPickupPin)
-              _pinMarker(pickup, Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : RidonsColors.navy),
+              _pinMarker(
+                pickup,
+                Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : RidonsColors.navy,
+              ),
             if (dropoff != null) _pinMarker(dropoff, RidonsColors.primary),
             if (candidate != null) _pinMarker(candidate, RidonsColors.primary),
             if (etaMid != null)

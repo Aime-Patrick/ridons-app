@@ -14,4 +14,5 @@ export 'ridons_star_rating.dart';
 export 'ridons_location_tile.dart';
 export 'ridons_language_tile.dart';
 export 'ridons_role_card.dart';
+export 'ridons_notification_bell.dart';
 

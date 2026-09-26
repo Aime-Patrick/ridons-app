@@ -3,10 +3,7 @@ import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 class RealtimeMessage {
-  const RealtimeMessage({
-    required this.event,
-    required this.data,
-  });
+  const RealtimeMessage({required this.event, required this.data});
 
   final String event;
   final Map<String, dynamic> data;
@@ -14,10 +11,7 @@ class RealtimeMessage {
 
 /// Socket.IO client for notification `/ws` (proxied through the gateway).
 class RealtimeClient {
-  RealtimeClient({
-    required this.wsUrl,
-    required this.readToken,
-  });
+  RealtimeClient({required this.wsUrl, required this.readToken});
 
   final String wsUrl;
   final Future<String?> Function() readToken;
@@ -38,17 +32,14 @@ class RealtimeClient {
       return;
     }
 
-    final socket = io.io(
-      wsUrl,
-      <String, dynamic>{
-        'path': '/ws',
-        'transports': ['websocket'],
-        'autoConnect': false,
-        'reconnection': true,
-        'forceNew': true,
-        'auth': {'token': token},
-      },
-    );
+    final socket = io.io(wsUrl, <String, dynamic>{
+      'path': '/ws',
+      'transports': ['websocket'],
+      'autoConnect': false,
+      'reconnection': true,
+      'forceNew': true,
+      'auth': {'token': token},
+    });
     _socket = socket;
 
     socket.onConnect((_) {
@@ -67,6 +58,7 @@ class RealtimeClient {
     socket.on('dispatch', (data) => _emit('dispatch', data));
     socket.on('incoming_request', (data) => _emit('incoming_request', data));
     socket.on('bid', (data) => _emit('bid', data));
+    socket.on('notification', (data) => _emit('notification', data));
     socket.connect();
   }
 
@@ -83,7 +75,9 @@ class RealtimeClient {
 
   Future<void> syncDriverChannels(Iterable<String> driverIds) async {
     final next = driverIds.map((id) => 'driver:$id').toSet();
-    final drop = _channels.where((c) => c.startsWith('driver:') && !next.contains(c)).toList();
+    final drop = _channels
+        .where((c) => c.startsWith('driver:') && !next.contains(c))
+        .toList();
     for (final channel in drop) {
       await unsubscribe(channel);
     }

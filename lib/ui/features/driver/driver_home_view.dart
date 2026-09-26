@@ -11,6 +11,7 @@ import '../../core/providers/session_providers.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/ridons_price_adjuster.dart';
 import '../account/passenger_avatar.dart';
+import '../notifications/notification_inbox_view.dart';
 import 'driver_trip_view.dart';
 import 'view_models/driver_home_view_model.dart';
 
@@ -88,7 +89,7 @@ class _DriverIdleHome extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = session.user;
-    final badge = ref.watch(notificationBadgeProvider).asData?.value ?? 0;
+    final notificationCenter = ref.watch(notificationCenterProvider);
     final stats = viewModel.stats;
     return ColoredBox(
       color: RidonsColors.background,
@@ -150,26 +151,13 @@ class _DriverIdleHome extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.notifications_none_rounded),
+                  RidonsNotificationBell(
+                    unreadCount: notificationCenter.unreadCount,
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const NotificationInboxView(),
                       ),
-                      if (badge > 0)
-                        const Positioned(
-                          right: 10,
-                          top: 10,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: RidonsColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: SizedBox(width: 8, height: 8),
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -676,162 +664,226 @@ class _OfferCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: RidonsColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: const BorderSide(color: RidonsColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-        child: Column(
-          children: [
-            Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : 360.0;
+        final compact = width < 340;
+        final horizontalPadding = (width * 0.045).clamp(12.0, 20.0).toDouble();
+        final titleFontSize = (width * 0.045).clamp(14.0, 16.0).toDouble();
+        final detailFontSize = (width * 0.034).clamp(11.0, 12.0).toDouble();
+        final routeFontSize = (width * 0.037).clamp(12.0, 14.0).toDouble();
+        final labelFontSize = (width * 0.034).clamp(11.0, 12.0).toDouble();
+        final buttonFontSize = (width * 0.04).clamp(12.0, 15.0).toDouble();
+        final isCounter = fare > offer.offeredPrice;
+        final actionLabel = isCounter
+            ? 'Counter ${_money.format(fare)} RWF'
+            : 'Accept offer';
+
+        return Material(
+          color: RidonsColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: const BorderSide(color: RidonsColors.border),
+          ),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              compact ? 12 : 14,
+              horizontalPadding,
+              compact ? 12 : 16,
+            ),
+            child: Column(
               children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundColor: RidonsColors.inputFill,
-                  child: Text(
-                    offer.displayName.isEmpty ? 'P' : offer.displayName[0],
-                    style: const TextStyle(
-                      color: RidonsColors.navy,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        offer.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: (width * 0.07).clamp(22.0, 26.0).toDouble(),
+                      backgroundColor: RidonsColors.inputFill,
+                      child: Text(
+                        offer.displayName.isEmpty ? 'P' : offer.displayName[0],
                         style: const TextStyle(
                           color: RidonsColors.navy,
                           fontWeight: FontWeight.w800,
-                          fontSize: 16,
                         ),
                       ),
-                      Text(
-                        '${offer.passengerIdLabel}  ${offer.passengerPhone}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: RidonsColors.textSecondary,
-                          fontSize: 12,
+                    ),
+                    SizedBox(width: compact ? 8 : 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            offer.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: RidonsColors.navy,
+                              fontWeight: FontWeight.w800,
+                              fontSize: titleFontSize,
+                            ),
+                          ),
+                          Text(
+                            '${offer.passengerIdLabel}  ${offer.passengerPhone}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: RidonsColors.textSecondary,
+                              fontSize: detailFontSize,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          offer.timerLabel,
+                          maxLines: 1,
+                          textAlign: TextAlign.end,
+                          style: TextStyle(
+                            color: RidonsColors.primary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: detailFontSize,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: compact ? 10 : 12),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: offer.fromName.isEmpty
+                            ? 'Pickup'
+                            : offer.fromName,
+                        style: TextStyle(
+                          color: RidonsColors.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: routeFontSize,
+                        ),
+                      ),
+                      const TextSpan(
+                        text: '  →  ',
+                        style: TextStyle(color: RidonsColors.textSecondary),
+                      ),
+                      TextSpan(
+                        text: offer.toName.isEmpty ? 'Dropoff' : offer.toName,
+                        style: TextStyle(
+                          color: RidonsColors.navy,
+                          fontWeight: FontWeight.w700,
+                          fontSize: routeFontSize,
                         ),
                       ),
                     ],
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                Flexible(
-                  child: Text(
-                    offer.timerLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: const TextStyle(
-                      color: RidonsColors.primary,
-                      fontWeight: FontWeight.w800,
+                SizedBox(height: compact ? 11 : 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _PriceCol(
+                        'Passenger offer',
+                        '${_money.format(offer.offeredPrice)} Rwf',
+                        labelFontSize: labelFontSize,
+                        valueFontSize: routeFontSize + 3,
+                      ),
                     ),
-                  ),
+                    Expanded(
+                      child: _PriceCol(
+                        'Fair Price',
+                        '${_money.format(offer.suggestedPrice == 0 ? offer.offeredPrice : offer.suggestedPrice)} Rwf',
+                        alignEnd: true,
+                        labelFontSize: labelFontSize,
+                        valueFontSize: routeFontSize + 3,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: compact ? 10 : 12),
+                RidonsPriceAdjuster(
+                  amountRwf: fare,
+                  onDecrement: () => onAdjust(-100),
+                  onIncrement: () => onAdjust(100),
+                ),
+                SizedBox(height: compact ? 10 : 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: busy ? null : onSkip,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: Size.fromHeight(compact ? 44 : 48),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: compact ? 8 : 12,
+                          ),
+                          shape: const StadiumBorder(),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Skip',
+                            style: TextStyle(fontSize: buttonFontSize),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: compact ? 8 : 10),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: busy ? null : onAccept,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: Size.fromHeight(compact ? 44 : 48),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: compact ? 8 : 12,
+                          ),
+                          backgroundColor: RidonsColors.primary,
+                          shape: const StadiumBorder(),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            actionLabel,
+                            maxLines: 1,
+                            style: TextStyle(fontSize: buttonFontSize),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: offer.fromName.isEmpty ? 'Pickup' : offer.fromName,
-                    style: const TextStyle(
-                      color: RidonsColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const TextSpan(
-                    text: '  →  ',
-                    style: TextStyle(color: RidonsColors.textSecondary),
-                  ),
-                  TextSpan(
-                    text: offer.toName.isEmpty ? 'Dropoff' : offer.toName,
-                    style: const TextStyle(
-                      color: RidonsColors.navy,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: _PriceCol(
-                    'Passenger offer',
-                    '${_money.format(offer.offeredPrice)} Rwf',
-                  ),
-                ),
-                Expanded(
-                  child: _PriceCol(
-                    'Fair Price',
-                    '${_money.format(offer.suggestedPrice == 0 ? offer.offeredPrice : offer.suggestedPrice)} Rwf',
-                    alignEnd: true,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            RidonsPriceAdjuster(
-              amountRwf: fare,
-              onDecrement: () => onAdjust(-100),
-              onIncrement: () => onAdjust(100),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: busy ? null : onSkip,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: const Text('Skip'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: busy ? null : onAccept,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                      backgroundColor: RidonsColors.primary,
-                      shape: const StadiumBorder(),
-                    ),
-                    child: const Text('Accept offer'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
 
 class _PriceCol extends StatelessWidget {
-  const _PriceCol(this.label, this.value, {this.alignEnd = false});
+  const _PriceCol(
+    this.label,
+    this.value, {
+    this.alignEnd = false,
+    this.labelFontSize = 12,
+    this.valueFontSize = 18,
+  });
 
   final String label;
   final String value;
   final bool alignEnd;
+  final double labelFontSize;
+  final double valueFontSize;
 
   @override
   Widget build(BuildContext context) {
@@ -842,9 +894,9 @@ class _PriceCol extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: RidonsColors.textSecondary,
-            fontSize: 12,
+            fontSize: labelFontSize,
           ),
         ),
         FittedBox(
@@ -853,10 +905,10 @@ class _PriceCol extends StatelessWidget {
           child: Text(
             value,
             maxLines: 1,
-            style: const TextStyle(
+            style: TextStyle(
               color: RidonsColors.navy,
               fontWeight: FontWeight.w800,
-              fontSize: 18,
+              fontSize: valueFontSize,
             ),
           ),
         ),

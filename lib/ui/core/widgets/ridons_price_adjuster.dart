@@ -24,46 +24,70 @@ class RidonsPriceAdjuster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: enabled ? 1 : 0.4,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: context.ridonsSheet,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: RidonsColors.primary, width: 1.4),
-        ),
-        child: Row(
-          children: [
-            _CircleBtn(
-              icon: Icons.remove,
-              onPressed: enabled ? onDecrement : null,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : 320.0;
+        final buttonSize = (width * 0.14).clamp(36.0, 48.0).toDouble();
+        final amountFontSize = (width * 0.065).clamp(18.0, 24.0).toDouble();
+        final horizontalPadding = width < 280 ? 4.0 : 8.0;
+
+        return Opacity(
+          opacity: enabled ? 1 : 0.4,
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: 6,
             ),
-            Expanded(
-              child: Text(
-                '${_fmt.format(amountRwf)} RWF',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: context.ridonsInk,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
+            decoration: BoxDecoration(
+              color: context.ridonsSheet,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: RidonsColors.primary, width: 1.4),
+            ),
+            child: Row(
+              children: [
+                _CircleBtn(
+                  size: buttonSize,
+                  icon: Icons.remove,
+                  onPressed: enabled ? onDecrement : null,
                 ),
-              ),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '${_fmt.format(amountRwf)} RWF',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: context.ridonsInk,
+                        fontSize: amountFontSize,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+                _CircleBtn(
+                  size: buttonSize,
+                  icon: Icons.add,
+                  onPressed: enabled ? onIncrement : null,
+                ),
+              ],
             ),
-            _CircleBtn(
-              icon: Icons.add,
-              onPressed: enabled ? onIncrement : null,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
 
 class _CircleBtn extends StatelessWidget {
-  const _CircleBtn({required this.icon, required this.onPressed});
+  const _CircleBtn({
+    required this.size,
+    required this.icon,
+    required this.onPressed,
+  });
 
+  final double size;
   final IconData icon;
   final VoidCallback? onPressed;
 
@@ -76,9 +100,9 @@ class _CircleBtn extends StatelessWidget {
         customBorder: const CircleBorder(),
         onTap: onPressed,
         child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Icon(icon, color: RidonsColors.primary),
+          width: size,
+          height: size,
+          child: Icon(icon, color: RidonsColors.primary, size: size * 0.45),
         ),
       ),
     );
