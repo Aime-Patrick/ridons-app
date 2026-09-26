@@ -210,66 +210,72 @@ class _RidonsOtpFieldState extends State<RidonsOtpField>
                     child: IgnorePointer(
                       ignoring: !widget.enabled,
                       child: AutofillGroup(
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          enabled: widget.enabled,
-                          autofocus: widget.autofocus && widget.enabled,
-                          keyboardType: TextInputType.number,
-                          textInputAction: TextInputAction.done,
-                          autofillHints: const [AutofillHints.oneTimeCode],
-                          enableSuggestions: false,
-                          autocorrect: false,
-                          obscureText: false,
-                          showCursor: false,
-                          enableInteractiveSelection: true,
-                          enableIMEPersonalizedLearning: false,
-                          smartDashesType: SmartDashesType.disabled,
-                          smartQuotesType: SmartQuotesType.disabled,
-                          keyboardAppearance: Theme.of(context).brightness,
-                          cursorColor: Colors.transparent,
-                          style: const TextStyle(
-                            color: Colors.transparent,
-                            fontSize: 2,
-                            height: 1,
+                        child: TextSelectionTheme(
+                          data: TextSelectionTheme.of(context).copyWith(
+                            selectionColor: Colors.transparent,
+                            selectionHandleColor: Colors.transparent,
                           ),
-                          inputFormatters: [
-                            _OtpDigitsFormatter(widget.length),
-                          ],
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            disabledBorder: InputBorder.none,
-                            filled: true,
-                            fillColor: Colors.transparent,
-                            isCollapsed: true,
-                            counterText: '',
-                            contentPadding: EdgeInsets.zero,
+                          child: TextField(
+                            controller: _controller,
+                            focusNode: _focusNode,
+                            enabled: widget.enabled,
+                            autofocus: widget.autofocus && widget.enabled,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.done,
+                            autofillHints: const [AutofillHints.oneTimeCode],
+                            enableSuggestions: false,
+                            autocorrect: false,
+                            obscureText: false,
+                            showCursor: false,
+                            enableInteractiveSelection: true,
+                            enableIMEPersonalizedLearning: false,
+                            smartDashesType: SmartDashesType.disabled,
+                            smartQuotesType: SmartQuotesType.disabled,
+                            keyboardAppearance: Theme.of(context).brightness,
+                            cursorColor: Colors.transparent,
+                            style: const TextStyle(
+                              color: Colors.transparent,
+                              fontSize: 2,
+                              height: 1,
+                            ),
+                            inputFormatters: [
+                              _OtpDigitsFormatter(widget.length),
+                            ],
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              filled: true,
+                              fillColor: Colors.transparent,
+                              isCollapsed: true,
+                              counterText: '',
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onChanged: _apply,
+                            onTap: widget.enabled
+                                ? () => _focusNode.requestFocus()
+                                : null,
+                            onSubmitted: (_) {
+                              if (_code.length == widget.length) {
+                                widget.onCompleted?.call(_code);
+                              }
+                            },
+                            contextMenuBuilder: (context, state) {
+                              return AdaptiveTextSelectionToolbar.buttonItems(
+                                anchors: state.contextMenuAnchors,
+                                buttonItems: [
+                                  ContextMenuButtonItem(
+                                    onPressed: () {
+                                      ContextMenuController.removeAny();
+                                      _paste();
+                                    },
+                                    label: 'Paste',
+                                  ),
+                                ],
+                              );
+                            },
                           ),
-                          onChanged: _apply,
-                          onTap: widget.enabled
-                              ? () => _focusNode.requestFocus()
-                              : null,
-                          onSubmitted: (_) {
-                            if (_code.length == widget.length) {
-                              widget.onCompleted?.call(_code);
-                            }
-                          },
-                          contextMenuBuilder: (context, state) {
-                            return AdaptiveTextSelectionToolbar.buttonItems(
-                              anchors: state.contextMenuAnchors,
-                              buttonItems: [
-                                ContextMenuButtonItem(
-                                  onPressed: () {
-                                    ContextMenuController.removeAny();
-                                    _paste();
-                                  },
-                                  label: 'Paste',
-                                ),
-                              ],
-                            );
-                          },
                         ),
                       ),
                     ),
