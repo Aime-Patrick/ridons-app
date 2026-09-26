@@ -162,7 +162,7 @@ class _ProfileSettingsViewState extends ConsumerState<ProfileSettingsView> {
             label: session?.user.role.isDriver == true
                 ? 'Driver ID'
                 : 'Passenger ID',
-            value: session?.user.publicIdLabel ?? 'PAX-0000',
+            value: session?.user.publicIdLabel ?? '—',
           ),
           const SizedBox(height: 24),
           RidonsButton(
@@ -434,7 +434,7 @@ class PrivacySettingsView extends ConsumerWidget {
           const SizedBox(height: 10),
           _InfoCard(
             label: user?.role.isDriver == true ? 'Driver ID' : 'Passenger ID',
-            value: user?.publicIdLabel ?? 'PAX-0000',
+            value: user?.publicIdLabel ?? '—',
           ),
           const SizedBox(height: 20),
           Text(

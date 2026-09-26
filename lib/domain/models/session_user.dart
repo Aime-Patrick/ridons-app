@@ -13,6 +13,7 @@ class SessionUser {
     this.locale = 'en',
     this.avatarKey = 'passenger',
     this.avatarUrl,
+    this.vehiclePlate,
     this.verificationStatus = VerificationStatus.approved,
     this.rejectReason,
   });
@@ -26,6 +27,7 @@ class SessionUser {
   final String locale;
   final String avatarKey;
   final String? avatarUrl;
+  final String? vehiclePlate;
   final VerificationStatus verificationStatus;
   final String? rejectReason;
 
@@ -58,8 +60,9 @@ class SessionUser {
 
   String get publicIdLabel => role.isDriver ? driverIdLabel : passengerIdLabel;
 
-  String get roleIdCaption =>
-      role.isDriver ? 'Driver ID · $driverIdLabel' : 'Passenger ID · $passengerIdLabel';
+  String get roleIdCaption => role.isDriver
+      ? 'Driver ID · $driverIdLabel'
+      : 'Passenger ID · $passengerIdLabel';
 
   String _idLabel(String prefix) {
     final tail = id.contains('_') ? id.split('_').last : id;
@@ -82,8 +85,11 @@ class SessionUser {
       locale: '${json['locale'] ?? 'en'}',
       avatarKey: '${json['avatarKey'] ?? 'passenger'}',
       avatarUrl: json['avatarUrl']?.toString(),
+      vehiclePlate: json['vehiclePlate']?.toString(),
       verificationStatus: VerificationStatus.values.firstWhere(
-        (value) => value.name == '${json['verificationStatus'] ?? (roleRaw == 'driver' ? 'pending' : 'approved')}',
+        (value) =>
+            value.name ==
+            '${json['verificationStatus'] ?? (roleRaw == 'driver' ? 'pending' : 'approved')}',
         orElse: () => roleRaw == 'driver'
             ? VerificationStatus.pending
             : VerificationStatus.approved,

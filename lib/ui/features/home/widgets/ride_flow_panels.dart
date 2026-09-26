@@ -22,30 +22,30 @@ class RideFlowPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (viewModel.stage) {
       RideStage.route || RideStage.preview => _RouteSheet(
-          viewModel: viewModel,
-          decorate: decorate,
-        ),
+        viewModel: viewModel,
+        decorate: decorate,
+      ),
       RideStage.search => _SearchSheet(viewModel: viewModel),
       RideStage.pickOnMap => _MapPickSheet(
-          viewModel: viewModel,
-          decorate: decorate,
-        ),
+        viewModel: viewModel,
+        decorate: decorate,
+      ),
       RideStage.estimate => _EstimateSheet(
-          viewModel: viewModel,
-          decorate: decorate,
-        ),
+        viewModel: viewModel,
+        decorate: decorate,
+      ),
       RideStage.offering => _OfferingSheet(
-          viewModel: viewModel,
-          decorate: decorate,
-        ),
+        viewModel: viewModel,
+        decorate: decorate,
+      ),
       RideStage.matched => _MatchedSheet(
-          viewModel: viewModel,
-          decorate: decorate,
-        ),
+        viewModel: viewModel,
+        decorate: decorate,
+      ),
       RideStage.payment => _PaymentSheet(
-          viewModel: viewModel,
-          decorate: decorate,
-        ),
+        viewModel: viewModel,
+        decorate: decorate,
+      ),
       RideStage.success => _SuccessSheet(viewModel: viewModel),
     };
   }
@@ -137,10 +137,7 @@ class RouteHeaderChip extends StatelessWidget {
 
 /// Google-style ETA chip for the route polyline midpoint.
 class RouteEtaMapBadge extends StatelessWidget {
-  const RouteEtaMapBadge({
-    super.key,
-    required this.viewModel,
-  });
+  const RouteEtaMapBadge({super.key, required this.viewModel});
 
   final HomeMapViewModel viewModel;
 
@@ -167,9 +164,7 @@ class RouteEtaMapBadge extends StatelessWidget {
       color: context.ridonsSheet,
       elevation: 6,
       shadowColor: const Color(0x33000000),
-      shape: StadiumBorder(
-        side: BorderSide(color: context.ridonsLine),
-      ),
+      shape: StadiumBorder(side: BorderSide(color: context.ridonsLine)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         child: loading
@@ -391,10 +386,7 @@ class _SearchSheetState extends State<_SearchSheet> {
                   ),
                   const Text(
                     'Route',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
@@ -439,39 +431,36 @@ class _SearchSheetState extends State<_SearchSheet> {
               child: viewModel.searchingPlaces && viewModel.suggestions.isEmpty
                   ? const Center(child: CircularProgressIndicator())
                   : viewModel.suggestions.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 32),
-                            child: Text(
-                              viewModel.searchQuery.trim().isEmpty
-                                  ? 'Looking up places near you. You can also search or pick on the map.'
-                                  : 'No places match that search. Try another name or pick on the map.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.color
-                                    ?.withValues(alpha: 0.7),
-                              ),
-                            ),
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          viewModel.searchQuery.trim().isEmpty
+                              ? 'Looking up places near you. You can also search or pick on the map.'
+                              : 'No places match that search. Try another name or pick on the map.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Theme.of(context).textTheme.bodyMedium?.color
+                                ?.withValues(alpha: 0.7),
                           ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-                          itemCount: viewModel.suggestions.length,
-                          separatorBuilder: (_, _) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final place = viewModel.suggestions[index];
-                            return RidonsLocationTile(
-                              title: place.name,
-                              subtitle: place.subtitle.isEmpty
-                                  ? null
-                                  : place.subtitle,
-                              onTap: () => viewModel.choosePlace(place),
-                            );
-                          },
                         ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                      itemCount: viewModel.suggestions.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final place = viewModel.suggestions[index];
+                        return RidonsLocationTile(
+                          title: place.name,
+                          subtitle: place.subtitle.isEmpty
+                              ? null
+                              : place.subtitle,
+                          onTap: () => viewModel.choosePlace(place),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -506,10 +495,7 @@ class _MapPickSheet extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Pick from map',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -528,10 +514,7 @@ class _MapPickSheet extends StatelessWidget {
               Expanded(
                 child: Text(
                   candidate?.name ?? 'Tap the map to drop a pin',
-                  style: TextStyle(
-                    color: context.ridonsMuted,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: context.ridonsMuted, fontSize: 13),
                 ),
               ),
             ],
@@ -571,15 +554,12 @@ class _EstimateSheet extends StatelessWidget {
           Text(
             viewModel.lastOfferMissed
                 ? (viewModel.lastOfferHadRiders
-                    ? 'Nobody took that fare. Raise it and send again.'
-                    : 'No riders within 3 km. Try again in a moment.')
+                      ? 'Nobody took that fare. Raise it and send again.'
+                      : 'No riders within 3 km. Try again in a moment.')
                 : viewModel.tripKm > 0
-                    ? 'About ${viewModel.tripDistanceLabel} · ${viewModel.tripEtaLabel} by road'
-                    : 'Market Fair price for this route.',
-            style: TextStyle(
-              color: context.ridonsMuted,
-              fontSize: 11,
-            ),
+                ? 'About ${viewModel.tripDistanceLabel} · ${viewModel.tripEtaLabel} by road'
+                : 'Market Fair price for this route.',
+            style: TextStyle(color: context.ridonsMuted, fontSize: 11),
           ),
           const SizedBox(height: 10),
           RidonsPriceAdjuster(
@@ -588,10 +568,7 @@ class _EstimateSheet extends StatelessWidget {
             onIncrement: () => viewModel.adjustPrice(100),
           ),
           const SizedBox(height: 10),
-          RidonsButton(
-            label: 'Confirm',
-            onPressed: viewModel.confirmOffer,
-          ),
+          RidonsButton(label: 'Confirm', onPressed: viewModel.confirmOffer),
           const SizedBox(height: 8),
           _RouteSummary(viewModel: viewModel),
         ],
@@ -618,10 +595,7 @@ class _OfferingSheet extends StatelessWidget {
         children: [
           const Text(
             'Offering your fare',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           Row(
@@ -631,10 +605,7 @@ class _OfferingSheet extends StatelessWidget {
                   viewModel.driversNotified == 0
                       ? 'No drivers have received this offer yet. We will keep searching.'
                       : '${viewModel.driversNotified} ${viewModel.driversNotified == 1 ? 'driver' : 'drivers'} notified · ETA ${viewModel.etaLabel}',
-                  style: TextStyle(
-                    color: context.ridonsMuted,
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: context.ridonsMuted, fontSize: 11),
                 ),
               ),
               const SizedBox(width: 8),
@@ -666,10 +637,7 @@ class _OfferingSheet extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
-          const RidonsButton(
-            label: 'Confirm',
-            onPressed: null,
-          ),
+          const RidonsButton(label: 'Confirm', onPressed: null),
           const SizedBox(height: 12),
           _RouteSummary(viewModel: viewModel),
         ],
@@ -856,13 +824,11 @@ class _CounterPrice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment:
-          emphasized ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: emphasized
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(color: context.ridonsMuted, fontSize: 10),
-        ),
+        Text(label, style: TextStyle(color: context.ridonsMuted, fontSize: 10)),
         const SizedBox(height: 2),
         Text(
           value,
@@ -899,10 +865,7 @@ class _MatchedSheet extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Match found',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ),
               Text(
@@ -942,10 +905,7 @@ class _MatchedSheet extends StatelessWidget {
                 ),
               ),
               const Expanded(
-                child: _Fact(
-                  label: 'Payment method',
-                  value: 'Cash or MoMo',
-                ),
+                child: _Fact(label: 'Payment method', value: 'Cash or MoMo'),
               ),
             ],
           ),
@@ -978,10 +938,7 @@ class _MatchedSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          RidonsButton(
-            label: "I've arrived",
-            onPressed: viewModel.goToPayment,
-          ),
+          RidonsButton(label: "I've arrived", onPressed: viewModel.goToPayment),
         ],
       ),
     );
@@ -1059,20 +1016,14 @@ class _SuccessSheet extends StatelessWidget {
               const Text(
                 'Trip recorded successfully',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 20),
               _TripReceiptCard(viewModel: viewModel),
               const SizedBox(height: 28),
               const Text(
                 'How was the ride?',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
               RidonsStarRating(
@@ -1268,11 +1219,7 @@ class _TripReceiptCard extends StatelessWidget {
 }
 
 class _ReceiptLine extends StatelessWidget {
-  const _ReceiptLine({
-    this.label,
-    this.labelWidget,
-    required this.trailing,
-  });
+  const _ReceiptLine({this.label, this.labelWidget, required this.trailing});
 
   final String? label;
   final Widget? labelWidget;
@@ -1289,17 +1236,11 @@ class _ReceiptLine extends StatelessWidget {
         ] else ...[
           Text(
             label ?? '',
-            style: TextStyle(
-              color: context.ridonsMuted,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: context.ridonsMuted, fontSize: 13),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: trailing,
-            ),
+            child: Align(alignment: Alignment.centerRight, child: trailing),
           ),
         ],
       ],
@@ -1430,10 +1371,7 @@ class _RouteSummary extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _SummaryLine(
-          icon: Icons.location_on,
-          text: viewModel.pickupLabel,
-        ),
+        _SummaryLine(icon: Icons.location_on, text: viewModel.pickupLabel),
         const SizedBox(height: 8),
         _SummaryLine(
           icon: Icons.location_on_outlined,
@@ -1486,18 +1424,12 @@ class _SheetTitleRow extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
         ),
         Text(
           trailing,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
         ),
       ],
     );
@@ -1516,13 +1448,7 @@ class _Fact extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: context.ridonsMuted,
-            fontSize: 11,
-          ),
-        ),
+        Text(label, style: TextStyle(color: context.ridonsMuted, fontSize: 11)),
         const SizedBox(height: 2),
         Text(
           value,
@@ -1623,9 +1549,9 @@ Future<void> _openNeedHelpDialog(
                   child: Text(
                     'Details',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: context.ridonsInk,
-                        ),
+                      fontWeight: FontWeight.w600,
+                      color: context.ridonsInk,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),

@@ -5,7 +5,6 @@ import 'package:latlong2/latlong.dart';
 
 import '../../core/providers/session_providers.dart';
 import '../../core/theme/ridons_colors.dart';
-import '../../core/widgets/ridons_tile_layer.dart';
 import '../../../data/services/location_service.dart';
 import '../../../data/services/places_service.dart';
 import '../../../data/services/routing_service.dart';
@@ -16,6 +15,7 @@ import '../account/passenger_avatar.dart';
 import '../notifications/notification_inbox_view.dart';
 import '../../core/widgets/map_marker_info_sheet.dart';
 import '../../core/widgets/ridons_notification_bell.dart';
+import '../../core/widgets/ridons_map_view.dart';
 import 'view_models/home_map_view_model.dart';
 import 'widgets/ride_flow_panels.dart';
 
@@ -468,22 +468,19 @@ class _PassengerMap extends StatelessWidget {
     final showDrivers = viewModel.nearbyDrivers.isNotEmpty;
     final etaMid = RoutingService.midpointAlong(viewModel.routePoints);
 
-    return FlutterMap(
-      mapController: controller,
-      options: MapOptions(
-        initialCenter: viewModel.mapCenter,
-        initialZoom: 15.4,
-        onMapReady: onMapReady,
-        onTap: (_, point) {
-          if (viewModel.stage == RideStage.pickOnMap) {
-            viewModel.pickOnMap(point);
-            return;
-          }
-          onMapTap?.call();
-        },
-      ),
-      children: [
-        ...RidonsMapTiles.layers(context),
+    return RidonsMapView(
+      controller: controller,
+      center: viewModel.mapCenter,
+      initialZoom: 15.4,
+      onMapReady: onMapReady,
+      onTap: (point) {
+        if (viewModel.stage == RideStage.pickOnMap) {
+          viewModel.pickOnMap(point);
+          return;
+        }
+        onMapTap?.call();
+      },
+      layers: [
         if (you != null && viewModel.hasGpsFix)
           CircleLayer(
             circles: [
@@ -524,11 +521,11 @@ class _PassengerMap extends StatelessWidget {
               for (final driver in viewModel.nearbyDrivers)
                 Marker(
                   point: driver.point,
-                  width: 32,
-                  height: 32,
+                  width: driver.id == viewModel.focusedDriverId ? 44 : 32,
+                  height: driver.id == viewModel.focusedDriverId ? 44 : 32,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => showMapMarkerInfoSheet(
+                    onTap: () => showMapMarkerInfoDialog(
                       context,
                       title: 'Driver',
                       subtitle: driver.id,
@@ -538,25 +535,8 @@ class _PassengerMap extends StatelessWidget {
                         'Heading': '${driver.headingDeg.toStringAsFixed(0)}°',
                       },
                     ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: RidonsColors.navy,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: driver.id == viewModel.focusedDriverId
-                              ? RidonsColors.accent
-                              : Colors.white,
-                          width: 2,
-                        ),
-                        boxShadow: const [
-                          BoxShadow(color: Color(0x33000000), blurRadius: 4),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.two_wheeler,
-                        color: Colors.white,
-                        size: 16,
-                      ),
+                    child: _DriverMapMarker(
+                      assigned: driver.id == viewModel.focusedDriverId,
                     ),
                   ),
                 ),
@@ -565,7 +545,7 @@ class _PassengerMap extends StatelessWidget {
                 you,
                 user: user,
                 token: token,
-                onTap: () => showMapMarkerInfoSheet(
+                onTap: () => showMapMarkerInfoDialog(
                   context,
                   title: 'Your location',
                   details: {
@@ -654,6 +634,32 @@ class _PassengerMap extends StatelessWidget {
       height: 44,
       alignment: Alignment.topCenter,
       child: Icon(Icons.location_on, color: color, size: 40),
+    );
+  }
+}
+
+class _DriverMapMarker extends StatelessWidget {
+  const _DriverMapMarker({required this.assigned});
+
+  final bool assigned;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: assigned ? RidonsColors.primary : RidonsColors.navy,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: assigned ? RidonsColors.accent : Colors.white,
+          width: assigned ? 3 : 2,
+        ),
+        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 4)],
+      ),
+      child: Icon(
+        Icons.two_wheeler,
+        color: Colors.white,
+        size: assigned ? 23 : 16,
+      ),
     );
   }
 }

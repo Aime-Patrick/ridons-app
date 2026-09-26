@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -16,7 +17,10 @@ import '../../../../domain/models/fare_policy.dart';
 import '../../../../domain/models/ride_offer.dart';
 import '../../../../domain/models/session_user.dart';
 
-enum DriverStage { home, locked, driving }
+enum DriverStage { home, locked, arrived, driving }
+
+const _pickupArrivalRadiusM = 60.0;
+const _journeyStartSpeedKmh = 5.0;
 
 class DriverHomeViewModel extends ChangeNotifier {
   DriverHomeViewModel({
@@ -61,11 +65,14 @@ class DriverHomeViewModel extends ChangeNotifier {
   List<LatLng> routePoints = const [];
   int? etaMinutes;
   LatLng? driverPoint;
+  LatLng? passengerPoint;
+  double passengerSpeedKmh = 0;
   Position? _fix;
 
   Timer? _inboxPoll;
   Timer? _pingTimer;
   bool _inboxRefreshing = false;
+  bool _statusBusy = false;
   StreamSubscription<Position>? _gps;
   StreamSubscription<RealtimeMessage>? _ws;
 
@@ -78,14 +85,12 @@ class DriverHomeViewModel extends ChangeNotifier {
   }
 
   int fareFor(RideOffer offer) =>
-      FarePolicy.normalize(
-        localFares[offer.requestId] ?? offer.offeredPrice,
-      );
+      FarePolicy.normalize(localFares[offer.requestId] ?? offer.offeredPrice);
 
   Future<void> bootstrap() async {
     await _location.ensureLocationPermission();
-    _fix = await _location.freshPosition() ??
-        await _location.lastKnownPosition();
+    _fix =
+        await _location.freshPosition() ?? await _location.lastKnownPosition();
     if (_fix != null) {
       driverPoint = LatLng(_fix!.latitude, _fix!.longitude);
     }
@@ -122,6 +127,9 @@ class DriverHomeViewModel extends ChangeNotifier {
           ),
         );
       }
+      _maybeDetectTripProgress(
+        position.speed.isFinite ? position.speed * 3.6 : 0,
+      );
       notifyListeners();
     });
   }
@@ -135,8 +143,9 @@ class DriverHomeViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       if (value) {
-        final backgroundReady =
-            await _location.ensureLocationPermission(background: true);
+        final backgroundReady = await _location.ensureLocationPermission(
+          background: true,
+        );
         if (!backgroundReady) {
           online = previous;
           errorMessage = 'Allow background location to stay online.';
@@ -314,13 +323,24 @@ class DriverHomeViewModel extends ChangeNotifier {
     try {
       final price = fareFor(offer);
       if (price > offer.offeredPrice) {
-        await _trips.counter(offer.requestId, price);
+        await _trips.counter(
+          offer.requestId,
+          price,
+          driverName: user.displayName,
+          vehiclePlate: user.vehiclePlate ?? '',
+          driverRating: stats.avgRating,
+        );
         busy = false;
         errorMessage = 'Counter sent. Waiting for the passenger.';
         notifyListeners();
         return;
       }
-      final locked = await _trips.accept(offer.requestId);
+      final locked = await _trips.accept(
+        offer.requestId,
+        driverName: user.displayName,
+        vehiclePlate: user.vehiclePlate ?? '',
+        driverRating: stats.avgRating,
+      );
       if (locked.rideId.isEmpty) {
         throw StateError('missing ride');
       }
@@ -354,27 +374,10 @@ class DriverHomeViewModel extends ChangeNotifier {
     busy = true;
     notifyListeners();
     try {
-      for (final next in ['en_route', 'arrived', 'in_progress']) {
-        try {
-          await _trips.updateStatus(current.rideId, next);
-        } catch (_) {}
-      }
-      ride = ActiveRide(
-        rideId: current.rideId,
-        requestId: current.requestId,
-        passengerId: current.passengerId,
-        status: 'in_progress',
-        fare: current.fare,
-        from: current.from,
-        to: current.to,
-        paymentMethod: current.paymentMethod,
-        passengerName: current.passengerName,
-        passengerPhone: current.passengerPhone,
-        fromName: current.fromName,
-        toName: current.toName,
+      if (stage == DriverStage.driving) return;
+      await _setRideStatus(
+        stage == DriverStage.arrived ? 'in_progress' : 'en_route',
       );
-      stage = DriverStage.driving;
-      await _refreshRoute(toDropoff: true);
     } finally {
       busy = false;
       notifyListeners();
@@ -394,11 +397,14 @@ class DriverHomeViewModel extends ChangeNotifier {
 
   Future<void> _enterRide(ActiveRide next) async {
     ride = next;
+    passengerPoint = null;
+    passengerSpeedKmh = 0;
     offers = const [];
     stage = next.isDriving ? DriverStage.driving : DriverStage.locked;
     if (next.status == 'matched') {
       try {
         await _trips.updateStatus(next.rideId, 'en_route');
+        ride = _withStatus(next, 'en_route');
       } catch (_) {}
     }
     await _realtime.subscribe('ride:${next.rideId}');
@@ -439,12 +445,102 @@ class DriverHomeViewModel extends ChangeNotifier {
     }
     if (message.event == 'status') {
       final status = '${message.data['status'] ?? ''}';
+      final current = ride;
+      if (current != null && (status == 'arrived' || status == 'in_progress')) {
+        ride = _withStatus(current, status);
+        stage = status == 'in_progress'
+            ? DriverStage.driving
+            : DriverStage.arrived;
+        if (status == 'in_progress') {
+          unawaited(_refreshRoute(toDropoff: true));
+        }
+        notifyListeners();
+      }
       if (status == 'cancelled') {
         ride = null;
         stage = DriverStage.home;
         notifyListeners();
       }
     }
+    if (message.event == 'location' &&
+        '${message.data['role'] ?? ''}'.toLowerCase() == 'passenger') {
+      final current = ride;
+      if (current == null ||
+          '${message.data['rideId'] ?? ''}' != current.rideId) {
+        return;
+      }
+      final coords = message.data['coords'];
+      if (coords is! List || coords.length < 2) return;
+      final lat = (coords[0] as num?)?.toDouble();
+      final lng = (coords[1] as num?)?.toDouble();
+      if (lat == null || lng == null) return;
+      passengerPoint = LatLng(lat, lng);
+      passengerSpeedKmh = (message.data['speedKmh'] as num?)?.toDouble() ?? 0;
+      final driverSpeed = _fix?.speed;
+      _maybeDetectTripProgress(
+        driverSpeed != null && driverSpeed.isFinite ? driverSpeed * 3.6 : 0,
+      );
+      notifyListeners();
+    }
+  }
+
+  Future<void> _maybeDetectTripProgress(double speedKmh) async {
+    final current = ride;
+    final driver = driverPoint;
+    final passenger = passengerPoint;
+    if (current == null || driver == null || passenger == null || _statusBusy) {
+      return;
+    }
+    final distance = _distanceMeters(driver, passenger);
+    if (stage == DriverStage.locked &&
+        current.status == 'en_route' &&
+        distance <= _pickupArrivalRadiusM) {
+      await _setRideStatus('arrived');
+      return;
+    }
+    if (stage == DriverStage.arrived &&
+        speedKmh >= _journeyStartSpeedKmh &&
+        passengerSpeedKmh >= _journeyStartSpeedKmh) {
+      await _setRideStatus('in_progress');
+    }
+  }
+
+  Future<void> _setRideStatus(String status) async {
+    final current = ride;
+    if (current == null || _statusBusy) return;
+    _statusBusy = true;
+    try {
+      await _trips.updateStatus(current.rideId, status);
+      ride = _withStatus(current, status);
+      stage = status == 'in_progress'
+          ? DriverStage.driving
+          : status == 'arrived'
+          ? DriverStage.arrived
+          : DriverStage.locked;
+      if (status == 'in_progress') {
+        await _refreshRoute(toDropoff: true);
+      }
+      notifyListeners();
+    } finally {
+      _statusBusy = false;
+    }
+  }
+
+  ActiveRide _withStatus(ActiveRide current, String status) {
+    return ActiveRide(
+      rideId: current.rideId,
+      requestId: current.requestId,
+      passengerId: current.passengerId,
+      status: status,
+      fare: current.fare,
+      from: current.from,
+      to: current.to,
+      paymentMethod: current.paymentMethod,
+      passengerName: current.passengerName,
+      passengerPhone: current.passengerPhone,
+      fromName: current.fromName,
+      toName: current.toName,
+    );
   }
 
   @override
@@ -459,4 +555,17 @@ class DriverHomeViewModel extends ChangeNotifier {
     unawaited(_location.setDriverOnlineIntent(false));
     super.dispose();
   }
+}
+
+double _distanceMeters(LatLng a, LatLng b) {
+  const earthRadiusM = 6371000.0;
+  const degreesToRadians = 3.141592653589793 / 180;
+  final dLat = (b.latitude - a.latitude) * degreesToRadians;
+  final dLng = (b.longitude - a.longitude) * degreesToRadians;
+  final lat1 = a.latitude * degreesToRadians;
+  final lat2 = b.latitude * degreesToRadians;
+  final h =
+      math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.cos(lat1) * math.cos(lat2) * math.sin(dLng / 2) * math.sin(dLng / 2);
+  return 2 * earthRadiusM * math.asin(math.sqrt(h));
 }

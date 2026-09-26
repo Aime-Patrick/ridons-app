@@ -57,9 +57,7 @@ class TripApi {
   }
 
   Future<void> cancelRequest(String requestId) async {
-    await _api.dio.post<Map<String, dynamic>>(
-      '/rides/$requestId/cancel',
-    );
+    await _api.dio.post<Map<String, dynamic>>('/rides/$requestId/cancel');
   }
 
   Future<List<RideOffer>> inbox() async {
@@ -79,9 +77,19 @@ class TripApi {
     }
   }
 
-  Future<ActiveRide> accept(String requestId) async {
+  Future<ActiveRide> accept(
+    String requestId, {
+    String driverName = '',
+    String vehiclePlate = '',
+    double driverRating = 0,
+  }) async {
     final response = await _api.dio.post<Map<String, dynamic>>(
       '/driver/requests/$requestId/accept',
+      data: {
+        if (driverName.trim().isNotEmpty) 'driverName': driverName.trim(),
+        if (vehiclePlate.trim().isNotEmpty) 'vehiclePlate': vehiclePlate.trim(),
+        if (driverRating > 0) 'driverRating': driverRating,
+      },
     );
     final data = response.data ?? const {};
     return ActiveRide(
@@ -95,20 +103,39 @@ class TripApi {
     );
   }
 
-  Future<void> counter(String requestId, int price) async {
+  Future<void> counter(
+    String requestId,
+    int price, {
+    String driverName = '',
+    String vehiclePlate = '',
+    double driverRating = 0,
+  }) async {
     await _api.dio.post<Map<String, dynamic>>(
       '/driver/requests/$requestId/counter',
-      data: {'price': FarePolicy.normalize(price)},
+      data: {
+        'price': FarePolicy.normalize(price),
+        if (driverName.trim().isNotEmpty) 'driverName': driverName.trim(),
+        if (vehiclePlate.trim().isNotEmpty) 'vehiclePlate': vehiclePlate.trim(),
+        if (driverRating > 0) 'driverRating': driverRating,
+      },
     );
   }
 
   Future<RideAssignment> acceptBid({
     required String requestId,
     required String bidId,
+    String driverName = '',
+    String vehiclePlate = '',
+    double driverRating = 0,
   }) async {
     final response = await _api.dio.post<Map<String, dynamic>>(
       '/rides/$requestId/accept-bid',
-      data: {'bidId': bidId},
+      data: {
+        'bidId': bidId,
+        if (driverName.trim().isNotEmpty) 'driverName': driverName.trim(),
+        if (vehiclePlate.trim().isNotEmpty) 'vehiclePlate': vehiclePlate.trim(),
+        if (driverRating > 0) 'driverRating': driverRating,
+      },
     );
     return RideAssignment.fromJson(
       response.data ?? const {},
@@ -187,7 +214,9 @@ class TripApi {
 
   Future<DriverStats> stats() async {
     try {
-      final response = await _api.dio.get<Map<String, dynamic>>('/driver/stats');
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/driver/stats',
+      );
       return DriverStats.fromJson(response.data ?? const {});
     } on DioException {
       return const DriverStats();
@@ -229,7 +258,9 @@ class TripApi {
         : (raw is Map ? (raw['trips'] as List? ?? const []) : const []);
     return list
         .whereType<Map>()
-        .map((item) => TripHistoryItem.fromJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) => TripHistoryItem.fromJson(Map<String, dynamic>.from(item)),
+        )
         .toList(growable: false);
   }
 }

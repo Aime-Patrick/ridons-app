@@ -5,7 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../domain/models/ride_offer.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/ridons_button.dart';
-import '../../core/widgets/ridons_tile_layer.dart';
+import '../../core/widgets/ridons_bottom_sheet.dart';
+import '../../core/widgets/ridons_map_view.dart';
 import '../../core/widgets/map_marker_info_sheet.dart';
 import 'view_models/driver_home_view_model.dart';
 
@@ -31,7 +32,10 @@ class DriverTripView extends StatelessWidget {
                 elevation: 3,
                 borderRadius: BorderRadius.circular(20),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   child: Text(
                     viewModel.etaChip,
                     style: const TextStyle(
@@ -53,26 +57,35 @@ class DriverTripView extends StatelessWidget {
   }
 }
 
-class _TripMap extends StatelessWidget {
+class _TripMap extends StatefulWidget {
   const _TripMap({required this.viewModel, required this.ride});
 
   final DriverHomeViewModel viewModel;
   final ActiveRide ride;
 
   @override
+  State<_TripMap> createState() => _TripMapState();
+}
+
+class _TripMapState extends State<_TripMap> {
+  final MapController _controller = MapController();
+
+  @override
   Widget build(BuildContext context) {
+    final viewModel = widget.viewModel;
+    final ride = widget.ride;
     final you = viewModel.driverPoint ?? ride.from;
-    final dest = viewModel.stage == DriverStage.driving ? ride.to : ride.from;
+    final dest = viewModel.stage == DriverStage.driving
+        ? ride.to
+        : (viewModel.passengerPoint ?? ride.from);
     final points = viewModel.routePoints.length >= 2
         ? viewModel.routePoints
         : [you, dest];
-    return FlutterMap(
-      options: MapOptions(
-        initialCenter: you,
-        initialZoom: 14.5,
-      ),
-      children: [
-        ...RidonsMapTiles.layers(context),
+    return RidonsMapView(
+      controller: _controller,
+      center: you,
+      initialZoom: 15.4,
+      layers: [
         PolylineLayer(
           polylines: [
             Polyline(
@@ -92,7 +105,7 @@ class _TripMap extends StatelessWidget {
               height: 44,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => showMapMarkerInfoSheet(
+                onTap: () => showMapMarkerInfoDialog(
                   context,
                   title: 'Driver',
                   subtitle: viewModel.user.displayName,
@@ -103,42 +116,41 @@ class _TripMap extends StatelessWidget {
                     'Ride': ride.rideId,
                   },
                 ),
-                child: CircleAvatar(
+                child: const CircleAvatar(
                   backgroundColor: RidonsColors.navy,
-                  child: Text(
-                    ride.passengerName.isEmpty ? '?' : ride.passengerName[0],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  child: Icon(Icons.two_wheeler, color: Colors.white),
                 ),
               ),
             ),
             Marker(
               point: dest,
-              width: 22,
-              height: 22,
+              width: 44,
+              height: 44,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => showMapMarkerInfoSheet(
+                onTap: () => showMapMarkerInfoDialog(
                   context,
                   title: 'Passenger',
                   subtitle: ride.passengerName,
                   details: {
                     if (ride.passengerPhone.isNotEmpty)
                       'Phone': ride.passengerPhone,
-                    'Pickup': ride.fromName.isNotEmpty
-                        ? ride.fromName
-                        : '${ride.from.latitude.toStringAsFixed(5)}, ${ride.from.longitude.toStringAsFixed(5)}',
+                    'Location': viewModel.passengerPoint == null
+                        ? (ride.fromName.isNotEmpty
+                              ? ride.fromName
+                              : '${ride.from.latitude.toStringAsFixed(5)}, ${ride.from.longitude.toStringAsFixed(5)}')
+                        : '${viewModel.passengerPoint!.latitude.toStringAsFixed(5)}, ${viewModel.passengerPoint!.longitude.toStringAsFixed(5)}',
                     'Ride': ride.rideId,
                   },
                 ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: RidonsColors.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
+                child: CircleAvatar(
+                  backgroundColor: RidonsColors.primaryLight,
+                  foregroundColor: RidonsColors.primaryDark,
+                  child: Text(
+                    ride.passengerName.isEmpty
+                        ? 'P'
+                        : ride.passengerName[0].toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -159,83 +171,83 @@ class _TripSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final driving = viewModel.stage == DriverStage.driving;
-    return Material(
-      color: context.ridonsSheet,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      child: SafeArea(
-        top: false,
-        minimum: const EdgeInsets.only(bottom: 8),
+    final arrived = viewModel.stage == DriverStage.arrived;
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 8),
+      child: RidonsBottomSheet(
+        showHandle: false,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.78,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.52,
           ),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            padding: EdgeInsets.zero,
             child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: Text(
-                    driving ? 'Drive to destination' : 'Trip locked',
-                    style: TextStyle(
-                      color: context.ridonsInk,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                const Icon(Icons.lock_rounded, color: RidonsColors.primary),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _PassengerCard(ride: ride),
-            if (!driving) ...[
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Expanded(
-                    child: _MetaCol(label: 'Agreed fare', value: null, ride: null),
-                  ),
-                  Expanded(
-                    child: _MetaCol(
-                      label: 'Payment method',
-                      value: _payLabel(ride.paymentMethod),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${ride.fare} Rwf',
-                      style: TextStyle(
-                        color: context.ridonsInk,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 22,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        driving
+                            ? 'Drive to destination'
+                            : arrived
+                            ? 'Passenger reached'
+                            : 'Heading to passenger',
+                        style: TextStyle(
+                          color: context.ridonsInk,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
+                    Icon(
+                      driving || arrived
+                          ? Icons.navigation_rounded
+                          : Icons.lock_rounded,
+                      size: 18,
+                      color: RidonsColors.primary,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _PassengerCard(ride: ride),
+                if (!driving) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _MetaCol(
+                          label: 'Agreed fare',
+                          value: '${ride.fare} Rwf',
+                        ),
+                      ),
+                      Expanded(
+                        child: _MetaCol(
+                          label: 'Payment method',
+                          value: _payLabel(ride.paymentMethod),
+                        ),
+                      ),
+                    ],
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 12),
+                  RidonsButton(
+                    label: arrived ? 'Start ride' : 'Heading to passenger',
+                    isLoading: viewModel.busy,
+                    onPressed: arrived || ride.status == 'matched'
+                        ? viewModel.startTrip
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  RidonsButton(
+                    label: 'Trip were canceled',
+                    variant: RidonsButtonVariant.secondary,
+                    onPressed: viewModel.cancelTrip,
+                  ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              RidonsButton(
-                label: 'Start a trip',
-                isLoading: viewModel.busy,
-                onPressed: viewModel.startTrip,
-              ),
-              const SizedBox(height: 10),
-              RidonsButton(
-                label: 'Trip were canceled',
-                variant: RidonsButtonVariant.secondary,
-                onPressed: viewModel.cancelTrip,
-              ),
-            ],
-          ],
+              ],
             ),
           ),
         ),
@@ -251,11 +263,10 @@ class _TripSheet extends StatelessWidget {
 }
 
 class _MetaCol extends StatelessWidget {
-  const _MetaCol({required this.label, this.value, this.ride});
+  const _MetaCol({required this.label, required this.value});
 
   final String label;
-  final String? value;
-  final ActiveRide? ride;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
@@ -263,15 +274,14 @@ class _MetaCol extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: TextStyle(color: context.ridonsMuted, fontSize: 12)),
-        if (value != null)
-          Text(
-            value!,
-            style: TextStyle(
-              color: context.ridonsInk,
-              fontWeight: FontWeight.w800,
-              fontSize: 18,
-            ),
+        Text(
+          value,
+          style: TextStyle(
+            color: context.ridonsInk,
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
           ),
+        ),
       ],
     );
   }
@@ -287,7 +297,7 @@ class _PassengerCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.ridonsLine),
       ),
       child: Column(
@@ -308,11 +318,13 @@ class _PassengerCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      ride.passengerName.isEmpty ? 'Passenger' : ride.passengerName,
+                      ride.passengerName.isEmpty
+                          ? 'Passenger'
+                          : ride.passengerName,
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         color: context.ridonsInk,
-                        fontSize: 16,
+                        fontSize: 15,
                       ),
                     ),
                     Text(
@@ -366,7 +378,9 @@ class _PassengerCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: ride.passengerPhone.isEmpty
                       ? null
-                      : () => launchUrl(Uri(scheme: 'tel', path: ride.passengerPhone)),
+                      : () => launchUrl(
+                          Uri(scheme: 'tel', path: ride.passengerPhone),
+                        ),
                   icon: const Icon(Icons.call_outlined),
                   label: const Text('Call'),
                   style: OutlinedButton.styleFrom(
@@ -381,10 +395,9 @@ class _PassengerCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: ride.passengerPhone.isEmpty
                       ? null
-                      : () => launchUrl(Uri(
-                            scheme: 'sms',
-                            path: ride.passengerPhone,
-                          )),
+                      : () => launchUrl(
+                          Uri(scheme: 'sms', path: ride.passengerPhone),
+                        ),
                   icon: const Icon(Icons.chat_bubble_outline),
                   label: const Text('Message'),
                   style: OutlinedButton.styleFrom(
@@ -404,8 +417,10 @@ class _PassengerCard extends StatelessWidget {
   static String _pax(String id) {
     final tail = id.contains('_') ? id.split('_').last : id;
     final cleaned = tail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
-    if (cleaned.isEmpty) return 'PAX-0000';
-    final few = cleaned.length <= 6 ? cleaned : cleaned.substring(cleaned.length - 6);
+    if (cleaned.isEmpty) return '—';
+    final few = cleaned.length <= 6
+        ? cleaned
+        : cleaned.substring(cleaned.length - 6);
     return 'PAX-${few.toUpperCase()}';
   }
 }

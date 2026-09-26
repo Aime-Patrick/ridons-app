@@ -26,7 +26,7 @@ class AccountView extends ConsumerWidget {
         user?.displayName ??
         (user?.role.isDriver == true ? 'Driver' : 'Passenger');
     final idLabel = user == null
-        ? 'Passenger ID · PAX-0000'
+        ? '—'
         : user.roleIdCaption;
 
     return ColoredBox(

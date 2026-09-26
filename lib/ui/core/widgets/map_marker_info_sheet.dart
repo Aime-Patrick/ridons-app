@@ -1,37 +1,37 @@
 import 'package:flutter/material.dart';
 
-Future<void> showMapMarkerInfoSheet(
+Future<void> showMapMarkerInfoDialog(
   BuildContext context, {
   required String title,
   String? subtitle,
   required Map<String, String> details,
 }) {
-  return showModalBottomSheet<void>(
+  return showDialog<void>(
     context: context,
-    showDragHandle: true,
-    builder: (context) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-            ),
             if (subtitle != null && subtitle.trim().isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(subtitle, style: TextStyle(color: Colors.grey.shade600)),
+              Text(
+                subtitle,
+                style: TextStyle(color: Theme.of(dialogContext).hintColor),
+              ),
+              const SizedBox(height: 16),
             ],
-            const SizedBox(height: 16),
             for (final entry in details.entries) ...[
               Row(
                 children: [
                   Expanded(
                     child: Text(
                       entry.key,
-                      style: TextStyle(color: Colors.grey.shade600),
+                      style: TextStyle(
+                        color: Theme.of(dialogContext).hintColor,
+                      ),
                     ),
                   ),
                   Flexible(
@@ -48,6 +48,12 @@ Future<void> showMapMarkerInfoSheet(
           ],
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Close'),
+        ),
+      ],
     ),
   );
 }

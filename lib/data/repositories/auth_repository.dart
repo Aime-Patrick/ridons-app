@@ -147,6 +147,8 @@ class RemoteAuthRepository implements AuthRepository {
     } on DioException catch (e) {
       // Only drop the session on auth failure — keep tokens on network/5xx.
       if (e.response?.statusCode == 401) {
+        final refreshed = await refreshSession();
+        if (refreshed != null) return refreshed;
         await _tokens.clear();
       }
       return null;

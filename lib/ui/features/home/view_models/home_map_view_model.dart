@@ -132,7 +132,8 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   String get etaLabel {
-    final minutes = etaMinutes ?? (tripDurationMin > 0 ? tripDurationMin : null);
+    final minutes =
+        etaMinutes ?? (tripDurationMin > 0 ? tripDurationMin : null);
     if (minutes == null) return '—';
     if (minutes < 1) return '<1 min';
     return '$minutes min';
@@ -349,21 +350,18 @@ class HomeMapViewModel extends ChangeNotifier {
       unawaited(_pingLocation());
     });
     _gpsSub?.cancel();
-    _gpsSub = _locationService.positionStream().listen(
-      (position) {
-        final firstFix = _lastFix == null;
-        _lastFix = position;
-        if (_pickupFollowsGps && firstFix) {
-          _applyGps(position);
-          _schedulePickupRename(position.latitude, position.longitude);
-        } else if (_pickupFollowsGps) {
-          _maybeResnapFromGps(position);
-        }
-        notifyListeners();
-        unawaited(_pingLocation());
-      },
-      onError: (_) {},
-    );
+    _gpsSub = _locationService.positionStream().listen((position) {
+      final firstFix = _lastFix == null;
+      _lastFix = position;
+      if (_pickupFollowsGps && firstFix) {
+        _applyGps(position);
+        _schedulePickupRename(position.latitude, position.longitude);
+      } else if (_pickupFollowsGps) {
+        _maybeResnapFromGps(position);
+      }
+      notifyListeners();
+      unawaited(_pingLocation());
+    }, onError: (_) {});
     await _refreshNearby();
     await _pingLocation();
   }
@@ -377,8 +375,9 @@ class HomeMapViewModel extends ChangeNotifier {
     final heading = (fix != null && fix.heading.isFinite && fix.heading >= 0)
         ? fix.heading
         : 0.0;
-    final speedMps =
-        (fix != null && fix.speed.isFinite) ? math.max(0, fix.speed) : 0.0;
+    final speedMps = (fix != null && fix.speed.isFinite)
+        ? math.max(0, fix.speed)
+        : 0.0;
     await _geoApi.ping(
       lat: lat,
       lng: lng,
@@ -424,10 +423,9 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   Future<void> _refreshNearby() async {
-    final origin = userPoint ??
-        (pickup == null
-            ? null
-            : LatLng(pickup!.latitude, pickup!.longitude));
+    final origin =
+        userPoint ??
+        (pickup == null ? null : LatLng(pickup!.latitude, pickup!.longitude));
     if (origin == null) return;
     final drivers = await _geoApi.nearby(
       lat: origin.latitude,
@@ -462,7 +460,8 @@ class HomeMapViewModel extends ChangeNotifier {
         existing.speedKmh = driver.speedKmh;
       }
     }
-    _tracked.removeWhere((id, _) => !seen.contains(id));
+    final assignedId = stage == RideStage.matched ? focusedDriverId : null;
+    _tracked.removeWhere((id, _) => !seen.contains(id) && id != assignedId);
     _publishMarkers();
     if (focusedDriverId == null || !_tracked.containsKey(focusedDriverId)) {
       focusedDriverId = drivers.isEmpty ? null : drivers.first.id;
@@ -520,6 +519,15 @@ class HomeMapViewModel extends ChangeNotifier {
       return;
     }
     if (message.event == 'location') {
+      if ('${message.data['role'] ?? ''}'.toLowerCase() != 'driver') {
+        return;
+      }
+      final rideId = '${message.data['rideId'] ?? ''}';
+      if (liveRideId != null &&
+          liveRideId!.isNotEmpty &&
+          rideId != liveRideId) {
+        return;
+      }
       final id = (message.data['driverId'] ?? '').toString();
       final coords = message.data['coords'];
       if (id.isEmpty || coords is! List || coords.length < 2) return;
@@ -544,6 +552,7 @@ class HomeMapViewModel extends ChangeNotifier {
         existing.speedKmh = speed;
       }
       _publishMarkers();
+      if (stage == RideStage.matched) unawaited(_refreshEta());
       notifyListeners();
       return;
     }
@@ -596,8 +605,7 @@ class HomeMapViewModel extends ChangeNotifier {
 
   Future<void> _refreshEta() async {
     final origin = pickup;
-    final tracked =
-        focusedDriverId == null ? null : _tracked[focusedDriverId!];
+    final tracked = focusedDriverId == null ? null : _tracked[focusedDriverId!];
     final driver = tracked ?? (_tracked.isEmpty ? null : _tracked.values.first);
     if (origin == null || driver == null) {
       etaMinutes = null;
@@ -645,10 +653,9 @@ class HomeMapViewModel extends ChangeNotifier {
     final gen = ++_searchGen;
     searchingPlaces = suggestions.isEmpty;
     if (searchingPlaces) notifyListeners();
-    final origin = userPoint ??
-        (pickup == null
-            ? null
-            : LatLng(pickup!.latitude, pickup!.longitude));
+    final origin =
+        userPoint ??
+        (pickup == null ? null : LatLng(pickup!.latitude, pickup!.longitude));
     final results = await _placesService.search(
       query: query,
       latitude: origin?.latitude,
@@ -802,6 +809,9 @@ class HomeMapViewModel extends ChangeNotifier {
       final assignment = await api.acceptBid(
         requestId: requestId,
         bidId: bid.bidId,
+        driverName: bid.driverName,
+        vehiclePlate: bid.vehiclePlate,
+        driverRating: bid.driverRating,
       );
       final driverId = assignment.driverId.isEmpty
           ? bid.driverId
@@ -809,9 +819,15 @@ class HomeMapViewModel extends ChangeNotifier {
       agreedFare = assignment.fare > 0 ? assignment.fare : bid.price;
       liveRideId = assignment.rideId.isEmpty ? liveRideId : assignment.rideId;
       matchedDriver = MatchedDriver(
-        name: bid.driverLabel,
-        plate: '',
-        rating: 0,
+        name: assignment.driverName.isNotEmpty
+            ? assignment.driverName
+            : (bid.driverName.isNotEmpty ? bid.driverName : bid.driverLabel),
+        plate: assignment.vehiclePlate.isNotEmpty
+            ? assignment.vehiclePlate
+            : bid.vehiclePlate,
+        rating: assignment.driverRating > 0
+            ? assignment.driverRating
+            : bid.driverRating,
       );
       counterOffers = const [];
       unawaited(_realtime.unsubscribe('request:$requestId'));
@@ -861,6 +877,10 @@ class HomeMapViewModel extends ChangeNotifier {
       focusedDriverId = _tracked.keys.first;
     }
     counterOffers = const [];
+    final rideId = liveRideId;
+    if (rideId != null && rideId.isNotEmpty) {
+      unawaited(_realtime.subscribe('ride:$rideId'));
+    }
     unawaited(_refreshEta());
     notifyListeners();
   }
@@ -918,6 +938,10 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   void resetToHome() {
+    final rideId = liveRideId;
+    if (rideId != null && rideId.isNotEmpty) {
+      unawaited(_realtime.unsubscribe('ride:$rideId'));
+    }
     _ticker?.cancel();
     _matchTimer?.cancel();
     dropoff = null;
@@ -936,6 +960,10 @@ class HomeMapViewModel extends ChangeNotifier {
     tripKm = 0;
     tripDurationMin = 0;
     routeMethod = '';
+    liveRequestId = null;
+    liveRideId = null;
+    matchedDriver = null;
+    focusedDriverId = null;
     _pickupFollowsGps = true;
     stage = RideStage.route;
     notifyListeners();
@@ -1036,9 +1064,7 @@ class HomeMapViewModel extends ChangeNotifier {
       final result = await _routingService.route(from, to);
       if (gen != _routeGen) return;
       routePoints = result.points;
-      routeAlternatives = [
-        for (final alt in result.alternatives) alt.points,
-      ];
+      routeAlternatives = [for (final alt in result.alternatives) alt.points];
       routeSteps = result.steps;
       tripKm = result.distanceKm;
       tripDurationMin = result.durationMin;
@@ -1104,7 +1130,8 @@ double _metersBetween(LatLng a, LatLng b) {
   const earth = 6371000.0;
   final dLat = (b.latitude - a.latitude) * math.pi / 180;
   final dLng = (b.longitude - a.longitude) * math.pi / 180;
-  final x = math.sin(dLat / 2) * math.sin(dLat / 2) +
+  final x =
+      math.sin(dLat / 2) * math.sin(dLat / 2) +
       math.cos(a.latitude * math.pi / 180) *
           math.cos(b.latitude * math.pi / 180) *
           math.sin(dLng / 2) *

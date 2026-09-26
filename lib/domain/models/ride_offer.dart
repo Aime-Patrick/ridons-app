@@ -54,7 +54,7 @@ class RideOffer {
     final tail =
         passengerId.contains('_') ? passengerId.split('_').last : passengerId;
     final cleaned = tail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
-    if (cleaned.isEmpty) return 'PAX-0000';
+    if (cleaned.isEmpty) return '—';
     final few = cleaned.length <= 6
         ? cleaned
         : cleaned.substring(cleaned.length - 6);

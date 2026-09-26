@@ -9,6 +9,9 @@ class RideBid {
     this.isCounter = true,
     this.etaMin = 0,
     this.distanceKm = 0,
+    this.driverName = '',
+    this.vehiclePlate = '',
+    this.driverRating = 0,
   });
 
   final String bidId;
@@ -18,6 +21,9 @@ class RideBid {
   final bool isCounter;
   final int etaMin;
   final double distanceKm;
+  final String driverName;
+  final String vehiclePlate;
+  final double driverRating;
 
   String get driverLabel {
     final raw = driverId.trim();
@@ -37,10 +43,7 @@ class RideBid {
     return 'Nearby driver';
   }
 
-  factory RideBid.fromJson(
-    Map<String, dynamic> json, {
-    String? requestId,
-  }) {
+  factory RideBid.fromJson(Map<String, dynamic> json, {String? requestId}) {
     return RideBid(
       bidId: '${json['bidId'] ?? json['id'] ?? ''}',
       requestId: '${json['requestId'] ?? requestId ?? ''}',
@@ -49,6 +52,9 @@ class RideBid {
       isCounter: json['isCounter'] as bool? ?? true,
       etaMin: (json['etaMin'] as num?)?.toInt() ?? 0,
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0,
+      driverName: '${json['driverName'] ?? ''}',
+      vehiclePlate: '${json['vehiclePlate'] ?? ''}',
+      driverRating: (json['driverRating'] as num?)?.toDouble() ?? 0,
     );
   }
 }
@@ -60,6 +66,9 @@ class RideAssignment {
     required this.driverId,
     required this.status,
     required this.fare,
+    this.driverName = '',
+    this.vehiclePlate = '',
+    this.driverRating = 0,
   });
 
   final String rideId;
@@ -67,6 +76,9 @@ class RideAssignment {
   final String driverId;
   final String status;
   final int fare;
+  final String driverName;
+  final String vehiclePlate;
+  final double driverRating;
 
   factory RideAssignment.fromJson(
     Map<String, dynamic> json, {
@@ -78,6 +90,9 @@ class RideAssignment {
       driverId: '${json['driverId'] ?? ''}',
       status: '${json['status'] ?? 'matched'}',
       fare: (json['fare'] as num?)?.toInt() ?? 0,
+      driverName: '${json['driverName'] ?? ''}',
+      vehiclePlate: '${json['vehiclePlate'] ?? ''}',
+      driverRating: (json['driverRating'] as num?)?.toDouble() ?? 0,
     );
   }
 }
