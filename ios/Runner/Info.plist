@@ -10,6 +10,12 @@
 		<string>Ridons uses your location to find pickup points and calculate routes.</string>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 		<string>Ridons uses your location to keep your trip on the map while you ride.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>Ridons uses your location to keep your driver status and trip location current in the background.</string>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>location</string>
+		</array>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>CFBundleDevelopmentRegion</key>

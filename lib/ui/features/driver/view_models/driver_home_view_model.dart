@@ -94,7 +94,17 @@ class DriverHomeViewModel extends ChangeNotifier {
     _ws = _realtime.messages.listen(_onRealtime);
     unawaited(_realtime.connect());
     unawaited(_realtime.subscribe('driver:${user.id}'));
-    _gps = _location.positionStream().listen((position) {
+    _startGpsTracking(background: onTrip);
+    final shouldResumeOnline = await _location.driverOnlineIntent();
+    if (shouldResumeOnline) {
+      await toggleOnline(true);
+    }
+    notifyListeners();
+  }
+
+  void _startGpsTracking({required bool background}) {
+    _gps?.cancel();
+    _gps = _location.positionStream(background: background).listen((position) {
       _fix = position;
       driverPoint = LatLng(position.latitude, position.longitude);
       if (online || onTrip) {
@@ -102,13 +112,14 @@ class DriverHomeViewModel extends ChangeNotifier {
           _geo.ping(
             lat: position.latitude,
             lng: position.longitude,
+            headingDeg: position.heading.isFinite ? position.heading : 0,
+            speedKmh: position.speed.isFinite ? position.speed * 3.6 : 0,
             rideId: ride?.rideId,
           ),
         );
       }
       notifyListeners();
     });
-    notifyListeners();
   }
 
   Future<void> toggleOnline(bool value) async {
@@ -119,6 +130,16 @@ class DriverHomeViewModel extends ChangeNotifier {
     errorMessage = null;
     notifyListeners();
     try {
+      if (value) {
+        final backgroundReady =
+            await _location.ensureLocationPermission(background: true);
+        if (!backgroundReady) {
+          online = previous;
+          errorMessage = 'Allow background location to stay online.';
+          return;
+        }
+        await _location.requestNotifications();
+      }
       final fix = _fix ?? await _location.currentPosition();
       if (value && fix == null) {
         online = previous;
@@ -162,16 +183,26 @@ class DriverHomeViewModel extends ChangeNotifier {
       }
       online = value;
       errorMessage = null;
+      await _location.setDriverOnlineIntent(value);
+      _startGpsTracking(background: value || onTrip);
       if (online) {
         _inboxPoll?.cancel();
         _inboxPoll = Timer.periodic(const Duration(seconds: 4), (_) {
           unawaited(refreshInbox());
         });
         _pingTimer?.cancel();
-        _pingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+        _pingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
           final pos = _fix;
           if (pos == null) return;
-          unawaited(_geo.ping(lat: pos.latitude, lng: pos.longitude));
+          unawaited(
+            _geo.ping(
+              lat: pos.latitude,
+              lng: pos.longitude,
+              headingDeg: pos.heading.isFinite ? pos.heading : 0,
+              speedKmh: pos.speed.isFinite ? pos.speed * 3.6 : 0,
+              rideId: ride?.rideId,
+            ),
+          );
         });
         unawaited(refreshInbox());
       } else {
@@ -419,6 +450,7 @@ class DriverHomeViewModel extends ChangeNotifier {
     if (online) {
       unawaited(_geo.setOnline(online: false));
     }
+    unawaited(_location.setDriverOnlineIntent(false));
     super.dispose();
   }
 }

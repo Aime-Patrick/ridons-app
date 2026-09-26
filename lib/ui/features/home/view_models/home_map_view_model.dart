@@ -326,7 +326,7 @@ class HomeMapViewModel extends ChangeNotifier {
       _interpolate();
     });
     _pingTimer?.cancel();
-    _pingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+    _pingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       unawaited(_pingLocation());
     });
     _gpsSub?.cancel();

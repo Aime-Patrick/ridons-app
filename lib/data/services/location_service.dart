@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class LocationService {
   static const _latKey = 'ridons.last_lat';
   static const _lngKey = 'ridons.last_lng';
+  static const _driverOnlineKey = 'ridons.driver_online_intent';
 
   Future<bool> hasLocationPermission() async {
     try {
@@ -21,7 +22,7 @@ class LocationService {
     }
   }
 
-  Future<bool> ensureLocationPermission() async {
+  Future<bool> ensureLocationPermission({bool background = false}) async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -35,6 +36,10 @@ class LocationService {
       if (permission == LocationPermission.deniedForever ||
           permission == LocationPermission.denied) {
         return false;
+      }
+      if (background && permission != LocationPermission.always) {
+        final always = await Permission.locationAlways.request();
+        if (!always.isGranted) return false;
       }
       return true;
     } catch (_) {
@@ -74,9 +79,9 @@ class LocationService {
     }
   }
 
-  Stream<Position> positionStream() {
+  Stream<Position> positionStream({bool background = false}) {
     return Geolocator.getPositionStream(
-      locationSettings: _settings(distanceFilter: 5),
+      locationSettings: _settings(distanceFilter: 5, background: background),
     ).asyncMap((position) async {
       await remember(position.latitude, position.longitude);
       return position;
@@ -89,6 +94,22 @@ class LocationService {
       await prefs.setDouble(_latKey, latitude);
       await prefs.setDouble(_lngKey, longitude);
     } catch (_) {}
+  }
+
+  Future<void> setDriverOnlineIntent(bool online) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_driverOnlineKey, online);
+    } catch (_) {}
+  }
+
+  Future<bool> driverOnlineIntent() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_driverOnlineKey) ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<Position?> _cachedPosition() async {
@@ -117,26 +138,39 @@ class LocationService {
   LocationSettings _settings({
     Duration? timeLimit,
     int distanceFilter = 0,
+    bool background = false,
   }) {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return AndroidSettings(
-        accuracy: LocationAccuracy.high,
+        accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: distanceFilter,
-        // Emulator + many devices resolve faster via the legacy LM.
-        forceLocationManager: true,
+        intervalDuration: const Duration(seconds: 4),
+        forceLocationManager: false,
         timeLimit: timeLimit,
+        foregroundNotificationConfig: background
+            ? const ForegroundNotificationConfig(
+                notificationTitle: 'Ridons driver mode',
+                notificationText: 'Your live location is active while you are online.',
+                notificationChannelName: 'Ridons driver location',
+                enableWakeLock: true,
+                enableWifiLock: true,
+                setOngoing: true,
+              )
+            : null,
       );
     }
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return AppleSettings(
-        accuracy: LocationAccuracy.high,
+        accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: distanceFilter,
         timeLimit: timeLimit,
         activityType: ActivityType.automotiveNavigation,
+        allowBackgroundLocationUpdates: background,
+        showBackgroundLocationIndicator: background,
       );
     }
     return LocationSettings(
-      accuracy: LocationAccuracy.high,
+      accuracy: LocationAccuracy.bestForNavigation,
       distanceFilter: distanceFilter,
       timeLimit: timeLimit,
     );
