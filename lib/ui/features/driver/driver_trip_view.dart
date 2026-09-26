@@ -6,6 +6,7 @@ import '../../../domain/models/ride_offer.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/ridons_button.dart';
 import '../../core/widgets/ridons_tile_layer.dart';
+import '../../core/widgets/map_marker_info_sheet.dart';
 import 'view_models/driver_home_view_model.dart';
 
 class DriverTripView extends StatelessWidget {
@@ -89,11 +90,28 @@ class _TripMap extends StatelessWidget {
               point: you,
               width: 44,
               height: 44,
-              child: CircleAvatar(
-                backgroundColor: RidonsColors.navy,
-                child: Text(
-                  ride.passengerName.isEmpty ? 'P' : ride.passengerName[0],
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => showMapMarkerInfoSheet(
+                  context,
+                  title: 'Driver',
+                  subtitle: viewModel.user.displayName,
+                  details: {
+                    'Status': 'Active',
+                    'Location':
+                        '${you.latitude.toStringAsFixed(5)}, ${you.longitude.toStringAsFixed(5)}',
+                    'Ride': ride.rideId,
+                  },
+                ),
+                child: CircleAvatar(
+                  backgroundColor: RidonsColors.navy,
+                  child: Text(
+                    ride.passengerName.isEmpty ? '?' : ride.passengerName[0],
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -101,11 +119,27 @@ class _TripMap extends StatelessWidget {
               point: dest,
               width: 22,
               height: 22,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: RidonsColors.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => showMapMarkerInfoSheet(
+                  context,
+                  title: 'Passenger',
+                  subtitle: ride.passengerName,
+                  details: {
+                    if (ride.passengerPhone.isNotEmpty)
+                      'Phone': ride.passengerPhone,
+                    'Pickup': ride.fromName.isNotEmpty
+                        ? ride.fromName
+                        : '${ride.from.latitude.toStringAsFixed(5)}, ${ride.from.longitude.toStringAsFixed(5)}',
+                    'Ride': ride.rideId,
+                  },
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: RidonsColors.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 3),
+                  ),
                 ),
               ),
             ),

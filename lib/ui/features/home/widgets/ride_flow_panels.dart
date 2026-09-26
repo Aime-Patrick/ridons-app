@@ -675,7 +675,7 @@ class _MatchedSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final driver = HomeMapViewModel.matchedDriver;
+    final driver = viewModel.matchedDriver;
     return RidonsBottomSheet(
       showHandle: false,
       decorate: decorate,
@@ -715,9 +715,11 @@ class _MatchedSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: RidonsDriverCard(
-              name: driver.name,
-              plate: driver.plate,
-              rating: driver.rating,
+              name: driver?.name.isNotEmpty == true
+                  ? driver!.name
+                  : 'Driver details pending',
+              plate: driver?.plate ?? '',
+              rating: driver?.rating ?? 0,
             ),
           ),
           const SizedBox(height: 12),

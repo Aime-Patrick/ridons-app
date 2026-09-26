@@ -67,11 +67,7 @@ class HomeMapViewModel extends ChangeNotifier {
   final SupportApi? _supportApi;
   final String passengerName;
 
-  static const matchedDriver = MatchedDriver(
-    name: 'Jean Bosco Nsabimana',
-    plate: 'SPIRO-RAD 562 B',
-    rating: 4.5,
-  );
+  MatchedDriver? matchedDriver;
 
   RideStage stage = RideStage.route;
   bool locationPromptNeeded = false;
@@ -137,11 +133,15 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   String get driverReceiptLabel {
-    final parts = matchedDriver.name.trim().split(RegExp(r'\s+'));
+    final driver = matchedDriver;
+    if (driver == null || driver.name.trim().isEmpty) {
+      return 'Driver details pending';
+    }
+    final parts = driver.name.trim().split(RegExp(r'\s+'));
     final short = parts.length <= 1
-        ? matchedDriver.name
+        ? driver.name
         : '${parts.sublist(0, parts.length - 1).join(' ')} ${parts.last[0]}.';
-    return '$short - ${matchedDriver.plate}';
+    return driver.plate.trim().isEmpty ? short : '$short - ${driver.plate}';
   }
 
   String get receiptSummary {
@@ -509,6 +509,15 @@ class HomeMapViewModel extends ChangeNotifier {
     if (message.event == 'matched' && stage == RideStage.offering) {
       final id = '${message.data['rideId'] ?? ''}';
       if (id.isNotEmpty) liveRideId = id;
+      final driverId = '${message.data['driverId'] ?? ''}';
+      matchedDriver = MatchedDriver(
+        name: '${message.data['driverName'] ?? ''}',
+        plate: '${message.data['vehiclePlate'] ?? ''}',
+        rating: (message.data['driverRating'] as num?)?.toDouble() ?? 0,
+      );
+      if (driverId.isNotEmpty && !_tracked.containsKey(driverId)) {
+        focusedDriverId = driverId;
+      }
       showMatch();
       return;
     }

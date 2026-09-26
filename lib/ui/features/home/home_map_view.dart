@@ -13,6 +13,7 @@ import '../../../domain/models/geo_place.dart';
 import '../../../domain/models/ride_stage.dart';
 import '../../../domain/models/session_user.dart';
 import '../account/passenger_avatar.dart';
+import '../../core/widgets/map_marker_info_sheet.dart';
 import 'view_models/home_map_view_model.dart';
 import 'widgets/ride_flow_panels.dart';
 
@@ -511,28 +512,55 @@ class _PassengerMap extends StatelessWidget {
                   point: driver.point,
                   width: 32,
                   height: 32,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: RidonsColors.navy,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: driver.id == viewModel.focusedDriverId
-                            ? RidonsColors.accent
-                            : Colors.white,
-                        width: 2,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0x33000000), blurRadius: 4),
-                      ],
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => showMapMarkerInfoSheet(
+                      context,
+                      title: 'Driver',
+                      subtitle: driver.id,
+                      details: {
+                        'Status': 'Online',
+                        'Speed': '${driver.speedKmh.toStringAsFixed(1)} km/h',
+                        'Heading': '${driver.headingDeg.toStringAsFixed(0)}°',
+                      },
                     ),
-                    child: const Icon(
-                      Icons.two_wheeler,
-                      color: Colors.white,
-                      size: 16,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: RidonsColors.navy,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: driver.id == viewModel.focusedDriverId
+                              ? RidonsColors.accent
+                              : Colors.white,
+                          width: 2,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x33000000), blurRadius: 4),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.two_wheeler,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                   ),
                 ),
-            if (you != null) _youMarker(you, user: user, token: token),
+            if (you != null)
+              _youMarker(
+                you,
+                user: user,
+                token: token,
+                onTap: () => showMapMarkerInfoSheet(
+                  context,
+                  title: 'Your location',
+                  details: {
+                    'Status': 'Active',
+                    'Coordinates':
+                        '${you.latitude.toStringAsFixed(5)}, ${you.longitude.toStringAsFixed(5)}',
+                  },
+                ),
+              ),
             if (showPickupPin)
               _pinMarker(pickup, Theme.of(context).brightness == Brightness.dark
                   ? Colors.white
@@ -555,38 +583,47 @@ class _PassengerMap extends StatelessWidget {
     );
   }
 
-  Marker _youMarker(LatLng point, {SessionUser? user, String? token}) {
+  Marker _youMarker(
+    LatLng point, {
+    SessionUser? user,
+    String? token,
+    VoidCallback? onTap,
+  }) {
     return Marker(
       point: point,
       width: 44,
       height: 44,
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x66000000),
-              blurRadius: 6,
-              offset: Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Container(
-          decoration: BoxDecoration(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 6,
+                offset: Offset(0, 1),
+              ),
+            ],
           ),
-          child: ClipOval(
-            child: user != null && user.hasChosenAvatar
-                ? PassengerAvatar(user: user, radius: 19, token: token)
-                : const ColoredBox(
-                    color: Color(0xFF4285F4),
-                    child: Icon(
-                      Icons.person_rounded,
-                      color: Colors.white,
-                      size: 22,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+            ),
+            child: ClipOval(
+              child: user != null && user.hasChosenAvatar
+                  ? PassengerAvatar(user: user, radius: 19, token: token)
+                  : const ColoredBox(
+                      color: Color(0xFF4285F4),
+                      child: Icon(
+                        Icons.person_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
-                  ),
+            ),
           ),
         ),
       ),
