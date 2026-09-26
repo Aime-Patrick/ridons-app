@@ -9,6 +9,7 @@ import '../../../domain/models/ride_offer.dart';
 import '../../../domain/models/session_user.dart';
 import '../../core/providers/session_providers.dart';
 import '../../core/theme/ridons_colors.dart';
+import '../../core/widgets/ridons_notification_bell.dart';
 import '../../core/widgets/ridons_price_adjuster.dart';
 import '../account/passenger_avatar.dart';
 import '../notifications/notification_inbox_view.dart';
