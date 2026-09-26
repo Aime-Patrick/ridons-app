@@ -81,7 +81,8 @@ class DriverHomeViewModel extends ChangeNotifier {
 
   Future<void> bootstrap() async {
     await _location.ensureLocationPermission();
-    _fix = await _location.currentPosition();
+    _fix = await _location.freshPosition() ??
+        await _location.lastKnownPosition();
     if (_fix != null) {
       driverPoint = LatLng(_fix!.latitude, _fix!.longitude);
     }
@@ -140,7 +141,9 @@ class DriverHomeViewModel extends ChangeNotifier {
         }
         await _location.requestNotifications();
       }
-      final fix = _fix ?? await _location.currentPosition();
+      // Do not go online using the bootstrap/last-known fix when a fresh GPS
+      // reading is available. The first presence coordinate is user-visible.
+      final fix = await _location.freshPosition() ?? _fix;
       if (value && fix == null) {
         online = previous;
         errorMessage = 'Turn on location to go online.';

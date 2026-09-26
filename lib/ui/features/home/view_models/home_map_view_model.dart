@@ -165,12 +165,9 @@ class HomeMapViewModel extends ChangeNotifier {
   LatLng? get userPoint {
     final fix = _lastFix;
     if (fix != null) {
-      final gps = LatLng(fix.latitude, fix.longitude);
-      if (_pickupFollowsGps && pickup != null) {
-        final named = LatLng(pickup!.latitude, pickup!.longitude);
-        if (_metersBetween(named, gps) < 160) return named;
-      }
-      return gps;
+      // Reverse-geocoded place coordinates are labels, not a replacement for
+      // the device fix. Keep the marker and all presence requests on GPS.
+      return LatLng(fix.latitude, fix.longitude);
     }
     final origin = pickup;
     if (origin == null) return null;
@@ -255,7 +252,7 @@ class HomeMapViewModel extends ChangeNotifier {
 
     // Prefer a fresh GPS fix (emulator Extended Controls / real device).
     // Fall back to OS last-known, then last cached fix — never a hardcoded city.
-    final fresh = await _locationService.currentPosition();
+    final fresh = await _locationService.freshPosition();
     final last = fresh ?? await _locationService.lastKnownPosition();
     if (last != null) {
       _applyGps(last);
@@ -276,7 +273,14 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   Future<void> _renamePickup(double latitude, double longitude) async {
-    pickup = await _placesService.reverse(latitude, longitude);
+    final named = await _placesService.reverse(latitude, longitude);
+    if (!_pickupFollowsGps) return;
+    pickup = GeoPlace(
+      name: named.name,
+      subtitle: named.subtitle,
+      latitude: latitude,
+      longitude: longitude,
+    );
     notifyListeners();
   }
 
@@ -294,15 +298,22 @@ class HomeMapViewModel extends ChangeNotifier {
   Future<void> _refineFixAndName(Position? last) async {
     locating = last == null;
     if (last == null) notifyListeners();
-    final position = await _locationService.currentPosition() ?? last;
+    final position = await _locationService.freshPosition() ?? last;
     if (position != null) {
       _applyGps(position);
       locating = false;
       notifyListeners();
       if (!_pickupFollowsGps) return;
-      pickup = await _placesService.reverse(
+      final named = await _placesService.reverse(
         position.latitude,
         position.longitude,
+      );
+      if (!_pickupFollowsGps) return;
+      pickup = GeoPlace(
+        name: named.name,
+        subtitle: named.subtitle,
+        latitude: position.latitude,
+        longitude: position.longitude,
       );
     }
     locating = false;
@@ -372,6 +383,7 @@ class HomeMapViewModel extends ChangeNotifier {
   void _maybeResnapFromGps(Position position) {
     final origin = pickup;
     if (origin == null) {
+      _applyGps(position);
       _schedulePickupRename(position.latitude, position.longitude);
       return;
     }
@@ -379,9 +391,12 @@ class HomeMapViewModel extends ChangeNotifier {
       LatLng(origin.latitude, origin.longitude),
       LatLng(position.latitude, position.longitude),
     );
-    // GPS often sits on the carriageway while you are in the shop next to it.
-    if (meters < 120) return;
-    _schedulePickupRename(position.latitude, position.longitude);
+    // Keep the exact GPS coordinate even when the display label stays the
+    // same. Reverse geocoding is only used to refresh the label occasionally.
+    _applyGps(position);
+    if (meters >= 120) {
+      _schedulePickupRename(position.latitude, position.longitude);
+    }
   }
 
   void _schedulePickupRename(double lat, double lng) {
@@ -390,7 +405,12 @@ class HomeMapViewModel extends ChangeNotifier {
       if (!_pickupFollowsGps) return;
       final named = await _placesService.reverse(lat, lng);
       if (!_pickupFollowsGps) return;
-      pickup = named;
+      pickup = GeoPlace(
+        name: named.name,
+        subtitle: named.subtitle,
+        latitude: lat,
+        longitude: lng,
+      );
       notifyListeners();
     });
   }

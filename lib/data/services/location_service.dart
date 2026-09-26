@@ -67,7 +67,7 @@ class LocationService {
     return _cachedPosition();
   }
 
-  Future<Position?> currentPosition() async {
+  Future<Position?> currentPosition({bool allowLastKnown = true}) async {
     try {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: _settings(timeLimit: const Duration(seconds: 15)),
@@ -75,9 +75,14 @@ class LocationService {
       await remember(position.latitude, position.longitude);
       return position;
     } catch (_) {
-      return lastKnownPosition();
+      return allowLastKnown ? lastKnownPosition() : null;
     }
   }
+
+  /// Returns only a fresh OS fix. Callers that need a visual fallback should
+  /// request [lastKnownPosition] explicitly so stale coordinates are never
+  /// mistaken for a live position.
+  Future<Position?> freshPosition() => currentPosition(allowLastKnown: false);
 
   Stream<Position> positionStream({bool background = false}) {
     return Geolocator.getPositionStream(
