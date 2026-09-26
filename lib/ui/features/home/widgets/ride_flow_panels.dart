@@ -628,16 +628,15 @@ class _OfferingSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  viewModel.driversViewing == 0
-                      ? 'No riders within 3 km. Waiting in case one comes online…'
-                      : '${viewModel.driversViewing} riders nearby · ETA ${viewModel.etaLabel}',
+                  viewModel.driversNotified == 0
+                      ? 'No drivers have received this offer yet. We will keep searching.'
+                      : '${viewModel.driversNotified} ${viewModel.driversNotified == 1 ? 'driver' : 'drivers'} notified · ETA ${viewModel.etaLabel}',
                   style: TextStyle(
                     color: context.ridonsMuted,
                     fontSize: 11,
                   ),
                 ),
               ),
-              if (viewModel.driversViewing > 0) const _StackedAvatars(),
               const SizedBox(width: 8),
               Text(
                 viewModel.timerLabel,
@@ -1588,36 +1587,6 @@ class _PaymentOption extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _StackedAvatars extends StatelessWidget {
-  const _StackedAvatars();
-
-  @override
-  Widget build(BuildContext context) {
-    const colors = [
-      Color(0xFF0F172A),
-      Color(0xFFC91D22),
-      Color(0xFFF59E0B),
-    ];
-    return SizedBox(
-      width: 64,
-      height: 28,
-      child: Stack(
-        children: [
-          for (var i = 0; i < colors.length; i++)
-            Positioned(
-              left: i * 16.0,
-              child: CircleAvatar(
-                radius: 12,
-                backgroundColor: colors[i],
-                child: const Icon(Icons.person, size: 14, color: Colors.white),
-              ),
-            ),
-        ],
       ),
     );
   }

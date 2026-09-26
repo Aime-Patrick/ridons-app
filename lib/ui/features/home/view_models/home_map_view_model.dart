@@ -89,7 +89,7 @@ class HomeMapViewModel extends ChangeNotifier {
   List<LiveMapMarker> nearbyDrivers = const [];
   int offeredPrice = 1900;
   int agreedFare = 0;
-  int driversViewing = 0;
+  int driversNotified = 0;
   Duration offerTimer = const Duration(seconds: 60);
   String paymentMethod = 'Cash';
   bool loadingRoute = false;
@@ -435,7 +435,7 @@ class HomeMapViewModel extends ChangeNotifier {
     );
     _applyNearby(drivers);
     if (stage != RideStage.offering) {
-      driversViewing = nearbyDrivers.length;
+      driversNotified = nearbyDrivers.length;
     }
     unawaited(_realtime.connect());
     await _realtime.syncDriverChannels(drivers.map((d) => d.id));
@@ -579,7 +579,7 @@ class HomeMapViewModel extends ChangeNotifier {
     if (message.event == 'dispatch' && stage == RideStage.offering) {
       final count = (message.data['candidateCount'] as num?)?.toInt();
       if (count != null) {
-        driversViewing = count;
+        driversNotified = count;
         lastOfferHadRiders = count > 0;
         notifyListeners();
       }
@@ -755,7 +755,7 @@ class HomeMapViewModel extends ChangeNotifier {
     bidError = null;
     agreedFare = 0;
     lastOfferMissed = false;
-    driversViewing = 0;
+    driversNotified = 0;
     lastOfferHadRiders = false;
     _startTimer(const Duration(seconds: 50));
     _matchTimer?.cancel();
@@ -777,7 +777,7 @@ class HomeMapViewModel extends ChangeNotifier {
         passengerName: passengerName,
       );
       liveRequestId = created.requestId;
-      driversViewing = created.candidateCount;
+      driversNotified = created.candidateCount;
       lastOfferHadRiders = created.candidateCount > 0;
       notifyListeners();
       if (liveRequestId != null && liveRequestId!.isNotEmpty) {
