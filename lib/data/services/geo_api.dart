@@ -46,7 +46,6 @@ class GeoApi {
             );
           })
           .whereType<LiveMapMarker>()
-          .where((marker) => !marker.id.startsWith('sim_drv'))
           .toList(growable: false);
     } on DioException {
       return const [];
