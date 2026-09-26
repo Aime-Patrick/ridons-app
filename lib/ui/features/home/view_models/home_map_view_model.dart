@@ -110,7 +110,6 @@ class HomeMapViewModel extends ChangeNotifier {
   Timer? _ticker;
   Timer? _matchTimer;
   Timer? _searchDebounce;
-  Timer? _nearbyPoll;
   Timer? _interp;
   Timer? _pingTimer;
   StreamSubscription<Position>? _gpsSub;
@@ -337,10 +336,7 @@ class HomeMapViewModel extends ChangeNotifier {
     _liveStarted = true;
     _wsSub = _realtime.messages.listen(_onRealtime);
     unawaited(_realtime.connect());
-    _nearbyPoll?.cancel();
-    _nearbyPoll = Timer.periodic(const Duration(seconds: 4), (_) {
-      unawaited(_refreshNearby());
-    });
+    await _realtime.subscribe('marketplace:presence');
     _interp?.cancel();
     _interp = Timer.periodic(const Duration(milliseconds: 250), (_) {
       _interpolate();
@@ -525,6 +521,7 @@ class HomeMapViewModel extends ChangeNotifier {
       final rideId = '${message.data['rideId'] ?? ''}';
       if (liveRideId != null &&
           liveRideId!.isNotEmpty &&
+          rideId.isNotEmpty &&
           rideId != liveRideId) {
         return;
       }
@@ -534,6 +531,12 @@ class HomeMapViewModel extends ChangeNotifier {
       final lat = (coords[0] as num?)?.toDouble();
       final lng = (coords[1] as num?)?.toDouble();
       if (lat == null || lng == null) return;
+      if (rideId.isEmpty && !_isNearUser(LatLng(lat, lng))) {
+        _tracked.remove(id);
+        _publishMarkers();
+        notifyListeners();
+        return;
+      }
       final existing = _tracked[id];
       final point = LatLng(lat, lng);
       final heading = (message.data['headingDeg'] as num?)?.toDouble() ?? 0;
@@ -553,6 +556,40 @@ class HomeMapViewModel extends ChangeNotifier {
       }
       _publishMarkers();
       if (stage == RideStage.matched) unawaited(_refreshEta());
+      notifyListeners();
+      return;
+    }
+    if (message.event == 'presence') {
+      if ('${message.data['role'] ?? 'driver'}'.toLowerCase() != 'driver') {
+        return;
+      }
+      final id = '${message.data['driverId'] ?? ''}';
+      final online = message.data['online'] == true;
+      if (id.isEmpty || !online) {
+        if (id.isNotEmpty) _tracked.remove(id);
+        _publishMarkers();
+        notifyListeners();
+        return;
+      }
+      final coords = message.data['coords'];
+      if (coords is! List || coords.length < 2) return;
+      final lat = (coords[0] as num?)?.toDouble();
+      final lng = (coords[1] as num?)?.toDouble();
+      if (lat == null || lng == null) return;
+      final point = LatLng(lat, lng);
+      if (!_isNearUser(point)) {
+        _tracked.remove(id);
+        _publishMarkers();
+        notifyListeners();
+        return;
+      }
+      _upsertTracked(
+        id: id,
+        point: point,
+        headingDeg: (message.data['headingDeg'] as num?)?.toDouble() ?? 0,
+        speedKmh: (message.data['speedKmh'] as num?)?.toDouble() ?? 0,
+      );
+      unawaited(_realtime.subscribe('driver:$id'));
       notifyListeners();
       return;
     }
@@ -601,6 +638,33 @@ class HomeMapViewModel extends ChangeNotifier {
       }
       _offerTimedOut();
     }
+  }
+
+  bool _isNearUser(LatLng point) {
+    final origin = userPoint;
+    return origin != null && _metersBetween(origin, point) <= 3000;
+  }
+
+  void _upsertTracked({
+    required String id,
+    required LatLng point,
+    required double headingDeg,
+    required double speedKmh,
+  }) {
+    final existing = _tracked[id];
+    if (existing == null) {
+      _tracked[id] = _TrackedDriver(
+        id: id,
+        target: point,
+        display: point,
+        headingDeg: headingDeg,
+        speedKmh: speedKmh,
+      );
+      return;
+    }
+    existing.target = point;
+    existing.headingDeg = headingDeg;
+    existing.speedKmh = speedKmh;
   }
 
   Future<void> _refreshEta() async {
@@ -1109,7 +1173,6 @@ class HomeMapViewModel extends ChangeNotifier {
     _ticker?.cancel();
     _matchTimer?.cancel();
     _searchDebounce?.cancel();
-    _nearbyPoll?.cancel();
     _interp?.cancel();
     _pingTimer?.cancel();
     unawaited(_gpsSub?.cancel());
