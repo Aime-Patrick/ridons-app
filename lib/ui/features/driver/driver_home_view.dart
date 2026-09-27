@@ -11,6 +11,7 @@ import '../../core/providers/session_providers.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/ridons_notification_bell.dart';
 import '../../core/widgets/ridons_price_adjuster.dart';
+import '../../core/widgets/ridons_rating_prompt.dart';
 import '../account/passenger_avatar.dart';
 import '../notifications/notification_inbox_view.dart';
 import 'driver_trip_view.dart';
@@ -171,6 +172,20 @@ class _DriverIdleHome extends ConsumerWidget {
                 onToggleHidden: viewModel.toggleEarningsHidden,
                 onToggleOnline: viewModel.toggleOnline,
               ),
+              if (viewModel.pendingRatingRideId != null) ...[
+                const SizedBox(height: 16),
+                RidonsRatingPrompt(
+                  title: viewModel.pendingRatingPassengerName.isEmpty
+                      ? 'Rate the passenger'
+                      : 'Rate ${viewModel.pendingRatingPassengerName}',
+                  value: viewModel.passengerRating,
+                  onChanged: viewModel.setPassengerRating,
+                  onCommentChanged: viewModel.setPassengerRatingComment,
+                  onSubmit: viewModel.submitPassengerRating,
+                  isLoading: viewModel.passengerRatingBusy,
+                  errorMessage: viewModel.passengerRatingError,
+                ),
+              ],
               if (viewModel.quests.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 const Text(
@@ -277,7 +292,7 @@ class _EarningsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -289,16 +304,13 @@ class _EarningsCard extends StatelessWidget {
         child: CustomPaint(
           foregroundPainter: const _EarningsPatternPainter(),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
             child: Column(
               children: [
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.start,
-                  runSpacing: 16,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 160,
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -309,11 +321,11 @@ class _EarningsCard extends StatelessWidget {
                                 'RWF Earned',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 20,
+                                  fontSize: 13,
                                   height: 1.1,
                                 ),
                               ),
-                              const SizedBox(width: 9),
+                              const SizedBox(width: 4),
                               Semantics(
                                 button: true,
                                 label: hidden
@@ -329,19 +341,19 @@ class _EarningsCard extends StatelessWidget {
                                           ? Icons.visibility_off_outlined
                                           : Icons.visibility_outlined,
                                       color: Colors.white,
-                                      size: 26,
+                                      size: 17,
                                     ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 4),
                           Text(
                             hidden ? '********' : _money.format(stats.total),
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 27,
+                              fontSize: 18,
                               height: 1,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.4,
@@ -350,6 +362,7 @@ class _EarningsCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -357,23 +370,25 @@ class _EarningsCard extends StatelessWidget {
                           'Online',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 20,
+                            fontSize: 13,
                             height: 1.1,
                           ),
                         ),
-                        const SizedBox(height: 9),
+                        const SizedBox(height: 4),
                         _OnlineToggle(
                           value: online,
                           busy: onlineBusy,
                           onChanged: onToggleOnline,
+                          width: 44,
+                          height: 23,
                         ),
                       ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 21),
-                Container(height: 2, color: Colors.white24),
-                const SizedBox(height: 23),
+                const SizedBox(height: 9),
+                Container(height: 1, color: Colors.white24),
+                const SizedBox(height: 9),
                 Row(
                   children: [
                     _Stat(
@@ -381,9 +396,24 @@ class _EarningsCard extends StatelessWidget {
                       stats.avgRating == 0
                           ? '—'
                           : stats.avgRating.toStringAsFixed(1),
+                      labelFontSize: 10,
+                      valueFontSize: 12,
+                      dividerHeight: 31,
                     ),
-                    _Stat('Trips', '${stats.trips}'),
-                    _Stat('Accept', '${stats.acceptanceRate}%'),
+                    _Stat(
+                      'Trips',
+                      '${stats.trips}',
+                      labelFontSize: 10,
+                      valueFontSize: 12,
+                      dividerHeight: 31,
+                    ),
+                    _Stat(
+                      'Accept',
+                      '${stats.acceptanceRate}%',
+                      labelFontSize: 10,
+                      valueFontSize: 12,
+                      dividerHeight: 31,
+                    ),
                   ],
                 ),
               ],
@@ -396,17 +426,26 @@ class _EarningsCard extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat(this.label, this.value);
+  const _Stat(
+    this.label,
+    this.value, {
+    required this.labelFontSize,
+    required this.valueFontSize,
+    required this.dividerHeight,
+  });
 
   final String label;
   final String value;
+  final double labelFontSize;
+  final double valueFontSize;
+  final double dividerHeight;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Row(
         children: [
-          if (label != 'Rating') const _StatDivider(),
+          if (label != 'Rating') _StatDivider(height: dividerHeight),
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(left: label == 'Rating' ? 0 : 8),
@@ -417,9 +456,9 @@ class _Stat extends StatelessWidget {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white70,
-                      fontSize: 16,
+                      fontSize: labelFontSize,
                       height: 1.05,
                     ),
                   ),
@@ -428,10 +467,10 @@ class _Stat extends StatelessWidget {
                     value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
-                      fontSize: 18,
+                      fontSize: valueFontSize,
                       height: 1,
                     ),
                   ),
@@ -446,13 +485,15 @@ class _Stat extends StatelessWidget {
 }
 
 class _StatDivider extends StatelessWidget {
-  const _StatDivider();
+  const _StatDivider({required this.height});
+
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: 1,
-      height: 53,
+      height: height,
       child: CustomPaint(painter: _DottedLinePainter()),
     );
   }
@@ -463,11 +504,15 @@ class _OnlineToggle extends StatelessWidget {
     required this.value,
     required this.busy,
     required this.onChanged,
+    this.width = 66,
+    this.height = 36,
   });
 
   final bool value;
   final bool busy;
   final ValueChanged<bool> onChanged;
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -480,18 +525,18 @@ class _OnlineToggle extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
-          width: 66,
-          height: 36,
-          padding: const EdgeInsets.all(4),
+          width: width,
+          height: height,
+          padding: EdgeInsets.all(height * 0.11),
           decoration: BoxDecoration(
             color: value ? RidonsColors.primary : Colors.white24,
             borderRadius: BorderRadius.circular(99),
           ),
           child: busy
-              ? const Center(
+              ? Center(
                   child: SizedBox(
-                    width: 18,
-                    height: 18,
+                    width: height * 0.5,
+                    height: height * 0.5,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -502,10 +547,10 @@ class _OnlineToggle extends StatelessWidget {
                   alignment: value
                       ? Alignment.centerRight
                       : Alignment.centerLeft,
-                  child: const SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: DecoratedBox(
+                  child: SizedBox(
+                    width: height * 0.78,
+                    height: height * 0.78,
+                    child: const DecoratedBox(
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
@@ -787,6 +832,20 @@ class _OfferCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (offer.negotiationRound > 0) ...[
+                  SizedBox(height: compact ? 6 : 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Negotiation round ${offer.negotiationRound} of ${offer.maxNegotiationRounds}',
+                      style: TextStyle(
+                        color: RidonsColors.textSecondary,
+                        fontSize: labelFontSize,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
                 SizedBox(height: compact ? 11 : 14),
                 Row(
                   children: [

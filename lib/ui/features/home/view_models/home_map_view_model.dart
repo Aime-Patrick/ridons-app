@@ -8,11 +8,13 @@ import 'package:latlong2/latlong.dart';
 import '../../../../data/services/geo_api.dart';
 import '../../../../data/services/location_service.dart';
 import '../../../../data/services/places_service.dart';
+import '../../../../data/services/pricing_api.dart';
 import '../../../../data/services/realtime_client.dart';
 import '../../../../data/services/routing_service.dart';
 import '../../../../data/services/trip_api.dart';
 import '../../../../data/services/support_api.dart';
 import '../../../../domain/models/geo_place.dart';
+import '../../../../domain/models/fare_estimate.dart';
 import '../../../../domain/models/fare_policy.dart';
 import '../../../../domain/models/live_driver.dart';
 import '../../../../domain/models/ride_bid.dart';
@@ -23,11 +25,13 @@ class MatchedDriver {
     required this.name,
     required this.plate,
     required this.rating,
+    this.avatarUrl,
   });
 
   final String name;
   final String plate;
   final double rating;
+  final String? avatarUrl;
 }
 
 class _TrackedDriver {
@@ -55,9 +59,11 @@ class HomeMapViewModel extends ChangeNotifier {
     required GeoApi this._geoApi,
     required RealtimeClient this._realtime,
     TripApi? tripApi,
+    PricingApi? pricingApi,
     SupportApi? supportApi,
     this.passengerName = '',
   }) : _tripApi = tripApi,
+       _pricingApi = pricingApi,
        _supportApi = supportApi;
 
   final LocationService _locationService;
@@ -66,10 +72,12 @@ class HomeMapViewModel extends ChangeNotifier {
   final GeoApi _geoApi;
   final RealtimeClient _realtime;
   final TripApi? _tripApi;
+  final PricingApi? _pricingApi;
   final SupportApi? _supportApi;
   final String passengerName;
 
   MatchedDriver? matchedDriver;
+  String driverPhone = '';
   List<RideBid> counterOffers = const [];
   bool bidBusy = false;
   String? bidError;
@@ -87,10 +95,13 @@ class HomeMapViewModel extends ChangeNotifier {
   List<List<LatLng>> routeAlternatives = const [];
   List<RouteStep> routeSteps = const [];
   List<LiveMapMarker> nearbyDrivers = const [];
-  int offeredPrice = 1900;
+  int offeredPrice = 0;
+  FareEstimate? fareEstimate;
+  bool loadingFareEstimate = false;
+  String? fareEstimateError;
   int agreedFare = 0;
   int driversNotified = 0;
-  Duration offerTimer = const Duration(seconds: 60);
+  Duration offerTimer = Duration.zero;
   String paymentMethod = 'Cash';
   bool loadingRoute = false;
   bool locating = false;
@@ -99,6 +110,7 @@ class HomeMapViewModel extends ChangeNotifier {
   String recordNumber = '';
   String? liveRequestId;
   String? liveRideId;
+  String liveRideStatus = '';
   bool lastOfferMissed = false;
   bool lastOfferHadRiders = false;
   double tripKm = 0;
@@ -106,6 +118,11 @@ class HomeMapViewModel extends ChangeNotifier {
   String routeMethod = '';
   int? etaMinutes;
   String? focusedDriverId;
+  String ratingComment = '';
+  bool ratingBusy = false;
+  String? ratingError;
+  bool sharingTrip = false;
+  String? shareError;
 
   Timer? _ticker;
   Timer? _matchTimer;
@@ -161,10 +178,26 @@ class HomeMapViewModel extends ChangeNotifier {
 
   String get pickupLabel => pickup?.name ?? 'My current location';
   String get dropoffLabel => dropoff?.name ?? '';
+
+  String get rideStatusLabel {
+    switch (liveRideStatus) {
+      case 'en_route':
+        return 'Driver on the way';
+      case 'arrived':
+        return 'Driver is at pickup';
+      case 'in_progress':
+        return 'Trip in progress';
+      case 'completed':
+        return 'Trip complete';
+      default:
+        return 'Match found';
+    }
+  }
   bool get hasRoute =>
       pickup != null && dropoff != null && routePoints.length >= 2;
 
   String get timerLabel {
+    if (offerTimer == Duration.zero) return '';
     final minutes = offerTimer.inMinutes;
     final seconds = offerTimer.inSeconds % 60;
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
@@ -360,6 +393,45 @@ class HomeMapViewModel extends ChangeNotifier {
     }, onError: (_) {});
     await _refreshNearby();
     await _pingLocation();
+    await _restoreActiveRide();
+  }
+
+  Future<void> _restoreActiveRide() async {
+    final api = _tripApi;
+    if (api == null) return;
+    final active = await api.passengerActiveRide();
+    if (active == null || active.rideId.isEmpty) return;
+
+    liveRequestId = active.requestId.isEmpty ? null : active.requestId;
+    liveRideId = active.rideId;
+    liveRideStatus = active.status;
+    agreedFare = active.fare;
+    matchedDriver = MatchedDriver(
+      name: active.driverName,
+      plate: active.driverVehiclePlate,
+      rating: active.driverRating,
+      avatarUrl: active.driverAvatarUrl,
+    );
+    driverPhone = active.driverPhone;
+    pickup = GeoPlace(
+      name: active.fromName.isEmpty ? 'Pickup location' : active.fromName,
+      latitude: active.from.latitude,
+      longitude: active.from.longitude,
+    );
+    dropoff = GeoPlace(
+      name: active.toName.isEmpty ? 'Dropoff location' : active.toName,
+      latitude: active.to.latitude,
+      longitude: active.to.longitude,
+    );
+    focusedDriverId = active.driverId.isEmpty
+        ? focusedDriverId
+        : active.driverId;
+    stage = active.status == 'completed'
+        ? RideStage.payment
+        : RideStage.matched;
+    await _realtime.subscribe('ride:${active.rideId}');
+    await _refreshEta();
+    notifyListeners();
   }
 
   Future<void> _pingLocation() async {
@@ -609,17 +681,50 @@ class HomeMapViewModel extends ChangeNotifier {
       final vehiclePlate = '${message.data['vehiclePlate'] ?? ''}';
       final driverRating =
           (message.data['driverRating'] as num?)?.toDouble() ?? 0;
+      final driverAvatarUrl = message.data['driverAvatarUrl']?.toString();
+      driverPhone = '${message.data['driverPhone'] ?? driverPhone}'.trim();
       matchedDriver = MatchedDriver(
         name: driverName.isEmpty ? matchedDriver?.name ?? '' : driverName,
         plate: vehiclePlate.isEmpty ? matchedDriver?.plate ?? '' : vehiclePlate,
         rating: driverRating > 0 ? driverRating : matchedDriver?.rating ?? 0,
+        avatarUrl: driverAvatarUrl ?? matchedDriver?.avatarUrl,
       );
       final fare = (message.data['fare'] as num?)?.toInt() ?? 0;
       if (fare > 0) agreedFare = fare;
+      liveRideStatus = 'matched';
       if (driverId.isNotEmpty && !_tracked.containsKey(driverId)) {
         focusedDriverId = driverId;
       }
       showMatch(driverId: driverId, fare: fare);
+      return;
+    }
+    if (message.event == 'status') {
+      final eventRideId = '${message.data['rideId'] ?? ''}';
+      if (liveRideId == null ||
+          liveRideId!.isEmpty ||
+          eventRideId != liveRideId) {
+        return;
+      }
+      final status = '${message.data['status'] ?? ''}';
+      if (!const {
+        'matched',
+        'en_route',
+        'arrived',
+        'in_progress',
+        'completed',
+      }.contains(status)) {
+        if (status == 'cancelled') {
+          resetToHome();
+        }
+        return;
+      }
+      liveRideStatus = status;
+      if (status == 'completed') {
+        stage = RideStage.payment;
+      } else {
+        stage = RideStage.matched;
+      }
+      notifyListeners();
       return;
     }
     if (message.event == 'dispatch' && stage == RideStage.offering) {
@@ -804,23 +909,81 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   void startEstimate() {
-    if (tripKm > 0) {
-      offeredPrice = _routingService.suggestFareFromKm(tripKm);
-    } else if (pickup != null && dropoff != null) {
-      offeredPrice = _routingService.suggestFare(pickup!, dropoff!);
-    }
+    final from = pickup;
+    final to = dropoff;
+    if (from == null || to == null) return;
     stage = RideStage.estimate;
-    _startTimer(const Duration(seconds: 60));
+    offerTimer = Duration.zero;
+    offeredPrice = 0;
+    fareEstimate = null;
+    fareEstimateError = null;
+    loadingFareEstimate = true;
     notifyListeners();
+    unawaited(_loadFareEstimate(from, to));
+  }
+
+  Future<void> _loadFareEstimate(GeoPlace from, GeoPlace to) async {
+    final api = _pricingApi;
+    if (api == null) {
+      loadingFareEstimate = false;
+      fareEstimateError = 'Price service is unavailable.';
+      notifyListeners();
+      return;
+    }
+    try {
+      final estimate = await api.estimate(
+        from: LatLng(from.latitude, from.longitude),
+        to: LatLng(to.latitude, to.longitude),
+      );
+      if (!_samePlace(from, pickup) || !_samePlace(to, dropoff)) return;
+      fareEstimate = estimate;
+      offeredPrice = estimate.suggestedPrice;
+      if (tripKm <= 0 && estimate.distanceKm > 0) {
+        tripKm = estimate.distanceKm;
+      }
+      fareEstimateError = estimate.suggestedPrice > 0
+          ? null
+          : 'Price service returned no fare.';
+    } catch (_) {
+      if (!_samePlace(from, pickup) || !_samePlace(to, dropoff)) return;
+      offeredPrice = 0;
+      fareEstimateError = 'Could not load the current fare. Please try again.';
+    } finally {
+      if (_samePlace(from, pickup) && _samePlace(to, dropoff)) {
+        loadingFareEstimate = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  bool _samePlace(GeoPlace a, GeoPlace? b) {
+    return b != null &&
+        (a.latitude - b.latitude).abs() < 0.000001 &&
+        (a.longitude - b.longitude).abs() < 0.000001;
   }
 
   void adjustPrice(int delta) {
-    if (stage != RideStage.estimate) return;
-    offeredPrice = FarePolicy.normalize(offeredPrice + delta);
+    if (stage != RideStage.estimate || loadingFareEstimate || offeredPrice <= 0) {
+      return;
+    }
+    offeredPrice = FarePolicy.normalize(
+      offeredPrice + delta,
+      minimum: fareEstimate?.minPrice ?? FarePolicy.minRwf,
+    );
     notifyListeners();
   }
 
+  void retryFareEstimate() {
+    if (loadingFareEstimate || pickup == null || dropoff == null) return;
+    startEstimate();
+  }
+
   Future<void> confirmOffer() async {
+    if (loadingFareEstimate || offeredPrice <= 0) {
+      fareEstimateError = 'Wait for the current fare before sending the offer.';
+      notifyListeners();
+      return;
+    }
     stage = RideStage.offering;
     counterOffers = const [];
     bidError = null;
@@ -828,7 +991,8 @@ class HomeMapViewModel extends ChangeNotifier {
     lastOfferMissed = false;
     driversNotified = 0;
     lastOfferHadRiders = false;
-    _startTimer(const Duration(seconds: 50));
+    _ticker?.cancel();
+    offerTimer = Duration.zero;
     _matchTimer?.cancel();
     notifyListeners();
     final api = _tripApi;
@@ -842,14 +1006,18 @@ class HomeMapViewModel extends ChangeNotifier {
         pickup: from,
         dropoff: to,
         offeredPrice: offeredPrice,
-        suggestedPrice: tripKm > 0
-            ? _routingService.suggestFareFromKm(tripKm)
-            : _routingService.suggestFare(from, to),
+        suggestedPrice: fareEstimate?.suggestedPrice ?? offeredPrice,
         passengerName: passengerName,
       );
       liveRequestId = created.requestId;
+      if (created.offeredPrice > 0) {
+        offeredPrice = created.offeredPrice;
+      }
       driversNotified = created.candidateCount;
       lastOfferHadRiders = created.candidateCount > 0;
+      if (created.offerTtlSec > 0) {
+        _startTimer(Duration(seconds: created.offerTtlSec));
+      }
       notifyListeners();
       if (liveRequestId != null && liveRequestId!.isNotEmpty) {
         await _realtime.subscribe('request:$liveRequestId');
@@ -882,6 +1050,7 @@ class HomeMapViewModel extends ChangeNotifier {
           : assignment.driverId;
       agreedFare = assignment.fare > 0 ? assignment.fare : bid.price;
       liveRideId = assignment.rideId.isEmpty ? liveRideId : assignment.rideId;
+      liveRideStatus = 'matched';
       matchedDriver = MatchedDriver(
         name: assignment.driverName.isNotEmpty
             ? assignment.driverName
@@ -892,7 +1061,11 @@ class HomeMapViewModel extends ChangeNotifier {
         rating: assignment.driverRating > 0
             ? assignment.driverRating
             : bid.driverRating,
+        avatarUrl: assignment.driverAvatarUrl ?? bid.driverAvatarUrl,
       );
+      driverPhone = assignment.driverPhone.isNotEmpty
+          ? assignment.driverPhone
+          : bid.driverPhone;
       counterOffers = const [];
       unawaited(_realtime.unsubscribe('request:$requestId'));
       showMatch(driverId: driverId, fare: agreedFare);
@@ -902,6 +1075,33 @@ class HomeMapViewModel extends ChangeNotifier {
           .where((item) => item.bidId != bid.bidId)
           .toList(growable: false);
       notifyListeners();
+    } finally {
+      bidBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> counterBack(RideBid bid, int price) async {
+    final requestId = liveRequestId;
+    final api = _tripApi;
+    if (bidBusy || requestId == null || requestId.isEmpty || api == null) {
+      return;
+    }
+    bidBusy = true;
+    bidError = null;
+    notifyListeners();
+    try {
+      await api.counterBid(
+        requestId: requestId,
+        bidId: bid.bidId,
+        price: FarePolicy.normalize(price),
+      );
+      counterOffers = counterOffers
+          .where((item) => item.bidId != bid.bidId)
+          .toList(growable: false);
+      bidError = 'Counter offer sent. Waiting for the driver.';
+    } catch (_) {
+      bidError = 'Could not send your counter offer. Please try again.';
     } finally {
       bidBusy = false;
       notifyListeners();
@@ -932,6 +1132,7 @@ class HomeMapViewModel extends ChangeNotifier {
 
   void showMatch({String? driverId, int? fare}) {
     stage = RideStage.matched;
+    liveRideStatus = 'matched';
     if (fare != null && fare > 0) agreedFare = fare;
     _ticker?.cancel();
     _matchTimer?.cancel();
@@ -1001,6 +1202,54 @@ class HomeMapViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRatingComment(String value) {
+    ratingComment = value;
+    notifyListeners();
+  }
+
+  Future<String?> createTripShareLink() async {
+    final rideId = liveRideId;
+    final api = _tripApi;
+    if (sharingTrip || rideId == null || rideId.isEmpty || api == null) {
+      return null;
+    }
+    sharingTrip = true;
+    shareError = null;
+    notifyListeners();
+    try {
+      return await api.createShareLink(rideId);
+    } catch (_) {
+      shareError = 'Could not create the trip sharing link.';
+      return null;
+    } finally {
+      sharingTrip = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> submitRating() async {
+    final rideId = liveRideId;
+    final api = _tripApi;
+    if (rideId == null || rideId.isEmpty || api == null || rating < 1) return;
+    ratingBusy = true;
+    ratingError = null;
+    sharingTrip = false;
+    shareError = null;
+    notifyListeners();
+    try {
+      await api.rateRide(
+        rideId,
+        rating: rating,
+        comment: ratingComment,
+      );
+      resetToHome();
+    } catch (_) {
+      ratingError = 'Could not submit your rating. Please try again.';
+      ratingBusy = false;
+      notifyListeners();
+    }
+  }
+
   void resetToHome() {
     final rideId = liveRideId;
     if (rideId != null && rideId.isNotEmpty) {
@@ -1013,11 +1262,17 @@ class HomeMapViewModel extends ChangeNotifier {
     routePoints = const [];
     routeAlternatives = const [];
     routeSteps = const [];
-    offeredPrice = 1900;
+    offeredPrice = 0;
+    fareEstimate = null;
+    loadingFareEstimate = false;
+    fareEstimateError = null;
     agreedFare = 0;
     counterOffers = const [];
     bidError = null;
     rating = 0;
+    ratingComment = '';
+    ratingBusy = false;
+    ratingError = null;
     paymentMethod = 'Cash';
     searchQuery = '';
     recordNumber = '';
@@ -1026,7 +1281,9 @@ class HomeMapViewModel extends ChangeNotifier {
     routeMethod = '';
     liveRequestId = null;
     liveRideId = null;
+    liveRideStatus = '';
     matchedDriver = null;
+    driverPhone = '';
     focusedDriverId = null;
     _pickupFollowsGps = true;
     stage = RideStage.route;
@@ -1075,7 +1332,7 @@ class HomeMapViewModel extends ChangeNotifier {
     counterOffers = const [];
     bidError = null;
     stage = RideStage.estimate;
-    _startTimer(const Duration(seconds: 60));
+    offerTimer = Duration.zero;
     notifyListeners();
   }
 
@@ -1119,9 +1376,6 @@ class HomeMapViewModel extends ChangeNotifier {
     routePoints = const [];
     routeAlternatives = const [];
     routeSteps = const [];
-    if (stage == RideStage.estimate || stage == RideStage.preview) {
-      offeredPrice = quick.suggestedFare;
-    }
     notifyListeners();
 
     try {
@@ -1133,9 +1387,6 @@ class HomeMapViewModel extends ChangeNotifier {
       tripKm = result.distanceKm;
       tripDurationMin = result.durationMin;
       routeMethod = result.method;
-      if (stage == RideStage.estimate || stage == RideStage.preview) {
-        offeredPrice = result.suggestedFare;
-      }
     } catch (_) {
       if (gen != _routeGen) return;
       // Only fall back to a straight line if OSRM truly failed.

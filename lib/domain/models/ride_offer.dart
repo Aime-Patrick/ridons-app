@@ -14,24 +14,37 @@ class RideOffer {
     this.passengerPhone = '',
     this.fromName = '',
     this.toName = '',
+    this.driverName = '',
+    this.driverVehiclePlate = '',
+    this.driverRating = 0,
+    this.driverPhone = '',
+    this.driverAvatarUrl,
     this.suggestedPrice = 0,
     this.paymentMethod = 'cash',
     this.counterPrice,
+    this.negotiationRound = 0,
+    this.maxNegotiationRounds = 3,
   });
 
   final String requestId;
   final String passengerId;
   final LatLng from;
   final LatLng to;
-  final int offeredPrice;
+  int offeredPrice;
   final DateTime expiresAt;
   String passengerName;
   String passengerPhone;
   String fromName;
   String toName;
+  String driverName;
+  String driverVehiclePlate;
+  double driverRating;
+  String? driverAvatarUrl;
   int suggestedPrice;
   final String paymentMethod;
   int? counterPrice;
+  int negotiationRound;
+  int maxNegotiationRounds;
 
   Duration get remaining {
     final left = expiresAt.difference(DateTime.now());
@@ -40,6 +53,7 @@ class RideOffer {
 
   String get timerLabel {
     final left = remaining;
+    if (left == Duration.zero) return '';
     final m = left.inMinutes;
     final s = left.inSeconds % 60;
     return '$m:${s.toString().padLeft(2, '0')}';
@@ -73,8 +87,18 @@ class RideOffer {
       to: LatLng(toLat, toLng),
       offeredPrice: (json['offeredPrice'] as num?)?.toInt() ?? 0,
       expiresAt: DateTime.tryParse('${json['expiresAt'] ?? ''}')?.toLocal() ??
-          DateTime.now().add(const Duration(seconds: 60)),
+          DateTime.now(),
       paymentMethod: '${json['paymentMethod'] ?? 'cash'}',
+      driverName: '${json['driverName'] ?? ''}',
+      driverVehiclePlate: '${json['vehiclePlate'] ?? ''}',
+      driverRating: (json['driverRating'] as num?)?.toDouble() ?? 0,
+      driverAvatarUrl: json['driverAvatarUrl']?.toString(),
+      negotiationRound: (json['negotiationRound'] as num?)?.toInt() ??
+          (json['round'] as num?)?.toInt() ??
+          0,
+      maxNegotiationRounds: (json['maxNegotiationRounds'] as num?)?.toInt() ??
+          (json['maxRounds'] as num?)?.toInt() ??
+          3,
     );
     offer._applyComments('${json['comments'] ?? ''}');
     return offer;
@@ -105,11 +129,17 @@ class ActiveRide {
     required this.fare,
     required this.from,
     required this.to,
+    this.driverId = '',
+    this.driverName = '',
+    this.driverVehiclePlate = '',
+    this.driverRating = 0,
+    this.driverPhone = '',
     this.paymentMethod = 'cash',
     this.passengerName = '',
     this.passengerPhone = '',
     this.fromName = '',
     this.toName = '',
+    this.driverAvatarUrl,
   });
 
   final String rideId;
@@ -119,11 +149,17 @@ class ActiveRide {
   final int fare;
   final LatLng from;
   final LatLng to;
+  final String driverId;
+  final String driverName;
+  final String driverVehiclePlate;
+  final double driverRating;
+  final String driverPhone;
   final String paymentMethod;
   final String passengerName;
   final String passengerPhone;
   final String fromName;
   final String toName;
+  final String? driverAvatarUrl;
 
   bool get isDriving => status == 'in_progress';
   bool get isLocked =>

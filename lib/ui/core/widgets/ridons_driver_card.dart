@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../data/config/api_config.dart';
 import '../theme/ridons_colors.dart';
 
 class RidonsDriverCard extends StatelessWidget {
@@ -19,15 +20,20 @@ class RidonsDriverCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resolvedAvatarUrl = avatarUrl == null
+        ? null
+        : avatarUrl!.startsWith('http')
+        ? avatarUrl
+        : '${defaultGatewayUrl()}$avatarUrl';
     return Row(
       children: [
         CircleAvatar(
           radius: 28,
           backgroundColor: RidonsColors.primaryLight,
-          backgroundImage: avatarUrl != null
-              ? CachedNetworkImageProvider(avatarUrl!)
+          backgroundImage: resolvedAvatarUrl != null
+              ? CachedNetworkImageProvider(resolvedAvatarUrl)
               : null,
-          child: avatarUrl == null
+          child: resolvedAvatarUrl == null
               ? Text(
                   name.isNotEmpty ? name[0].toUpperCase() : '?',
                   style: const TextStyle(

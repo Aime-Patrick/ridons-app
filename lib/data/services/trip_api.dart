@@ -5,16 +5,21 @@ import '../../domain/models/geo_place.dart';
 import '../../domain/models/fare_policy.dart';
 import '../../domain/models/ride_bid.dart';
 import '../../domain/models/ride_offer.dart';
+import '../../domain/models/received_rating.dart';
 import 'api_client.dart';
 
 class RideRequestCreated {
   const RideRequestCreated({
     required this.requestId,
     required this.candidateCount,
+    required this.offerTtlSec,
+    required this.offeredPrice,
   });
 
   final String requestId;
   final int candidateCount;
+  final int offerTtlSec;
+  final int offeredPrice;
 }
 
 class TripApi {
@@ -29,7 +34,7 @@ class TripApi {
     int suggestedPrice = 0,
     String paymentMethod = 'cash',
     String passengerName = '',
-    int offerTtlSec = 60,
+    int? offerTtlSec,
   }) async {
     final response = await _api.dio.post<Map<String, dynamic>>(
       '/rides/request',
@@ -46,13 +51,15 @@ class TripApi {
         ),
         'paymentMethod': paymentMethod.toLowerCase(),
         'vehicleType': 'bike',
-        'offerTtlSec': offerTtlSec,
+        if (offerTtlSec != null) 'offerTtlSec': offerTtlSec,
       },
     );
     final data = response.data ?? const {};
     return RideRequestCreated(
       requestId: '${data['requestId'] ?? ''}',
       candidateCount: (data['candidateCount'] as num?)?.toInt() ?? 0,
+      offerTtlSec: (data['offerTtlSec'] as num?)?.toInt() ?? 0,
+      offeredPrice: (data['offeredPrice'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -82,6 +89,7 @@ class TripApi {
     String driverName = '',
     String vehiclePlate = '',
     double driverRating = 0,
+    String? driverAvatarUrl,
   }) async {
     final response = await _api.dio.post<Map<String, dynamic>>(
       '/driver/requests/$requestId/accept',
@@ -89,6 +97,8 @@ class TripApi {
         if (driverName.trim().isNotEmpty) 'driverName': driverName.trim(),
         if (vehiclePlate.trim().isNotEmpty) 'vehiclePlate': vehiclePlate.trim(),
         if (driverRating > 0) 'driverRating': driverRating,
+        if (driverAvatarUrl?.trim().isNotEmpty == true)
+          'driverAvatarUrl': driverAvatarUrl!.trim(),
       },
     );
     final data = response.data ?? const {};
@@ -109,6 +119,7 @@ class TripApi {
     String driverName = '',
     String vehiclePlate = '',
     double driverRating = 0,
+    String? driverAvatarUrl,
   }) async {
     await _api.dio.post<Map<String, dynamic>>(
       '/driver/requests/$requestId/counter',
@@ -117,7 +128,20 @@ class TripApi {
         if (driverName.trim().isNotEmpty) 'driverName': driverName.trim(),
         if (vehiclePlate.trim().isNotEmpty) 'vehiclePlate': vehiclePlate.trim(),
         if (driverRating > 0) 'driverRating': driverRating,
+        if (driverAvatarUrl?.trim().isNotEmpty == true)
+          'driverAvatarUrl': driverAvatarUrl!.trim(),
       },
+    );
+  }
+
+  Future<void> counterBid({
+    required String requestId,
+    required String bidId,
+    required int price,
+  }) async {
+    await _api.dio.post<Map<String, dynamic>>(
+      '/rides/$requestId/counter',
+      data: {'bidId': bidId, 'price': FarePolicy.normalize(price)},
     );
   }
 
@@ -193,6 +217,14 @@ class TripApi {
         passengerId: '${ride['passengerId'] ?? offer?.passengerId ?? ''}',
         status: '${ride['status'] ?? ''}',
         fare: (ride['fare'] as num?)?.toInt() ?? 0,
+        driverId: '${ride['driverId'] ?? ''}',
+        driverName: '${ride['driverName'] ?? offer?.driverName ?? ''}',
+        driverVehiclePlate:
+            '${ride['vehiclePlate'] ?? offer?.driverVehiclePlate ?? ''}',
+        driverRating: (ride['driverRating'] as num?)?.toDouble() ??
+            offer?.driverRating ??
+            0,
+        driverPhone: '${ride['driverPhone'] ?? ''}',
         from: LatLng(
           (ride['fromLat'] as num?)?.toDouble() ?? offer?.from.latitude ?? 0,
           (ride['fromLng'] as num?)?.toDouble() ?? offer?.from.longitude ?? 0,
@@ -206,6 +238,80 @@ class TripApi {
         passengerPhone: offer?.passengerPhone ?? '',
         fromName: offer?.fromName ?? '',
         toName: offer?.toName ?? '',
+        driverAvatarUrl: offer?.driverAvatarUrl,
+      );
+    } on DioException {
+      return null;
+    }
+  }
+
+  Future<String> createShareLink(String rideId) async {
+    final response = await _api.dio.post<Map<String, dynamic>>(
+      '/rides/$rideId/share',
+    );
+    final url = '${response.data?['url'] ?? ''}'.trim();
+    if (url.isEmpty) {
+      throw StateError('The trip share link was not returned.');
+    }
+    return url;
+  }
+
+  Future<void> rateRide(
+    String rideId, {
+    required int rating,
+    String comment = '',
+    List<String> tags = const [],
+  }) async {
+    await _api.dio.post<Map<String, dynamic>>(
+      '/rides/$rideId/rate',
+      data: {
+        'rating': rating,
+        'comment': comment.trim(),
+        'tags': tags,
+      },
+    );
+  }
+
+  Future<ActiveRide?> passengerActiveRide() async {
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/passenger/rides/active',
+      );
+      final rideRaw = response.data?['ride'];
+      if (rideRaw is! Map) return null;
+      final ride = Map<String, dynamic>.from(rideRaw);
+      final requestRaw = response.data?['request'];
+      final request = requestRaw is Map
+          ? Map<String, dynamic>.from(requestRaw)
+          : <String, dynamic>{};
+      final offer = request.isEmpty ? null : RideOffer.fromJson(request);
+      return ActiveRide(
+        rideId: '${ride['rideId'] ?? ride['id'] ?? ''}',
+        requestId: '${ride['requestId'] ?? offer?.requestId ?? ''}',
+        passengerId: '${ride['passengerId'] ?? ''}',
+        driverId: '${ride['driverId'] ?? ''}',
+        driverName: '${ride['driverName'] ?? offer?.driverName ?? ''}',
+        driverVehiclePlate:
+            '${ride['vehiclePlate'] ?? offer?.driverVehiclePlate ?? ''}',
+        driverRating: (ride['driverRating'] as num?)?.toDouble() ??
+            offer?.driverRating ??
+            0,
+        driverPhone: '${response.data?['driverPhone'] ?? ride['driverPhone'] ?? ''}',
+        status: '${ride['status'] ?? ''}',
+        fare: (ride['fare'] as num?)?.toInt() ?? offer?.offeredPrice ?? 0,
+        from: LatLng(
+          (ride['fromLat'] as num?)?.toDouble() ?? offer?.from.latitude ?? 0,
+          (ride['fromLng'] as num?)?.toDouble() ?? offer?.from.longitude ?? 0,
+        ),
+        to: LatLng(
+          (ride['toLat'] as num?)?.toDouble() ?? offer?.to.latitude ?? 0,
+          (ride['toLng'] as num?)?.toDouble() ?? offer?.to.longitude ?? 0,
+        ),
+        paymentMethod: offer?.paymentMethod ?? 'cash',
+        fromName: offer?.fromName ?? '',
+        toName: offer?.toName ?? '',
+        driverAvatarUrl: ride['driverAvatarUrl']?.toString() ??
+            offer?.driverAvatarUrl,
       );
     } on DioException {
       return null;
@@ -245,6 +351,18 @@ class TripApi {
       queryParameters: {'period': period},
     );
     return DriverStats.fromJson(response.data ?? const {});
+  }
+
+  Future<List<ReceivedRating>> receivedRatings() async {
+    final response = await _api.dio.get<Map<String, dynamic>>(
+      '/driver/ratings',
+    );
+    final raw = response.data?['ratings'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((item) => ReceivedRating.fromJson(Map<String, dynamic>.from(item)))
+        .toList(growable: false);
   }
 
   Future<List<TripHistoryItem>> myTrips({String period = 'all'}) async {

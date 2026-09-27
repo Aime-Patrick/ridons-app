@@ -12,6 +12,10 @@ class RideBid {
     this.driverName = '',
     this.vehiclePlate = '',
     this.driverRating = 0,
+    this.driverPhone = '',
+    this.driverAvatarUrl,
+    this.negotiationRound = 0,
+    this.maxNegotiationRounds = 3,
   });
 
   final String bidId;
@@ -24,6 +28,10 @@ class RideBid {
   final String driverName;
   final String vehiclePlate;
   final double driverRating;
+  final String driverPhone;
+  final String? driverAvatarUrl;
+  final int negotiationRound;
+  final int maxNegotiationRounds;
 
   String get driverLabel {
     final raw = driverId.trim();
@@ -44,6 +52,12 @@ class RideBid {
   }
 
   factory RideBid.fromJson(Map<String, dynamic> json, {String? requestId}) {
+    final round = (json['round'] as num?)?.toInt() ??
+        (json['negotiationRound'] as num?)?.toInt() ??
+        0;
+    final maxRounds = (json['maxRounds'] as num?)?.toInt() ??
+        (json['maxNegotiationRounds'] as num?)?.toInt() ??
+        3;
     return RideBid(
       bidId: '${json['bidId'] ?? json['id'] ?? ''}',
       requestId: '${json['requestId'] ?? requestId ?? ''}',
@@ -55,6 +69,10 @@ class RideBid {
       driverName: '${json['driverName'] ?? ''}',
       vehiclePlate: '${json['vehiclePlate'] ?? ''}',
       driverRating: (json['driverRating'] as num?)?.toDouble() ?? 0,
+      driverPhone: '${json['driverPhone'] ?? ''}',
+      driverAvatarUrl: json['driverAvatarUrl']?.toString(),
+      negotiationRound: round,
+      maxNegotiationRounds: maxRounds,
     );
   }
 }
@@ -69,6 +87,8 @@ class RideAssignment {
     this.driverName = '',
     this.vehiclePlate = '',
     this.driverRating = 0,
+    this.driverPhone = '',
+    this.driverAvatarUrl,
   });
 
   final String rideId;
@@ -79,6 +99,8 @@ class RideAssignment {
   final String driverName;
   final String vehiclePlate;
   final double driverRating;
+  final String driverPhone;
+  final String? driverAvatarUrl;
 
   factory RideAssignment.fromJson(
     Map<String, dynamic> json, {
@@ -93,6 +115,8 @@ class RideAssignment {
       driverName: '${json['driverName'] ?? ''}',
       vehiclePlate: '${json['vehiclePlate'] ?? ''}',
       driverRating: (json['driverRating'] as num?)?.toDouble() ?? 0,
+      driverPhone: '${json['driverPhone'] ?? ''}',
+      driverAvatarUrl: json['driverAvatarUrl']?.toString(),
     );
   }
 }

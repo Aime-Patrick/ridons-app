@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/providers/session_providers.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../../domain/models/ride_offer.dart';
+import '../../../domain/models/received_rating.dart';
 
 class DriverEarningsView extends ConsumerStatefulWidget {
   const DriverEarningsView({super.key});
@@ -16,6 +17,7 @@ class DriverEarningsView extends ConsumerStatefulWidget {
 class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
   DriverStats _today = const DriverStats();
   DriverStats _week = const DriverStats();
+  List<ReceivedRating> _ratings = const [];
   var _loading = true;
   String? _error;
 
@@ -36,10 +38,12 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
       final api = ref.read(tripApiProvider);
       final today = await api.earnings(period: 'today');
       final week = await api.earnings(period: 'week');
+      final ratings = await api.receivedRatings();
       if (!mounted) return;
       setState(() {
         _today = today;
         _week = week;
+        _ratings = ratings;
         _error = null;
         _loading = false;
       });
@@ -93,6 +97,20 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
                       _tile('Today', _today),
                       const SizedBox(height: 10),
                       _tile('This week', _week),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Recent ratings',
+                        style: TextStyle(
+                          color: RidonsColors.navy,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (_ratings.isEmpty)
+                        _emptyRatings()
+                      else
+                        ..._ratings.map(_ratingTile),
                     ],
                   ],
                 ),
@@ -130,6 +148,58 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
           Text(
             '${stats.trips} trips',
             style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyRatings() {
+    return const Text(
+      'No ratings received yet.',
+      style: TextStyle(color: RidonsColors.textSecondary),
+    );
+  }
+
+  Widget _ratingTile(ReceivedRating item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: RidonsColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${item.rating}/5',
+            style: const TextStyle(
+              color: RidonsColors.accent,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.comment.trim().isEmpty
+                      ? 'No comment'
+                      : item.comment.trim(),
+                  style: const TextStyle(color: RidonsColors.navy),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${DateFormat('MMM d, yyyy').format(item.createdAt)} · ${item.rideId}',
+                  style: const TextStyle(
+                    color: RidonsColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

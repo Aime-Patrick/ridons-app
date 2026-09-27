@@ -11,6 +11,7 @@ export 'ridons_logo.dart';
 export 'ridons_price_adjuster.dart';
 export 'ridons_driver_card.dart';
 export 'ridons_star_rating.dart';
+export 'ridons_rating_prompt.dart';
 export 'ridons_location_tile.dart';
 export 'ridons_language_tile.dart';
 export 'ridons_role_card.dart';

@@ -6,6 +6,7 @@ import '../../../data/services/api_client.dart';
 import '../../../data/services/geo_api.dart';
 import '../../../data/services/driver_documents_service.dart';
 import '../../../data/services/notification_api.dart';
+import '../../../data/services/pricing_api.dart';
 import '../../../data/services/prefs_store.dart';
 import '../../../data/services/realtime_client.dart';
 import '../../../data/services/token_store.dart';
@@ -35,6 +36,10 @@ final geoApiProvider = Provider<GeoApi>((ref) {
 
 final tripApiProvider = Provider<TripApi>((ref) {
   return TripApi(ref.watch(apiClientProvider));
+});
+
+final pricingApiProvider = Provider<PricingApi>((ref) {
+  return PricingApi(ref.watch(apiClientProvider));
 });
 
 final supportApiProvider = Provider<SupportApi>((ref) {

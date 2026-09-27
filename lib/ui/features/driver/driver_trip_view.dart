@@ -69,11 +69,36 @@ class _TripMap extends StatefulWidget {
 
 class _TripMapState extends State<_TripMap> {
   final MapController _controller = MapController();
+  LatLng? _lastFollowPoint;
+
+  @override
+  void didUpdateWidget(covariant _TripMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _followDriverIfNeeded();
+  }
+
+  void _followDriverIfNeeded() {
+    if (!widget.viewModel.inAppNavigation) return;
+    final point = widget.viewModel.driverPoint;
+    if (point == null ||
+        (_lastFollowPoint != null &&
+            _lastFollowPoint!.latitude == point.latitude &&
+            _lastFollowPoint!.longitude == point.longitude)) {
+      return;
+    }
+    _lastFollowPoint = point;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.viewModel.inAppNavigation) {
+        _controller.move(point, 16.2);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final viewModel = widget.viewModel;
     final ride = widget.ride;
+    _followDriverIfNeeded();
     final you = viewModel.driverPoint ?? ride.from;
     final dest = viewModel.stage == DriverStage.driving
         ? ride.to
@@ -214,7 +239,20 @@ class _TripSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _PassengerCard(ride: ride),
-                if (!driving) ...[
+                if (driving) ...[
+                  const SizedBox(height: 12),
+                  RidonsButton(
+                    label: 'Complete trip',
+                    isLoading: viewModel.busy,
+                    onPressed: viewModel.startTrip,
+                  ),
+                  const SizedBox(height: 10),
+                  RidonsButton(
+                    label: 'Trip was canceled',
+                    variant: RidonsButtonVariant.secondary,
+                    onPressed: viewModel.cancelTrip,
+                  ),
+                ] else ...[
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -234,15 +272,19 @@ class _TripSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   RidonsButton(
-                    label: arrived ? 'Start ride' : 'Heading to passenger',
+                    label: arrived
+                        ? 'Start ride'
+                        : viewModel.inAppNavigation
+                        ? 'Following route to passenger'
+                        : 'Navigate to passenger',
                     isLoading: viewModel.busy,
-                    onPressed: arrived || ride.status == 'matched'
+                    onPressed: arrived
                         ? viewModel.startTrip
-                        : null,
+                        : viewModel.navigateToPickup,
                   ),
                   const SizedBox(height: 10),
                   RidonsButton(
-                    label: 'Trip were canceled',
+                    label: 'Trip was canceled',
                     variant: RidonsButtonVariant.secondary,
                     onPressed: viewModel.cancelTrip,
                   ),

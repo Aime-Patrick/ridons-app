@@ -62,7 +62,15 @@ class DriverHomeViewModel extends ChangeNotifier {
   List<RideOffer> offers = const [];
   final Map<String, int> localFares = {};
   ActiveRide? ride;
+  String? pendingRatingRideId;
+  String pendingRatingPassengerName = '';
+  int passengerRating = 0;
+  String passengerRatingComment = '';
+  bool passengerRatingBusy = false;
+  String? passengerRatingError;
   List<LatLng> routePoints = const [];
+  List<RouteStep> routeSteps = const [];
+  bool inAppNavigation = false;
   int? etaMinutes;
   LatLng? driverPoint;
   LatLng? passengerPoint;
@@ -329,6 +337,7 @@ class DriverHomeViewModel extends ChangeNotifier {
           driverName: user.displayName,
           vehiclePlate: user.vehiclePlate ?? '',
           driverRating: stats.avgRating,
+          driverAvatarUrl: user.avatarUrl,
         );
         busy = false;
         errorMessage = 'Counter sent. Waiting for the passenger.';
@@ -340,6 +349,7 @@ class DriverHomeViewModel extends ChangeNotifier {
         driverName: user.displayName,
         vehiclePlate: user.vehiclePlate ?? '',
         driverRating: stats.avgRating,
+        driverAvatarUrl: user.avatarUrl,
       );
       if (locked.rideId.isEmpty) {
         throw StateError('missing ride');
@@ -374,7 +384,18 @@ class DriverHomeViewModel extends ChangeNotifier {
     busy = true;
     notifyListeners();
     try {
-      if (stage == DriverStage.driving) return;
+      if (stage == DriverStage.driving) {
+        await _setRideStatus('completed');
+        _preparePassengerRating(current);
+        ride = null;
+        stage = DriverStage.home;
+        routePoints = const [];
+        routeSteps = const [];
+        inAppNavigation = false;
+        if (online) await refreshInbox();
+        notifyListeners();
+        return;
+      }
       await _setRideStatus(
         stage == DriverStage.arrived ? 'in_progress' : 'en_route',
       );
@@ -391,8 +412,18 @@ class DriverHomeViewModel extends ChangeNotifier {
     ride = null;
     stage = DriverStage.home;
     routePoints = const [];
+    routeSteps = const [];
+    inAppNavigation = false;
     if (online) await refreshInbox();
     notifyListeners();
+  }
+
+  Future<void> navigateToPickup() async {
+    final current = ride;
+    if (current == null) return;
+    inAppNavigation = true;
+    notifyListeners();
+    await _refreshRoute(toDropoff: false);
   }
 
   Future<void> _enterRide(ActiveRide next) async {
@@ -401,6 +432,7 @@ class DriverHomeViewModel extends ChangeNotifier {
     passengerSpeedKmh = 0;
     offers = const [];
     stage = next.isDriving ? DriverStage.driving : DriverStage.locked;
+    inAppNavigation = false;
     if (next.status == 'matched') {
       try {
         await _trips.updateStatus(next.rideId, 'en_route');
@@ -419,7 +451,7 @@ class DriverHomeViewModel extends ChangeNotifier {
     final current = ride;
     if (current == null) return;
     final start = driverPoint ?? current.from;
-    final end = toDropoff ? current.to : current.from;
+    final end = toDropoff ? current.to : (passengerPoint ?? current.from);
     final result = await _routing.route(
       GeoPlace(
         name: 'You',
@@ -431,8 +463,10 @@ class DriverHomeViewModel extends ChangeNotifier {
         latitude: end.latitude,
         longitude: end.longitude,
       ),
+      steps: true,
     );
     routePoints = result.points;
+    routeSteps = result.steps;
     if (result.durationMin > 0) {
       etaMinutes = result.durationMin;
     }
@@ -443,6 +477,27 @@ class DriverHomeViewModel extends ChangeNotifier {
     if (message.event == 'incoming_request' && online && !onTrip) {
       unawaited(refreshInbox());
     }
+    if (message.event == 'passenger_counter' && online && !onTrip) {
+      final requestId = '${message.data['requestId'] ?? ''}';
+      final price = (message.data['price'] as num?)?.toInt();
+      if (requestId.isEmpty || price == null || price <= 0) return;
+      for (final offer in offers) {
+        if (offer.requestId != requestId) continue;
+        offer.offeredPrice = FarePolicy.normalize(price);
+        offer.negotiationRound =
+            (message.data['round'] as num?)?.toInt() ??
+            offer.negotiationRound + 1;
+        offer.maxNegotiationRounds =
+            (message.data['maxRounds'] as num?)?.toInt() ??
+            offer.maxNegotiationRounds;
+        localFares.remove(requestId);
+        errorMessage = 'Passenger countered at ${offer.offeredPrice} RWF.';
+        notifyListeners();
+        return;
+      }
+      unawaited(refreshInbox());
+      return;
+    }
     if (message.event == 'status') {
       final status = '${message.data['status'] ?? ''}';
       final current = ride;
@@ -452,6 +507,7 @@ class DriverHomeViewModel extends ChangeNotifier {
             ? DriverStage.driving
             : DriverStage.arrived;
         if (status == 'in_progress') {
+          inAppNavigation = false;
           unawaited(_refreshRoute(toDropoff: true));
         }
         notifyListeners();
@@ -459,6 +515,15 @@ class DriverHomeViewModel extends ChangeNotifier {
       if (status == 'cancelled') {
         ride = null;
         stage = DriverStage.home;
+        notifyListeners();
+      }
+      if (status == 'completed') {
+        if (current != null) _preparePassengerRating(current);
+        ride = null;
+        stage = DriverStage.home;
+        routePoints = const [];
+        routeSteps = const [];
+        inAppNavigation = false;
         notifyListeners();
       }
     }
@@ -476,6 +541,9 @@ class DriverHomeViewModel extends ChangeNotifier {
       if (lat == null || lng == null) return;
       passengerPoint = LatLng(lat, lng);
       passengerSpeedKmh = (message.data['speedKmh'] as num?)?.toDouble() ?? 0;
+      if (inAppNavigation && stage == DriverStage.locked) {
+        unawaited(_refreshRoute(toDropoff: false));
+      }
       final driverSpeed = _fix?.speed;
       _maybeDetectTripProgress(
         driverSpeed != null && driverSpeed.isFinite ? driverSpeed * 3.6 : 0,
@@ -518,6 +586,7 @@ class DriverHomeViewModel extends ChangeNotifier {
           ? DriverStage.arrived
           : DriverStage.locked;
       if (status == 'in_progress') {
+        inAppNavigation = false;
         await _refreshRoute(toDropoff: true);
       }
       notifyListeners();
@@ -526,20 +595,73 @@ class DriverHomeViewModel extends ChangeNotifier {
     }
   }
 
+  void _preparePassengerRating(ActiveRide completedRide) {
+    pendingRatingRideId = completedRide.rideId;
+    pendingRatingPassengerName = completedRide.passengerName.trim();
+    passengerRating = 0;
+    passengerRatingComment = '';
+    passengerRatingError = null;
+  }
+
+  void setPassengerRating(int value) {
+    passengerRating = value;
+    notifyListeners();
+  }
+
+  void setPassengerRatingComment(String value) {
+    passengerRatingComment = value;
+    notifyListeners();
+  }
+
+  Future<void> submitPassengerRating() async {
+    final rideId = pendingRatingRideId;
+    if (rideId == null || rideId.isEmpty || passengerRating < 1) return;
+    passengerRatingBusy = true;
+    passengerRatingError = null;
+    notifyListeners();
+    try {
+      await _trips.rateRide(
+        rideId,
+        rating: passengerRating,
+        comment: passengerRatingComment,
+      );
+      skipPassengerRating();
+    } catch (_) {
+      passengerRatingBusy = false;
+      passengerRatingError = 'Could not submit your rating. Please try again.';
+      notifyListeners();
+    }
+  }
+
+  void skipPassengerRating() {
+    pendingRatingRideId = null;
+    pendingRatingPassengerName = '';
+    passengerRating = 0;
+    passengerRatingComment = '';
+    passengerRatingBusy = false;
+    passengerRatingError = null;
+    notifyListeners();
+  }
+
   ActiveRide _withStatus(ActiveRide current, String status) {
     return ActiveRide(
       rideId: current.rideId,
       requestId: current.requestId,
       passengerId: current.passengerId,
+      driverId: current.driverId,
       status: status,
       fare: current.fare,
       from: current.from,
       to: current.to,
       paymentMethod: current.paymentMethod,
+      driverName: current.driverName,
+      driverVehiclePlate: current.driverVehiclePlate,
+      driverRating: current.driverRating,
       passengerName: current.passengerName,
       passengerPhone: current.passengerPhone,
       fromName: current.fromName,
       toName: current.toName,
+      driverAvatarUrl: current.driverAvatarUrl,
     );
   }
 

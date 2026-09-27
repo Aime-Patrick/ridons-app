@@ -58,6 +58,7 @@ class RealtimeClient {
     socket.on('dispatch', (data) => _emit('dispatch', data));
     socket.on('incoming_request', (data) => _emit('incoming_request', data));
     socket.on('bid', (data) => _emit('bid', data));
+    socket.on('passenger_counter', (data) => _emit('passenger_counter', data));
     socket.on('notification', (data) => _emit('notification', data));
     socket.connect();
   }

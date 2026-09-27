@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../data/config/api_config.dart';
 import '../../../core/theme/ridons_colors.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../../domain/models/ride_stage.dart';
@@ -492,7 +495,7 @@ class _MapPickSheet extends StatelessWidget {
                 onPressed: viewModel.closeMapPicker,
                 icon: const Icon(Icons.close, size: 20),
               ),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Pick from map',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
@@ -555,7 +558,7 @@ class _EstimateSheet extends StatelessWidget {
             viewModel.lastOfferMissed
                 ? (viewModel.lastOfferHadRiders
                       ? 'Nobody took that fare. Raise it and send again.'
-                      : 'No riders within 3 km. Try again in a moment.')
+                      : 'No nearby riders took this offer. Try again in a moment.')
                 : viewModel.tripKm > 0
                 ? 'About ${viewModel.tripDistanceLabel} · ${viewModel.tripEtaLabel} by road'
                 : 'Market Fair price for this route.',
@@ -564,11 +567,38 @@ class _EstimateSheet extends StatelessWidget {
           const SizedBox(height: 10),
           RidonsPriceAdjuster(
             amountRwf: viewModel.offeredPrice,
+            enabled: !viewModel.loadingFareEstimate &&
+                viewModel.offeredPrice > 0,
             onDecrement: () => viewModel.adjustPrice(-100),
             onIncrement: () => viewModel.adjustPrice(100),
           ),
+          if (viewModel.loadingFareEstimate) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Loading the current fare…',
+              textAlign: TextAlign.center,
+            ),
+          ],
+          if (viewModel.fareEstimateError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              viewModel.fareEstimateError!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.ridonsMuted, fontSize: 12),
+            ),
+            TextButton(
+              onPressed: viewModel.retryFareEstimate,
+              child: const Text('Retry'),
+            ),
+          ],
           const SizedBox(height: 10),
-          RidonsButton(label: 'Confirm', onPressed: viewModel.confirmOffer),
+          RidonsButton(
+            label: 'Confirm',
+            onPressed: viewModel.loadingFareEstimate ||
+                    viewModel.offeredPrice <= 0
+                ? null
+                : viewModel.confirmOffer,
+          ),
           const SizedBox(height: 8),
           _RouteSummary(viewModel: viewModel),
         ],
@@ -716,6 +746,8 @@ class _CounterOffersPanel extends StatelessWidget {
                 busy: viewModel.bidBusy,
                 onAccept: () => viewModel.acceptCounterOffer(offers[index]),
                 onDecline: () => viewModel.rejectCounterOffer(offers[index]),
+                onCounter: (price) =>
+                    viewModel.counterBack(offers[index], price),
               ),
             ],
           ],
@@ -725,13 +757,14 @@ class _CounterOffersPanel extends StatelessWidget {
   }
 }
 
-class _CounterOfferTile extends StatelessWidget {
+class _CounterOfferTile extends StatefulWidget {
   const _CounterOfferTile({
     required this.bid,
     required this.originalPrice,
     required this.busy,
     required this.onAccept,
     required this.onDecline,
+    required this.onCounter,
   });
 
   final RideBid bid;
@@ -739,18 +772,77 @@ class _CounterOfferTile extends StatelessWidget {
   final bool busy;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
+  final ValueChanged<int> onCounter;
+
+  @override
+  State<_CounterOfferTile> createState() => _CounterOfferTileState();
+}
+
+class _CounterOfferTileState extends State<_CounterOfferTile> {
+  late int _counterPrice;
+
+  @override
+  void initState() {
+    super.initState();
+    _counterPrice = widget.originalPrice;
+  }
+
+  @override
+  void didUpdateWidget(covariant _CounterOfferTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.bid.bidId != widget.bid.bidId) {
+      _counterPrice = widget.originalPrice;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final bid = widget.bid;
+    final avatarUrl = bid.driverAvatarUrl;
+    final resolvedAvatarUrl = avatarUrl == null
+        ? null
+        : avatarUrl.startsWith('http')
+        ? avatarUrl
+        : '${defaultGatewayUrl()}$avatarUrl';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: context.ridonsFill,
+              backgroundImage: resolvedAvatarUrl == null
+                  ? null
+                  : CachedNetworkImageProvider(resolvedAvatarUrl),
+              child: resolvedAvatarUrl == null
+                  ? Text(
+                      (bid.driverName.isNotEmpty
+                              ? bid.driverName
+                              : bid.driverLabel)[0]
+                          .toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                bid.driverLabel,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    bid.driverName.isNotEmpty ? bid.driverName : bid.driverLabel,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  if (bid.driverRating > 0)
+                    Text(
+                      '★ ${bid.driverRating.toStringAsFixed(1)}',
+                      style: TextStyle(
+                        color: context.ridonsMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                ],
               ),
             ),
             Text(
@@ -759,13 +851,18 @@ class _CounterOfferTile extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 4),
+        Text(
+          'Round ${bid.negotiationRound} of ${bid.maxNegotiationRounds}',
+          style: TextStyle(color: context.ridonsMuted, fontSize: 11),
+        ),
         const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: _CounterPrice(
                 label: 'Your offer',
-                value: '$originalPrice Rwf',
+                value: '${widget.originalPrice} Rwf',
               ),
             ),
             const Icon(Icons.arrow_forward, size: 16),
@@ -779,22 +876,36 @@ class _CounterOfferTile extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
+        RidonsPriceAdjuster(
+          amountRwf: _counterPrice,
+          enabled: !widget.busy,
+          onDecrement: () => setState(() {
+            _counterPrice =
+                (_counterPrice - 100).clamp(500, 1000000).toInt();
+          }),
+          onIncrement: () => setState(() {
+            _counterPrice += 100;
+          }),
+        ),
+        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: busy ? null : onDecline,
+                onPressed: widget.busy
+                    ? null
+                    : () => widget.onCounter(_counterPrice),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(42),
                   side: BorderSide(color: context.ridonsLine),
                 ),
-                child: const Text('Decline'),
+                child: const Text('Counter offer'),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: ElevatedButton(
-                onPressed: busy ? null : onAccept,
+                onPressed: widget.busy ? null : widget.onAccept,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: RidonsColors.primary,
                   foregroundColor: Colors.white,
@@ -804,6 +915,10 @@ class _CounterOfferTile extends StatelessWidget {
               ),
             ),
           ],
+        ),
+        TextButton(
+          onPressed: widget.busy ? null : widget.onDecline,
+          child: const Text('Leave it'),
         ),
       ],
     );
@@ -862,9 +977,9 @@ class _MatchedSheet extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Match found',
+                  viewModel.rideStatusLabel,
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -893,6 +1008,7 @@ class _MatchedSheet extends StatelessWidget {
                   : 'Driver details pending',
               plate: driver?.plate ?? '',
               rating: driver?.rating ?? 0,
+              avatarUrl: driver?.avatarUrl,
             ),
           ),
           const SizedBox(height: 12),
@@ -916,9 +1032,11 @@ class _MatchedSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.share_outlined, size: 16),
-                  label: const Text('Share this trip'),
+                  onPressed: viewModel.driverPhone.trim().isEmpty
+                      ? null
+                      : () => _callDriver(context, viewModel.driverPhone),
+                  icon: const Icon(Icons.call_outlined, size: 16),
+                  label: const Text('Call driver'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                   ),
@@ -927,9 +1045,13 @@ class _MatchedSheet extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _openNeedHelpDialog(context, viewModel),
-                  icon: const Icon(Icons.help_outline, size: 16),
-                  label: const Text('Need help?'),
+                  onPressed: viewModel.sharingTrip
+                      ? null
+                      : () => _shareTrip(context, viewModel),
+                  icon: const Icon(Icons.share_outlined, size: 16),
+                  label: Text(
+                    viewModel.sharingTrip ? 'Creating link' : 'Share trip',
+                  ),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                   ),
@@ -937,8 +1059,27 @@ class _MatchedSheet extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _openNeedHelpDialog(context, viewModel),
+              icon: const Icon(Icons.help_outline, size: 16),
+              label: const Text('Need help?'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
+            ),
+          ),
           const SizedBox(height: 10),
-          RidonsButton(label: "I've arrived", onPressed: viewModel.goToPayment),
+          RidonsButton(
+            label: viewModel.liveRideStatus == 'completed'
+                ? 'Continue to payment'
+                : viewModel.rideStatusLabel,
+            onPressed: viewModel.liveRideStatus == 'completed'
+                ? viewModel.goToPayment
+                : null,
+          ),
         ],
       ),
     );
@@ -1021,20 +1162,15 @@ class _SuccessSheet extends StatelessWidget {
               const SizedBox(height: 20),
               _TripReceiptCard(viewModel: viewModel),
               const SizedBox(height: 28),
-              const Text(
-                'How was the ride?',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              RidonsStarRating(
+              RidonsRatingPrompt(
+                title: 'How was the ride?',
                 value: viewModel.rating,
                 onChanged: viewModel.setRating,
-                size: 34,
-              ),
-              const SizedBox(height: 18),
-              RidonsButton(
-                label: 'Send rate',
-                onPressed: viewModel.resetToHome,
+                onCommentChanged: viewModel.setRatingComment,
+                onSubmit: viewModel.submitRating,
+                submitLabel: 'Send rating',
+                isLoading: viewModel.ratingBusy,
+                errorMessage: viewModel.ratingError,
               ),
               const SizedBox(height: 10),
               RidonsButton(
@@ -1633,6 +1769,53 @@ Future<void> _openNeedHelpDialog(
       const SnackBar(
         content: Text('Support ticket sent. Our team will follow up.'),
       ),
+    );
+  }
+}
+
+Future<void> _callDriver(BuildContext context, String phone) async {
+  final normalized = phone.trim();
+  if (normalized.isEmpty) return;
+  final launched = await launchUrl(
+    Uri(scheme: 'tel', path: normalized),
+    mode: LaunchMode.externalApplication,
+  );
+  if (!launched && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Calling is not available on this device.')),
+    );
+  }
+}
+
+Future<void> _shareTrip(
+  BuildContext context,
+  HomeMapViewModel viewModel,
+) async {
+  final link = await viewModel.createTripShareLink();
+  if (!context.mounted) return;
+  if (link == null || link.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(viewModel.shareError ?? 'Could not share this trip.')),
+    );
+    return;
+  }
+
+  final text = Uri.encodeComponent('Track my Ridons trip: $link');
+  final whatsapp = Uri.parse('whatsapp://send?text=$text');
+  final openedWhatsApp = await launchUrl(
+    whatsapp,
+    mode: LaunchMode.externalApplication,
+  );
+  if (openedWhatsApp || !context.mounted) return;
+
+  final browserFallback = Uri.parse('https://api.whatsapp.com/send?text=$text');
+  final openedFallback = await launchUrl(
+    browserFallback,
+    mode: LaunchMode.externalApplication,
+  );
+  if (!openedFallback && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('WhatsApp is not available on this device.')),
     );
   }
 }
