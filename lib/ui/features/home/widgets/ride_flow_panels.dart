@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../data/config/api_config.dart';
+import '../../../../data/config/api_config.dart';
 import '../../../core/theme/ridons_colors.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../../domain/models/ride_stage.dart';

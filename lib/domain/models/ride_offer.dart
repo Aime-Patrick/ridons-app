@@ -39,6 +39,7 @@ class RideOffer {
   String driverName;
   String driverVehiclePlate;
   double driverRating;
+  String driverPhone;
   String? driverAvatarUrl;
   int suggestedPrice;
   final String paymentMethod;
