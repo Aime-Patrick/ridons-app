@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -38,16 +39,16 @@ class SignUpView extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Your app for fair deals',
+                  'fair_deals_tagline'.tr(),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: context.ridonsInk,
-                      ),
+                    fontWeight: FontWeight.w700,
+                    color: context.ridonsInk,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Choose a ride, name your price and connect\ninstantly with drivers',
+                  'choose_ride_tagline'.tr(),
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     color: context.ridonsMuted,
@@ -59,12 +60,12 @@ class SignUpView extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 RidonsButton(
-                  label: 'Continue with phone',
+                  label: 'continue_with_phone',
                   onPressed: () => context.go(AppRoutes.signUpPhone),
                 ),
                 const SizedBox(height: 8),
                 RidonsButton(
-                  label: 'Continue with Google',
+                  label: 'continue_with_google',
                   variant: RidonsButtonVariant.outline,
                   leading: SvgPicture.asset(
                     'assets/brand/google_g.svg',
@@ -72,7 +73,7 @@ class SignUpView extends StatelessWidget {
                     height: 20,
                   ),
                   onPressed: () {
-                    RidonsNotice.info(context, 'Google sign-in is coming soon.');
+                    RidonsNotice.info(context, 'google_coming_soon'.tr());
                   },
                 ),
                 const SizedBox(height: 22),
@@ -81,7 +82,7 @@ class SignUpView extends StatelessWidget {
                     onTap: () => context.go(AppRoutes.signInPhone),
                     child: Text.rich(
                       TextSpan(
-                        text: 'Already have an account? ',
+                        text: 'already_have_account'.tr(),
                         style: GoogleFonts.inter(
                           color: context.ridonsInk,
                           fontWeight: FontWeight.w400,
@@ -91,7 +92,7 @@ class SignUpView extends StatelessWidget {
                         ),
                         children: [
                           TextSpan(
-                            text: 'Sign In',
+                            text: 'sign_in'.tr(),
                             style: GoogleFonts.inter(
                               color: RidonsColors.primary,
                               fontWeight: FontWeight.w700,
@@ -109,7 +110,7 @@ class SignUpView extends StatelessWidget {
                 const SizedBox(height: 24),
                 Text.rich(
                   TextSpan(
-                    text: 'By continuing, you agree to our ',
+                    text: 'by_continuing'.tr(),
                     style: GoogleFonts.inter(
                       color: context.ridonsMuted,
                       fontWeight: FontWeight.w400,
@@ -119,7 +120,7 @@ class SignUpView extends StatelessWidget {
                     ),
                     children: [
                       TextSpan(
-                        text: 'Terms & conditions',
+                        text: 'terms_conditions'.tr(),
                         style: GoogleFonts.inter(
                           color: RidonsColors.primary,
                           fontWeight: FontWeight.w400,
@@ -131,9 +132,9 @@ class SignUpView extends StatelessWidget {
                           decorationColor: RidonsColors.primary,
                         ),
                       ),
-                      const TextSpan(text: ',\nacknowledge our '),
+                      TextSpan(text: 'acknowledge_our'.tr()),
                       TextSpan(
-                        text: 'Privacy Policy',
+                        text: 'privacy_policy'.tr(),
                         style: GoogleFonts.inter(
                           color: RidonsColors.primary,
                           fontWeight: FontWeight.w400,

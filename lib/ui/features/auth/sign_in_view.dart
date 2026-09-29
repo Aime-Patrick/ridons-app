@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,9 +56,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
     final vm = ref.read(authViewModelProvider);
     final sent = await vm.sendCode(_phoneController.text);
     if (!mounted || !sent) return;
-    context.go(
-      widget.isSignUp ? AppRoutes.signUpCode : AppRoutes.signInCode,
-    );
+    context.go(widget.isSignUp ? AppRoutes.signUpCode : AppRoutes.signInCode);
   }
 
   Future<void> _verify({bool? signUp}) async {
@@ -74,13 +73,13 @@ class _SignInViewState extends ConsumerState<SignInView> {
       session.needsProfile
           ? AppRoutes.signUpAccount
           : (session.user.role.isDriver && !session.user.isVerified
-              ? AppRoutes.driverVerification
-              : AppRoutes.home),
+                ? AppRoutes.driverVerification
+                : AppRoutes.home),
     );
   }
 
   void _googleSoon() {
-    RidonsNotice.info(context, 'Google sign-in is coming soon.');
+    RidonsNotice.info(context, 'google_coming_soon'.tr());
   }
 
   TextStyle _bodyStyle({
@@ -99,7 +98,8 @@ class _SignInViewState extends ConsumerState<SignInView> {
   @override
   Widget build(BuildContext context) {
     ref.listen(authViewModelProvider, (previous, next) {
-      final startedLoading = (next.sending && previous?.sending != true) ||
+      final startedLoading =
+          (next.sending && previous?.sending != true) ||
           (next.verifying && previous?.verifying != true);
       if (startedLoading) {
         FocusManager.instance.primaryFocus?.unfocus();
@@ -188,10 +188,10 @@ class _SignInViewState extends ConsumerState<SignInView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 46),
-        _buildHeading('Enter your number', centered: true),
+        _buildHeading('enter_your_number'.tr(), centered: true),
         const SizedBox(height: 8),
         Text(
-          "We'll send you a verification code on your phone number",
+          'verification_code_sent'.tr(),
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
             color: context.ridonsMuted,
@@ -210,17 +210,14 @@ class _SignInViewState extends ConsumerState<SignInView> {
         if (vm.errorMessage != null) ...[
           const SizedBox(height: 12),
           Text(
-            vm.errorMessage!,
+            vm.errorMessage!.tr(),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: RidonsColors.primary,
-              fontSize: 13,
-            ),
+            style: const TextStyle(color: RidonsColors.primary, fontSize: 13),
           ),
         ],
         const SizedBox(height: 16),
         RidonsButton(
-          label: 'Continue',
+          label: 'continue'.tr(),
           isLoading: vm.sending,
           onPressed: _continueToCode,
         ),
@@ -233,11 +230,11 @@ class _SignInViewState extends ConsumerState<SignInView> {
             child: Text.rich(
               widget.isSignUp
                   ? TextSpan(
-                      text: 'Already have an account? ',
+                      text: 'already_have_account'.tr(),
                       style: _bodyStyle(color: context.ridonsInk),
                       children: [
                         TextSpan(
-                          text: 'Sign In',
+                          text: 'sign_in'.tr(),
                           style: _bodyStyle(
                             color: RidonsColors.primary,
                             weight: FontWeight.w700,
@@ -246,11 +243,11 @@ class _SignInViewState extends ConsumerState<SignInView> {
                       ],
                     )
                   : TextSpan(
-                      text: 'Don\u2019t have an account? ',
+                      text: 'no_account'.tr(),
                       style: _bodyStyle(color: context.ridonsInk),
                       children: [
                         TextSpan(
-                          text: 'Create One',
+                          text: 'create_one'.tr(),
                           style: _bodyStyle(
                             color: RidonsColors.primary,
                             weight: FontWeight.w700,
@@ -264,16 +261,13 @@ class _SignInViewState extends ConsumerState<SignInView> {
         const SizedBox(height: 20),
         Center(
           child: Text(
-            'Or',
-            style: TextStyle(
-              color: context.ridonsMuted,
-              fontSize: 11,
-            ),
+            'or'.tr(),
+            style: TextStyle(color: context.ridonsMuted, fontSize: 11),
           ),
         ),
         const SizedBox(height: 10),
         RidonsButton(
-          label: 'Continue with Google',
+          label: 'continue_with_google'.tr(),
           variant: RidonsButtonVariant.outline,
           leading: SvgPicture.asset(
             'assets/brand/google_g.svg',
@@ -291,10 +285,10 @@ class _SignInViewState extends ConsumerState<SignInView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildHeading('Enter the code'),
+        _buildHeading('enter_the_code'.tr()),
         const SizedBox(height: 24),
         Text(
-          'A code was sent to your number\n${vm.displayPhone}',
+          '${'verification_code_sent_short'.tr()}\n${vm.displayPhone}',
           style: GoogleFonts.inter(
             color: context.ridonsInk,
             fontWeight: FontWeight.w400,
@@ -313,18 +307,15 @@ class _SignInViewState extends ConsumerState<SignInView> {
         if (vm.errorMessage != null) ...[
           const SizedBox(height: 12),
           Text(
-            vm.errorMessage!,
-            style: const TextStyle(
-              color: RidonsColors.primary,
-              fontSize: 13,
-            ),
+            vm.errorMessage!.tr(),
+            style: const TextStyle(color: RidonsColors.primary, fontSize: 13),
           ),
         ],
         const SizedBox(height: 16),
         RidonsButton(
           label: vm.phoneTaken
-              ? 'Sign In instead'
-              : (widget.isSignUp ? 'Continue' : 'Sign In'),
+              ? 'sign_in_instead'.tr()
+              : (widget.isSignUp ? 'continue'.tr() : 'sign_in'.tr()),
           isLoading: vm.verifying,
           onPressed: () => _verify(signUp: vm.phoneTaken ? false : null),
         ),
@@ -332,7 +323,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
         if (resendIn > 0)
           Text.rich(
             TextSpan(
-              text: 'Resend in ',
+              text: 'resend_in'.tr(),
               style: _bodyStyle(color: context.ridonsInk),
               children: [
                 TextSpan(
@@ -358,7 +349,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
               minimumSize: const Size(0, 40),
             ),
             child: Text(
-              'Resend code',
+              'resend_code'.tr(),
               style: _bodyStyle(
                 color: RidonsColors.primary,
                 weight: FontWeight.w700,
@@ -379,7 +370,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
             minimumSize: const Size(0, 40),
           ),
           child: Text(
-            'Try a different method',
+            'try_different_method'.tr(),
             style: _bodyStyle(color: RidonsColors.primary),
           ),
         ),

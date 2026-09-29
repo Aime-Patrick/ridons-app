@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -121,7 +122,9 @@ class _DriverIdleHome extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          'Driver ID · ${user.driverIdLabel}',
+                          'driver_id_caption'.tr(
+                            namedArgs: {'id': user.driverIdLabel},
+                          ),
                           style: TextStyle(
                             color: context.ridonsMuted,
                             fontSize: 13,
@@ -140,7 +143,9 @@ class _DriverIdleHome extends ConsumerWidget {
                               const SizedBox(width: 4),
                               Text(
                                 stats.priorityDispatch
-                                    ? '${stats.tierLabel} · Priority dispatch'
+                                    ? 'priority_dispatch'.tr(
+                                        namedArgs: {'tier': stats.tierLabel},
+                                      )
                                     : stats.tierLabel,
                                 style: const TextStyle(
                                   color: RidonsColors.accent,
@@ -176,8 +181,12 @@ class _DriverIdleHome extends ConsumerWidget {
                 const SizedBox(height: 16),
                 RidonsRatingPrompt(
                   title: viewModel.pendingRatingPassengerName.isEmpty
-                      ? 'Rate the passenger'
-                      : 'Rate ${viewModel.pendingRatingPassengerName}',
+                      ? 'rate_passenger'.tr()
+                      : 'rate_named_passenger'.tr(
+                          namedArgs: {
+                            'name': viewModel.pendingRatingPassengerName,
+                          },
+                        ),
                   value: viewModel.passengerRating,
                   onChanged: viewModel.setPassengerRating,
                   onCommentChanged: viewModel.setPassengerRatingComment,
@@ -189,7 +198,7 @@ class _DriverIdleHome extends ConsumerWidget {
               if (viewModel.quests.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 Text(
-                  'Quests',
+                  'quests'.tr(),
                   style: TextStyle(
                     color: context.ridonsInk,
                     fontSize: 22,
@@ -205,13 +214,15 @@ class _DriverIdleHome extends ConsumerWidget {
               if (viewModel.errorMessage != null) ...[
                 const SizedBox(height: 10),
                 Text(
-                  viewModel.errorMessage!,
+                  viewModel.errorMessage!.tr(
+                    namedArgs: {'amount': '${viewModel.counteredAmount ?? ''}'},
+                  ),
                   style: TextStyle(color: RidonsColors.primary),
                 ),
               ],
               const SizedBox(height: 22),
               Text(
-                'Available offers',
+                'available_offers'.tr(),
                 style: TextStyle(
                   color: context.ridonsInk,
                   fontSize: 22,
@@ -223,7 +234,7 @@ class _DriverIdleHome extends ConsumerWidget {
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
                   child: Text(
-                    'Go online to receive passenger offers.',
+                    'go_online_offers'.tr(),
                     style: TextStyle(color: context.ridonsMuted),
                   ),
                 )
@@ -233,14 +244,14 @@ class _DriverIdleHome extends ConsumerWidget {
                   child: Column(
                     children: [
                       Text(
-                        'No offers nearby yet.',
+                        'no_offers_yet'.tr(),
                         style: TextStyle(color: context.ridonsMuted),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         stats.priorityDispatch
-                            ? 'Gold and Platinum riders see new offers first.'
-                            : 'Keep rating high to see offers before nearby riders.',
+                            ? 'priority_riders_first'.tr()
+                            : 'rating_priority_offers'.tr(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: context.ridonsMuted,
@@ -317,8 +328,8 @@ class _EarningsCard extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
-                                'RWF Earned',
+                              Text(
+                                'rwf_earned'.tr(),
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 13,
@@ -329,8 +340,8 @@ class _EarningsCard extends StatelessWidget {
                               Semantics(
                                 button: true,
                                 label: hidden
-                                    ? 'Show earnings'
-                                    : 'Hide earnings',
+                                    ? 'show_earnings'.tr()
+                                    : 'hide_earnings'.tr(),
                                 child: GestureDetector(
                                   onTap: onToggleHidden,
                                   behavior: HitTestBehavior.opaque,
@@ -366,8 +377,8 @@ class _EarningsCard extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text(
-                          'Online',
+                        Text(
+                          'online'.tr(),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 13,
@@ -392,7 +403,7 @@ class _EarningsCard extends StatelessWidget {
                 Row(
                   children: [
                     _Stat(
-                      'Rating',
+                      'rating',
                       stats.avgRating == 0
                           ? '—'
                           : stats.avgRating.toStringAsFixed(1),
@@ -401,14 +412,14 @@ class _EarningsCard extends StatelessWidget {
                       dividerHeight: 31,
                     ),
                     _Stat(
-                      'Trips',
+                      'trips',
                       '${stats.trips}',
                       labelFontSize: 10,
                       valueFontSize: 12,
                       dividerHeight: 31,
                     ),
                     _Stat(
-                      'Accept',
+                      'accept',
                       '${stats.acceptanceRate}%',
                       labelFontSize: 10,
                       valueFontSize: 12,
@@ -445,15 +456,15 @@ class _Stat extends StatelessWidget {
     return Expanded(
       child: Row(
         children: [
-          if (label != 'Rating') _StatDivider(height: dividerHeight),
+          if (label != 'rating') _StatDivider(height: dividerHeight),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(left: label == 'Rating' ? 0 : 8),
+              padding: EdgeInsets.only(left: label == 'rating' ? 0 : 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    label,
+                    label.tr(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -519,7 +530,9 @@ class _OnlineToggle extends StatelessWidget {
     return Semantics(
       button: true,
       toggled: value,
-      label: busy ? 'Updating online status' : (value ? 'Online' : 'Offline'),
+      label: busy
+          ? 'updating_online_status'.tr()
+          : (value ? 'online'.tr() : 'offline'.tr()),
       child: GestureDetector(
         onTap: busy ? null : () => onChanged(!value),
         child: AnimatedContainer(
@@ -677,10 +690,7 @@ class _QuestCard extends StatelessWidget {
               quest.completed
                   ? '${quest.current} / ${quest.total} · Completed'
                   : '${quest.current} / ${quest.total}',
-              style: TextStyle(
-                color: context.ridonsMuted,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: context.ridonsMuted, fontSize: 12),
             ),
           ],
         ),
@@ -724,8 +734,10 @@ class _OfferCard extends StatelessWidget {
         final buttonFontSize = (width * 0.04).clamp(12.0, 15.0).toDouble();
         final isCounter = fare > offer.offeredPrice;
         final actionLabel = isCounter
-            ? 'Counter ${_money.format(fare)} RWF'
-            : 'Accept offer';
+            ? 'counter_amount'.tr(
+                namedArgs: {'amount': '${_money.format(fare)}'},
+              )
+            : 'accept_offer'.tr();
 
         return Material(
           color: context.ridonsSheet,
@@ -807,7 +819,7 @@ class _OfferCard extends StatelessWidget {
                     children: [
                       TextSpan(
                         text: offer.fromName.isEmpty
-                            ? 'Pickup'
+                            ? 'pickup'.tr()
                             : offer.fromName,
                         style: TextStyle(
                           color: RidonsColors.primary,
@@ -820,7 +832,9 @@ class _OfferCard extends StatelessWidget {
                         style: TextStyle(color: context.ridonsMuted),
                       ),
                       TextSpan(
-                        text: offer.toName.isEmpty ? 'Dropoff' : offer.toName,
+                        text: offer.toName.isEmpty
+                            ? 'dropoff'.tr()
+                            : offer.toName,
                         style: TextStyle(
                           color: context.ridonsInk,
                           fontWeight: FontWeight.w700,
@@ -837,7 +851,12 @@ class _OfferCard extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Negotiation round ${offer.negotiationRound} of ${offer.maxNegotiationRounds}',
+                      'negotiation_round'.tr(
+                        namedArgs: {
+                          'round': '${offer.negotiationRound}',
+                          'max': '${offer.maxNegotiationRounds}',
+                        },
+                      ),
                       style: TextStyle(
                         color: context.ridonsMuted,
                         fontSize: labelFontSize,
@@ -851,7 +870,7 @@ class _OfferCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _PriceCol(
-                        'Passenger offer',
+                        'passenger_offer',
                         '${_money.format(offer.offeredPrice)} Rwf',
                         labelFontSize: labelFontSize,
                         valueFontSize: routeFontSize + 3,
@@ -859,7 +878,7 @@ class _OfferCard extends StatelessWidget {
                     ),
                     Expanded(
                       child: _PriceCol(
-                        'Fair Price',
+                        'fair_price',
                         '${_money.format(offer.suggestedPrice == 0 ? offer.offeredPrice : offer.suggestedPrice)} Rwf',
                         alignEnd: true,
                         labelFontSize: labelFontSize,
@@ -890,7 +909,7 @@ class _OfferCard extends StatelessWidget {
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            'Skip',
+                            'skip'.tr(),
                             style: TextStyle(fontSize: buttonFontSize),
                           ),
                         ),
@@ -953,11 +972,8 @@ class _PriceCol extends StatelessWidget {
           : CrossAxisAlignment.start,
       children: [
         Text(
-          label,
-          style: TextStyle(
-            color: context.ridonsMuted,
-            fontSize: labelFontSize,
-          ),
+          label.tr(),
+          style: TextStyle(color: context.ridonsMuted, fontSize: labelFontSize),
         ),
         FittedBox(
           fit: BoxFit.scaleDown,

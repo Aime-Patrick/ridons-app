@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,7 @@ import '../account/passenger_avatar.dart';
 import '../notifications/notification_inbox_view.dart';
 import '../../core/widgets/map_marker_info_sheet.dart';
 import '../../core/widgets/ridons_notification_bell.dart';
+import '../../core/widgets/ridons_animated_marker.dart';
 import '../../core/widgets/ridons_map_view.dart';
 import '../../core/widgets/ridons_trip_sheet.dart';
 import 'view_models/home_map_view_model.dart';
@@ -37,6 +39,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
       DraggableScrollableController();
   List<LatLng> _fittedRoute = const [];
   var _didCenterOnGps = false;
+  var _followLocation = true;
   var _mapReady = false;
   RideStage? _sheetStage;
   var _sheetHasDropoff = false;
@@ -109,8 +112,16 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
       _viewModel.allowLocation();
       return;
     }
+    if (!_followLocation) {
+      setState(() => _followLocation = true);
+    }
     _moveTo(you);
     _didCenterOnGps = true;
+  }
+
+  void _pauseLocationFollow() {
+    if (!_followLocation) return;
+    setState(() => _followLocation = false);
   }
 
   void _moveTo(LatLng point) {
@@ -153,6 +164,13 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
       RideStage.success => 0.52,
       _ => 0.34,
     };
+  }
+
+  bool get _shouldFollowPassengerLocation {
+    // Keep route planning as an overview, but follow the passenger during an
+    // active matched ride so the live map stays centered on their movement.
+    return _viewModel.stage == RideStage.matched ||
+        _viewModel.routePoints.length < 2;
   }
 
   List<double> get _sheetSnapSizes {
@@ -245,7 +263,10 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
                 controller: _mapController,
                 viewModel: _viewModel,
                 sheetFraction: sheetFraction,
+                followLocation:
+                    _followLocation && _shouldFollowPassengerLocation,
                 onRecenter: askingLocation || searching ? null : _recenterOnYou,
+                onMapInteraction: _pauseLocationFollow,
                 deviceHeadingStream: _compassService.headingStream,
                 user: ref.watch(authSessionProvider).asData?.value?.user,
                 token: ref.watch(authSessionProvider).asData?.value?.token,
@@ -296,10 +317,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
                   snapSizes: _sheetSnapSizes,
                   // Keep initial size stable so didUpdateWidget does not
                   // replace extent mid-build.
-                  child: RideFlowPanel(
-                    viewModel: _viewModel,
-                    decorate: false,
-                  ),
+                  child: RideFlowPanel(viewModel: _viewModel, decorate: false),
                 ),
               ),
             if (searching || success)
@@ -408,23 +426,27 @@ class _PassengerMap extends StatelessWidget {
     required this.controller,
     required this.viewModel,
     required this.sheetFraction,
+    required this.followLocation,
     required this.deviceHeadingStream,
     this.onRecenter,
     this.user,
     this.token,
     this.onMapTap,
     this.onMapReady,
+    this.onMapInteraction,
   });
 
   final MapController controller;
   final HomeMapViewModel viewModel;
   final double sheetFraction;
+  final bool followLocation;
   final Stream<double> deviceHeadingStream;
   final VoidCallback? onRecenter;
   final SessionUser? user;
   final String? token;
   final VoidCallback? onMapTap;
   final VoidCallback? onMapReady;
+  final VoidCallback? onMapInteraction;
 
   @override
   Widget build(BuildContext context) {
@@ -445,10 +467,13 @@ class _PassengerMap extends StatelessWidget {
       controller: controller,
       center: viewModel.mapCenter,
       initialZoom: 15.4,
+      followLocation: followLocation,
+      followPoint: you,
       bottomControlsOffset: _mapControlBottom(context, sheetFraction),
       onRecenter: onRecenter,
       deviceHeadingStream: deviceHeadingStream,
       onMapReady: onMapReady,
+      onMapInteraction: onMapInteraction,
       onTap: (point) {
         if (viewModel.stage == RideStage.pickOnMap) {
           viewModel.pickOnMap(point);
@@ -505,12 +530,12 @@ class _PassengerMap extends StatelessWidget {
                     behavior: HitTestBehavior.opaque,
                     onTap: () => showMapMarkerInfoSheet(
                       context,
-                      title: 'Driver',
+                      title: 'driver',
                       subtitle: driver.id,
                       details: {
-                        'Status': 'Online',
-                        'Speed': '${driver.speedKmh.toStringAsFixed(1)} km/h',
-                        'Heading': '${driver.headingDeg.toStringAsFixed(0)}°',
+                        'status': 'online'.tr(),
+                        'speed': '${driver.speedKmh.toStringAsFixed(1)} km/h',
+                        'heading': '${driver.headingDeg.toStringAsFixed(0)}°',
                       },
                     ),
                     child: Center(
@@ -524,21 +549,6 @@ class _PassengerMap extends StatelessWidget {
                     ),
                   ),
                 ),
-            if (you != null)
-              _youMarker(
-                you,
-                user: user,
-                token: token,
-                onTap: () => showMapMarkerInfoSheet(
-                  context,
-                  title: 'Your location',
-                  details: {
-                    'Status': 'Active',
-                    'Coordinates':
-                        '${you.latitude.toStringAsFixed(5)}, ${you.longitude.toStringAsFixed(5)}',
-                  },
-                ),
-              ),
             if (showPickupPin)
               _pinMarker(
                 pickup,
@@ -560,55 +570,66 @@ class _PassengerMap extends StatelessWidget {
               ),
           ],
         ),
+        if (you != null)
+          RidonsAnimatedMarker(
+            point: you,
+            child: _youMarkerChild(
+              user: user,
+              token: token,
+              onTap: () => showMapMarkerInfoSheet(
+                context,
+                title: 'your_location',
+                details: {
+                  'status': 'active'.tr(),
+                  'coordinates':
+                      '${you.latitude.toStringAsFixed(5)}, ${you.longitude.toStringAsFixed(5)}',
+                },
+              ),
+            ),
+          ),
       ],
     );
   }
 
-  Marker _youMarker(
-    LatLng point, {
+  Widget _youMarkerChild({
     SessionUser? user,
     String? token,
     VoidCallback? onTap,
   }) {
-    return Marker(
-      point: point,
-      width: 44,
-      height: 44,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Center(
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x66000000),
-                  blurRadius: 5,
-                  offset: Offset(0, 1),
-                ),
-              ],
-            ),
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: ClipOval(
-                  child: user != null && user.hasChosenAvatar
-                      ? PassengerAvatar(user: user, radius: 9, token: token)
-                      : const ColoredBox(
-                          color: Color(0xFF4285F4),
-                          child: Icon(
-                            Icons.person_rounded,
-                            color: Colors.white,
-                            size: 12,
-                          ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Center(
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 5,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: ClipOval(
+                child: user != null && user.hasChosenAvatar
+                    ? PassengerAvatar(user: user, radius: 9, token: token)
+                    : const ColoredBox(
+                        color: Color(0xFF4285F4),
+                        child: Icon(
+                          Icons.person_rounded,
+                          color: Colors.white,
+                          size: 12,
                         ),
-                ),
+                      ),
               ),
             ),
           ),

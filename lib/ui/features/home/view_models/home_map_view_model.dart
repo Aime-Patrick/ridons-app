@@ -129,6 +129,8 @@ class HomeMapViewModel extends ChangeNotifier {
   Timer? _searchDebounce;
   Timer? _interp;
   Timer? _pingTimer;
+  DateTime? _lastLocationPingAt;
+  var _locationPingBusy = false;
   StreamSubscription<Position>? _gpsSub;
   StreamSubscription<RealtimeMessage>? _wsSub;
   Position? _lastFix;
@@ -158,7 +160,7 @@ class HomeMapViewModel extends ChangeNotifier {
   String get driverReceiptLabel {
     final driver = matchedDriver;
     if (driver == null || driver.name.trim().isEmpty) {
-      return 'Driver details pending';
+      return 'driver_details_pending';
     }
     final parts = driver.name.trim().split(RegExp(r'\s+'));
     final short = parts.length <= 1
@@ -176,23 +178,24 @@ class HomeMapViewModel extends ChangeNotifier {
         'Driver  $driverReceiptLabel';
   }
 
-  String get pickupLabel => pickup?.name ?? 'My current location';
+  String get pickupLabel => pickup?.name ?? 'my_location';
   String get dropoffLabel => dropoff?.name ?? '';
 
   String get rideStatusLabel {
     switch (liveRideStatus) {
       case 'en_route':
-        return 'Driver on the way';
+        return 'driver_on_the_way';
       case 'arrived':
-        return 'Driver has arrived';
+        return 'driver_has_arrived';
       case 'in_progress':
-        return 'Trip in progress';
+        return 'trip_in_progress';
       case 'completed':
-        return 'Trip complete';
+        return 'trip_complete';
       default:
-        return 'Match found';
+        return 'match_found';
     }
   }
+
   bool get hasRoute =>
       pickup != null && dropoff != null && routePoints.length >= 2;
 
@@ -329,7 +332,7 @@ class HomeMapViewModel extends ChangeNotifier {
     _lastFix = position;
     _pickupFollowsGps = true;
     pickup = GeoPlace(
-      name: pickup?.name ?? 'My current location',
+      name: pickup?.name ?? 'my_location',
       subtitle: pickup?.subtitle ?? '',
       latitude: position.latitude,
       longitude: position.longitude,
@@ -414,12 +417,12 @@ class HomeMapViewModel extends ChangeNotifier {
     );
     driverPhone = active.driverPhone;
     pickup = GeoPlace(
-      name: active.fromName.isEmpty ? 'Pickup location' : active.fromName,
+      name: active.fromName.isEmpty ? 'pickup_location' : active.fromName,
       latitude: active.from.latitude,
       longitude: active.from.longitude,
     );
     dropoff = GeoPlace(
-      name: active.toName.isEmpty ? 'Dropoff location' : active.toName,
+      name: active.toName.isEmpty ? 'dropoff_location' : active.toName,
       latitude: active.to.latitude,
       longitude: active.to.longitude,
     );
@@ -435,24 +438,36 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   Future<void> _pingLocation() async {
+    final now = DateTime.now();
+    final last = _lastLocationPingAt;
+    if (_locationPingBusy ||
+        (last != null && now.difference(last) < const Duration(seconds: 4))) {
+      return;
+    }
     final fix = _lastFix;
     final origin = pickup;
     final lat = fix?.latitude ?? origin?.latitude;
     final lng = fix?.longitude ?? origin?.longitude;
     if (lat == null || lng == null) return;
+    _locationPingBusy = true;
+    _lastLocationPingAt = now;
     final heading = (fix != null && fix.heading.isFinite && fix.heading >= 0)
         ? fix.heading
         : 0.0;
     final speedMps = (fix != null && fix.speed.isFinite)
         ? math.max(0, fix.speed)
         : 0.0;
-    await _geoApi.ping(
-      lat: lat,
-      lng: lng,
-      headingDeg: heading,
-      speedKmh: math.max(0, speedMps * 3.6),
-      rideId: liveRideId ?? liveRequestId,
-    );
+    try {
+      await _geoApi.ping(
+        lat: lat,
+        lng: lng,
+        headingDeg: heading,
+        speedKmh: math.max(0, speedMps * 3.6),
+        rideId: liveRideId ?? liveRequestId,
+      );
+    } finally {
+      _locationPingBusy = false;
+    }
   }
 
   void _maybeResnapFromGps(Position position) {
@@ -871,8 +886,8 @@ class HomeMapViewModel extends ChangeNotifier {
     final gen = ++_pinGen;
     resolvingPin = true;
     pickCandidate = GeoPlace(
-      name: 'Dropped pin',
-      subtitle: 'Finding address…',
+      name: 'dropped_pin',
+      subtitle: 'finding_address',
       latitude: point.latitude,
       longitude: point.longitude,
     );
@@ -886,7 +901,7 @@ class HomeMapViewModel extends ChangeNotifier {
     pickCandidate = GeoPlace(
       name: (named?.name.trim().isNotEmpty ?? false)
           ? named!.name
-          : 'Dropped pin',
+          : 'dropped_pin',
       subtitle: named?.subtitle ?? '',
       latitude: point.latitude,
       longitude: point.longitude,
@@ -926,7 +941,7 @@ class HomeMapViewModel extends ChangeNotifier {
     final api = _pricingApi;
     if (api == null) {
       loadingFareEstimate = false;
-      fareEstimateError = 'Price service is unavailable.';
+      fareEstimateError = 'price_service_unavailable';
       notifyListeners();
       return;
     }
@@ -943,11 +958,11 @@ class HomeMapViewModel extends ChangeNotifier {
       }
       fareEstimateError = estimate.suggestedPrice > 0
           ? null
-          : 'Price service returned no fare.';
+          : 'price_service_no_fare';
     } catch (_) {
       if (!_samePlace(from, pickup) || !_samePlace(to, dropoff)) return;
       offeredPrice = 0;
-      fareEstimateError = 'Could not load the current fare. Please try again.';
+      fareEstimateError = 'could_not_load_current_fare';
     } finally {
       if (_samePlace(from, pickup) && _samePlace(to, dropoff)) {
         loadingFareEstimate = false;
@@ -963,7 +978,9 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   void adjustPrice(int delta) {
-    if (stage != RideStage.estimate || loadingFareEstimate || offeredPrice <= 0) {
+    if (stage != RideStage.estimate ||
+        loadingFareEstimate ||
+        offeredPrice <= 0) {
       return;
     }
     offeredPrice = FarePolicy.normalize(
@@ -980,7 +997,7 @@ class HomeMapViewModel extends ChangeNotifier {
 
   Future<void> confirmOffer() async {
     if (loadingFareEstimate || offeredPrice <= 0) {
-      fareEstimateError = 'Wait for the current fare before sending the offer.';
+      fareEstimateError = 'wait_for_current_fare';
       notifyListeners();
       return;
     }
@@ -1070,7 +1087,7 @@ class HomeMapViewModel extends ChangeNotifier {
       unawaited(_realtime.unsubscribe('request:$requestId'));
       showMatch(driverId: driverId, fare: agreedFare);
     } catch (_) {
-      bidError = 'That offer is no longer available. Choose another one.';
+      bidError = 'offer_no_longer_available';
       counterOffers = counterOffers
           .where((item) => item.bidId != bid.bidId)
           .toList(growable: false);
@@ -1099,9 +1116,9 @@ class HomeMapViewModel extends ChangeNotifier {
       counterOffers = counterOffers
           .where((item) => item.bidId != bid.bidId)
           .toList(growable: false);
-      bidError = 'Counter offer sent. Waiting for the driver.';
+      bidError = 'counter_sent_passenger';
     } catch (_) {
-      bidError = 'Could not send your counter offer. Please try again.';
+      bidError = 'could_not_send_counter';
     } finally {
       bidBusy = false;
       notifyListeners();
@@ -1123,7 +1140,7 @@ class HomeMapViewModel extends ChangeNotifier {
           .where((item) => item.bidId != bid.bidId)
           .toList(growable: false);
     } catch (_) {
-      bidError = 'Could not remove that offer. Please try again.';
+      bidError = 'could_not_remove_offer';
     } finally {
       bidBusy = false;
       notifyListeners();
@@ -1219,7 +1236,7 @@ class HomeMapViewModel extends ChangeNotifier {
     try {
       return await api.createShareLink(rideId);
     } catch (_) {
-      shareError = 'Could not create the trip sharing link.';
+      shareError = 'could_not_create_share_link';
       return null;
     } finally {
       sharingTrip = false;
@@ -1237,14 +1254,10 @@ class HomeMapViewModel extends ChangeNotifier {
     shareError = null;
     notifyListeners();
     try {
-      await api.rateRide(
-        rideId,
-        rating: rating,
-        comment: ratingComment,
-      );
+      await api.rateRide(rideId, rating: rating, comment: ratingComment);
       resetToHome();
     } catch (_) {
-      ratingError = 'Could not submit your rating. Please try again.';
+      ratingError = 'could_not_submit_rating';
       ratingBusy = false;
       notifyListeners();
     }

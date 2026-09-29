@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -95,7 +96,7 @@ class RouteHeaderChip extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            viewModel.pickupLabel,
+                            viewModel.pickupLabel.tr(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -115,7 +116,7 @@ class RouteHeaderChip extends StatelessWidget {
                         ),
                         Flexible(
                           child: Text(
-                            viewModel.dropoffLabel,
+                            viewModel.dropoffLabel.tr(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -252,7 +253,7 @@ class LocationAccessSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'Allow location access',
+                    'allow_location_access'.tr(),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: context.ridonsInk,
@@ -262,7 +263,7 @@ class LocationAccessSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'We need your location to find nearby Moto Drivers',
+                    'location_permission_description'.tr(),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: context.ridonsMuted,
@@ -272,13 +273,13 @@ class LocationAccessSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 22),
                   RidonsButton(
-                    label: 'Allow location access',
+                    label: 'allow_location_access',
                     isLoading: locating,
                     onPressed: onAllow,
                   ),
                   const SizedBox(height: 10),
                   RidonsButton(
-                    label: 'Maybe later',
+                    label: 'maybe_later',
                     variant: RidonsButtonVariant.secondary,
                     onPressed: locating ? null : onSkip,
                   ),
@@ -309,7 +310,7 @@ class _RouteSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RidonsBottomSheet(
-      title: 'Route',
+      title: 'route',
       showHandle: false,
       decorate: decorate,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -319,7 +320,7 @@ class _RouteSheet extends StatelessWidget {
         children: [
           RideLocationField(
             value: viewModel.pickupLabel,
-            hint: 'My current location',
+            hint: 'my_current_location',
             showMapThumb: true,
             onTap: () => viewModel.openSearch(LocationField.pickup),
             onPinTap: () => viewModel.openMapPickerFor(LocationField.pickup),
@@ -327,14 +328,14 @@ class _RouteSheet extends StatelessWidget {
           const SizedBox(height: 8),
           RideLocationField(
             value: viewModel.dropoffLabel,
-            hint: 'Choose dropoff location',
+            hint: 'choose_dropoff_location',
             onTap: () => viewModel.openSearch(LocationField.dropoff),
             onPinTap: () => viewModel.openMapPickerFor(LocationField.dropoff),
           ),
           if (viewModel.dropoff != null) ...[
             const SizedBox(height: 12),
             RidonsButton(
-              label: 'Continue',
+              label: 'continue',
               onPressed: viewModel.continueFromRoute,
             ),
           ],
@@ -387,8 +388,8 @@ class _SearchSheetState extends State<_SearchSheet> {
                     onPressed: viewModel.closeSearch,
                     icon: const Icon(Icons.close, size: 20),
                   ),
-                  const Text(
-                    'Route',
+                  Text(
+                    'route'.tr(),
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ],
@@ -400,7 +401,7 @@ class _SearchSheetState extends State<_SearchSheet> {
                 children: [
                   RideLocationField(
                     value: viewModel.pickupLabel,
-                    hint: 'My location',
+                    hint: 'my_location',
                     highlighted: pickupActive,
                     controller: pickupActive ? _searchController : null,
                     onTap: () {
@@ -414,7 +415,7 @@ class _SearchSheetState extends State<_SearchSheet> {
                   const SizedBox(height: 8),
                   RideLocationField(
                     value: viewModel.dropoffLabel,
-                    hint: 'Choose dropoff location',
+                    hint: 'choose_dropoff_location',
                     highlighted: !pickupActive,
                     autofocus: !pickupActive,
                     controller: pickupActive ? null : _searchController,
@@ -439,8 +440,8 @@ class _SearchSheetState extends State<_SearchSheet> {
                         padding: const EdgeInsets.symmetric(horizontal: 32),
                         child: Text(
                           viewModel.searchQuery.trim().isEmpty
-                              ? 'Looking up places near you. You can also search or pick on the map.'
-                              : 'No places match that search. Try another name or pick on the map.',
+                              ? 'looking_up_places'.tr()
+                              : 'no_places_match'.tr(),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Theme.of(context).textTheme.bodyMedium?.color
@@ -501,7 +502,7 @@ class _MapPickSheet extends StatelessWidget {
               ),
               Expanded(
                 child: Text(
-                  'Pick from map',
+                  'pick_from_map'.tr(),
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -520,7 +521,7 @@ class _MapPickSheet extends StatelessWidget {
               ],
               Expanded(
                 child: Text(
-                  candidate?.name ?? 'Tap the map to drop a pin',
+                  (candidate?.name ?? 'tap_map_drop_pin').tr(),
                   style: TextStyle(color: context.ridonsMuted, fontSize: 13),
                 ),
               ),
@@ -528,7 +529,7 @@ class _MapPickSheet extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           RidonsButton(
-            label: 'Use this location',
+            label: 'use_this_location',
             onPressed: candidate == null ? null : viewModel.confirmMapPick,
           ),
         ],
@@ -554,52 +555,54 @@ class _EstimateSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SheetTitleRow(
-            title: 'Price estimation',
+            title: 'price_estimation',
             trailing: viewModel.timerLabel,
           ),
           const SizedBox(height: 4),
           Text(
             viewModel.lastOfferMissed
                 ? (viewModel.lastOfferHadRiders
-                      ? 'Nobody took that fare. Raise it and send again.'
-                      : 'No nearby riders took this offer. Try again in a moment.')
+                      ? 'nobody_took_fare'.tr()
+                      : 'no_nearby_riders'.tr())
                 : viewModel.tripKm > 0
-                ? 'About ${viewModel.tripDistanceLabel} · ${viewModel.tripEtaLabel} by road'
-                : 'Market Fair price for this route.',
+                ? 'about_route_by_road'.tr(
+                    namedArgs: {
+                      'distance': viewModel.tripDistanceLabel,
+                      'eta': viewModel.tripEtaLabel,
+                    },
+                  )
+                : 'market_fair_price'.tr(),
             style: TextStyle(color: context.ridonsMuted, fontSize: 11),
           ),
           const SizedBox(height: 10),
           RidonsPriceAdjuster(
             amountRwf: viewModel.offeredPrice,
-            enabled: !viewModel.loadingFareEstimate &&
-                viewModel.offeredPrice > 0,
+            enabled:
+                !viewModel.loadingFareEstimate && viewModel.offeredPrice > 0,
             onDecrement: () => viewModel.adjustPrice(-100),
             onIncrement: () => viewModel.adjustPrice(100),
           ),
           if (viewModel.loadingFareEstimate) ...[
             const SizedBox(height: 8),
-            const Text(
-              'Loading the current fare…',
-              textAlign: TextAlign.center,
-            ),
+            Text('loading_current_fare'.tr(), textAlign: TextAlign.center),
           ],
           if (viewModel.fareEstimateError != null) ...[
             const SizedBox(height: 8),
             Text(
-              viewModel.fareEstimateError!,
+              viewModel.fareEstimateError!.tr(),
               textAlign: TextAlign.center,
               style: TextStyle(color: context.ridonsMuted, fontSize: 12),
             ),
             TextButton(
               onPressed: viewModel.retryFareEstimate,
-              child: const Text('Retry'),
+              child: Text('retry'.tr()),
             ),
           ],
           const SizedBox(height: 10),
           RidonsButton(
-            label: 'Confirm',
-            onPressed: viewModel.loadingFareEstimate ||
-                    viewModel.offeredPrice <= 0
+            label: 'confirm',
+            onPressed:
+                viewModel.loadingFareEstimate || viewModel.offeredPrice <= 0
                 ? null
                 : viewModel.confirmOffer,
           ),
@@ -627,8 +630,8 @@ class _OfferingSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Offering your fare',
+          Text(
+            'offering_your_fare'.tr(),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
@@ -637,8 +640,16 @@ class _OfferingSheet extends StatelessWidget {
               Expanded(
                 child: Text(
                   viewModel.driversNotified == 0
-                      ? 'No drivers have received this offer yet. We will keep searching.'
-                      : '${viewModel.driversNotified} ${viewModel.driversNotified == 1 ? 'driver' : 'drivers'} notified · ETA ${viewModel.etaLabel}',
+                      ? 'no_drivers_received_offer'.tr()
+                      : 'drivers_notified'.tr(
+                          namedArgs: {
+                            'count': '${viewModel.driversNotified}',
+                            'driverWord': viewModel.driversNotified == 1
+                                ? 'driver'.tr()
+                                : 'drivers'.tr(),
+                            'eta': viewModel.etaLabel,
+                          },
+                        ),
                   style: TextStyle(color: context.ridonsMuted, fontSize: 11),
                 ),
               ),
@@ -666,12 +677,12 @@ class _OfferingSheet extends StatelessWidget {
           if (viewModel.bidError != null) ...[
             const SizedBox(height: 8),
             Text(
-              viewModel.bidError!,
+              viewModel.bidError!.tr(),
               style: TextStyle(color: context.ridonsMuted, fontSize: 12),
             ),
           ],
           const SizedBox(height: 12),
-          const RidonsButton(label: 'Confirm', onPressed: null),
+          RidonsButton(label: 'confirm', onPressed: null),
           const SizedBox(height: 12),
           _RouteSummary(viewModel: viewModel),
         ],
@@ -721,15 +732,17 @@ class _CounterOffersPanel extends StatelessWidget {
                     children: [
                       Text(
                         offers.length == 1
-                            ? 'A driver sent a counter-offer'
-                            : '${offers.length} drivers sent counter-offers',
+                            ? 'driver_sent_counter_offer'.tr()
+                            : 'drivers_sent_counter_offers'.tr(
+                                namedArgs: {'count': '${offers.length}'},
+                              ),
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       Text(
-                        'Choose one before the request expires',
+                        'choose_before_expiry'.tr(),
                         style: TextStyle(
                           color: context.ridonsMuted,
                           fontSize: 11,
@@ -835,7 +848,9 @@ class _CounterOfferTileState extends State<_CounterOfferTile> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    bid.driverName.isNotEmpty ? bid.driverName : bid.driverLabel,
+                    bid.driverName.isNotEmpty
+                        ? bid.driverName
+                        : bid.driverLabel,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   if (bid.driverRating > 0)
@@ -857,7 +872,12 @@ class _CounterOfferTileState extends State<_CounterOfferTile> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Round ${bid.negotiationRound} of ${bid.maxNegotiationRounds}',
+          'round_of'.tr(
+            namedArgs: {
+              'round': '${bid.negotiationRound}',
+              'total': '${bid.maxNegotiationRounds}',
+            },
+          ),
           style: TextStyle(color: context.ridonsMuted, fontSize: 11),
         ),
         const SizedBox(height: 8),
@@ -865,14 +885,14 @@ class _CounterOfferTileState extends State<_CounterOfferTile> {
           children: [
             Expanded(
               child: _CounterPrice(
-                label: 'Your offer',
+                label: 'your_offer',
                 value: '${widget.originalPrice} Rwf',
               ),
             ),
             const Icon(Icons.arrow_forward, size: 16),
             Expanded(
               child: _CounterPrice(
-                label: 'Driver asks',
+                label: 'driver_asks',
                 value: '${bid.price} Rwf',
                 emphasized: true,
               ),
@@ -884,8 +904,7 @@ class _CounterOfferTileState extends State<_CounterOfferTile> {
           amountRwf: _counterPrice,
           enabled: !widget.busy,
           onDecrement: () => setState(() {
-            _counterPrice =
-                (_counterPrice - 100).clamp(500, 1000000).toInt();
+            _counterPrice = (_counterPrice - 100).clamp(500, 1000000).toInt();
           }),
           onIncrement: () => setState(() {
             _counterPrice += 100;
@@ -903,7 +922,7 @@ class _CounterOfferTileState extends State<_CounterOfferTile> {
                   minimumSize: const Size.fromHeight(42),
                   side: BorderSide(color: context.ridonsLine),
                 ),
-                child: const Text('Counter offer'),
+                child: Text('counter_offer'.tr()),
               ),
             ),
             const SizedBox(width: 8),
@@ -915,14 +934,14 @@ class _CounterOfferTileState extends State<_CounterOfferTile> {
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(42),
                 ),
-                child: const Text('Accept'),
+                child: Text('accept'.tr()),
               ),
             ),
           ],
         ),
         TextButton(
           onPressed: widget.busy ? null : widget.onDecline,
-          child: const Text('Leave it'),
+          child: Text('leave_it'.tr()),
         ),
       ],
     );
@@ -947,10 +966,13 @@ class _CounterPrice extends StatelessWidget {
           ? CrossAxisAlignment.end
           : CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: context.ridonsMuted, fontSize: 10)),
+        Text(
+          label.tr(),
+          style: TextStyle(color: context.ridonsMuted, fontSize: 10),
+        ),
         const SizedBox(height: 2),
         Text(
-          value,
+          value.tr(),
           style: TextStyle(
             color: emphasized ? RidonsColors.primary : context.ridonsInk,
             fontWeight: FontWeight.w800,
@@ -1007,7 +1029,7 @@ class _MatchedSheet extends StatelessWidget {
             child: RidonsDriverCard(
               name: driver?.name.isNotEmpty == true
                   ? driver!.name
-                  : 'Driver details pending',
+                  : 'driver_details_pending',
               plate: driver?.plate ?? '',
               rating: driver?.rating ?? 0,
               avatarUrl: driver?.avatarUrl,
@@ -1018,12 +1040,12 @@ class _MatchedSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: _Fact(
-                  label: 'Agreed fare',
+                  label: 'agreed_fare',
                   value: '${viewModel.payableFare} Rwf',
                 ),
               ),
               const Expanded(
-                child: _Fact(label: 'Payment method', value: 'Cash or MoMo'),
+                child: _Fact(label: 'payment_method', value: 'cash_or_momo'),
               ),
             ],
           ),
@@ -1038,7 +1060,7 @@ class _MatchedSheet extends StatelessWidget {
                       ? null
                       : () => _callDriver(context, viewModel.driverPhone),
                   icon: const Icon(Icons.call_outlined, size: 16),
-                  label: const Text('Call driver'),
+                  label: Text('call_driver'.tr()),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                   ),
@@ -1052,7 +1074,9 @@ class _MatchedSheet extends StatelessWidget {
                       : () => _shareTrip(context, viewModel),
                   icon: const Icon(Icons.share_outlined, size: 16),
                   label: Text(
-                    viewModel.sharingTrip ? 'Creating link' : 'Share trip',
+                    viewModel.sharingTrip
+                        ? 'creating_link'.tr()
+                        : 'share_trip'.tr(),
                   ),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
@@ -1067,7 +1091,7 @@ class _MatchedSheet extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => _openNeedHelpDialog(context, viewModel),
               icon: const Icon(Icons.help_outline, size: 16),
-              label: const Text('Need help?'),
+              label: Text('need_help'.tr()),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(44),
               ),
@@ -1076,7 +1100,7 @@ class _MatchedSheet extends StatelessWidget {
           if (viewModel.liveRideStatus == 'completed') ...[
             const SizedBox(height: 10),
             RidonsButton(
-              label: 'Continue to payment',
+              label: 'continue_to_payment',
               onPressed: viewModel.goToPayment,
             ),
           ],
@@ -1095,7 +1119,7 @@ class _PaymentSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RidonsBottomSheet(
-      title: 'Payment',
+      title: 'payment',
       showHandle: false,
       decorate: decorate,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
@@ -1104,7 +1128,7 @@ class _PaymentSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Pay the driver directly. Confirm here when you’ve paid in cash or Mobile Money.',
+            'payment_confirmation_description'.tr(),
             style: TextStyle(
               color: context.ridonsMuted,
               fontSize: 13,
@@ -1113,19 +1137,21 @@ class _PaymentSheet extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _PaymentOption(
-            label: 'Cash',
+            label: 'cash',
             selected: viewModel.paymentMethod == 'Cash',
             onTap: () => viewModel.selectPayment('Cash'),
           ),
           const SizedBox(height: 8),
           _PaymentOption(
-            label: 'Mobile Money',
+            label: 'mobile_money',
             selected: viewModel.paymentMethod == 'Mobile Money',
             onTap: () => viewModel.selectPayment('Mobile Money'),
           ),
           const SizedBox(height: 16),
           RidonsButton(
-            label: "I've paid ${viewModel.payableFare} RWF",
+            label: 'ive_paid_amount'.tr(
+              namedArgs: {'amount': '${viewModel.payableFare}'},
+            ),
             onPressed: viewModel.confirmPayment,
           ),
         ],
@@ -1154,8 +1180,8 @@ class _SuccessSheet extends StatelessWidget {
                 child: Icon(Icons.check_rounded, color: Colors.white, size: 42),
               ),
               const SizedBox(height: 18),
-              const Text(
-                'Trip recorded successfully',
+              Text(
+                'trip_recorded_successfully'.tr(),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
@@ -1163,23 +1189,23 @@ class _SuccessSheet extends StatelessWidget {
               _TripReceiptCard(viewModel: viewModel),
               const SizedBox(height: 28),
               RidonsRatingPrompt(
-                title: 'How was the ride?',
+                title: 'how_was_ride',
                 value: viewModel.rating,
                 onChanged: viewModel.setRating,
                 onCommentChanged: viewModel.setRatingComment,
                 onSubmit: viewModel.submitRating,
-                submitLabel: 'Send rating',
+                submitLabel: 'send_rating',
                 isLoading: viewModel.ratingBusy,
                 errorMessage: viewModel.ratingError,
               ),
               const SizedBox(height: 10),
               RidonsButton(
-                label: 'Report a problem',
+                label: 'report_a_problem',
                 variant: RidonsButtonVariant.secondary,
                 onPressed: () => _openNeedHelpDialog(
                   context,
                   viewModel,
-                  defaultSubject: 'Problem with completed trip',
+                  defaultSubject: 'problem_completed_trip',
                   category: 'ride',
                 ),
               ),
@@ -1210,7 +1236,7 @@ class _TripReceiptCard extends StatelessWidget {
       child: Column(
         children: [
           _ReceiptLine(
-            label: 'Paid to the driver',
+            label: 'paid_to_driver',
             trailing: Text(
               '${viewModel.payableFare} Rwf',
               style: TextStyle(
@@ -1227,7 +1253,7 @@ class _TripReceiptCard extends StatelessWidget {
                 TextSpan(
                   children: [
                     TextSpan(
-                      text: viewModel.pickupLabel,
+                      text: viewModel.pickupLabel.tr(),
                       style: const TextStyle(
                         color: RidonsColors.primary,
                         fontWeight: FontWeight.w700,
@@ -1243,7 +1269,7 @@ class _TripReceiptCard extends StatelessWidget {
                       ),
                     ),
                     TextSpan(
-                      text: viewModel.dropoffLabel,
+                      text: viewModel.dropoffLabel.tr(),
                       style: TextStyle(
                         color: ink,
                         fontWeight: FontWeight.w700,
@@ -1267,9 +1293,9 @@ class _TripReceiptCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _ReceiptLine(
-            label: 'Driver',
+            label: 'driver',
             trailing: Text(
-              viewModel.driverReceiptLabel,
+              viewModel.driverReceiptLabel.tr(),
               textAlign: TextAlign.right,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1282,7 +1308,7 @@ class _TripReceiptCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _ReceiptLine(
-            label: 'Record No.',
+            label: 'record_number',
             trailing: Text(
               viewModel.recordNumber,
               style: TextStyle(
@@ -1302,7 +1328,7 @@ class _TripReceiptCard extends StatelessWidget {
                       ClipboardData(text: viewModel.receiptSummary),
                     );
                     if (!context.mounted) return;
-                    RidonsNotice.success(context, 'Record copied.');
+                    RidonsNotice.success(context, 'record_copied');
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: ink,
@@ -1313,8 +1339,8 @@ class _TripReceiptCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(100),
                     ),
                   ),
-                  child: const Text(
-                    'Share record',
+                  child: Text(
+                    'share_record'.tr(),
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -1323,7 +1349,7 @@ class _TripReceiptCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    RidonsNotice.info(context, 'PDF download is coming soon.');
+                    RidonsNotice.info(context, 'pdf_coming_soon');
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: ink,
@@ -1334,8 +1360,8 @@ class _TripReceiptCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(100),
                     ),
                   ),
-                  child: const Text(
-                    'Download PDF',
+                  child: Text(
+                    'download_pdf'.tr(),
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -1405,7 +1431,7 @@ class RideLocationField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final decoration = InputDecoration(
-      hintText: hint,
+      hintText: hint.tr(),
       prefixIcon: const Icon(Icons.search, size: 18),
       suffixIcon: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1475,7 +1501,7 @@ class RideLocationField extends StatelessWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              value.isEmpty ? hint : value,
+              value.isEmpty ? hint.tr() : value.tr(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -1506,7 +1532,7 @@ class _RouteSummary extends StatelessWidget {
         _SummaryLine(
           icon: Icons.location_on_outlined,
           text: viewModel.dropoffLabel.isEmpty
-              ? 'Choose dropoff location'
+              ? 'choose_dropoff_location'
               : viewModel.dropoffLabel,
         ),
       ],
@@ -1528,7 +1554,7 @@ class _SummaryLine extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            text,
+            text.tr(),
             style: TextStyle(
               color: context.ridonsInk,
               fontSize: 13,
@@ -1553,7 +1579,7 @@ class _SheetTitleRow extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            title,
+            title.tr(),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
         ),
@@ -1578,7 +1604,10 @@ class _Fact extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: context.ridonsMuted, fontSize: 11)),
+        Text(
+          label.tr(),
+          style: TextStyle(color: context.ridonsMuted, fontSize: 11),
+        ),
         const SizedBox(height: 2),
         Text(
           value,
@@ -1623,13 +1652,13 @@ class _PaymentOption extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                label == 'Cash' ? Icons.payments_outlined : Icons.phone_iphone,
+                label == 'cash' ? Icons.payments_outlined : Icons.phone_iphone,
                 color: RidonsColors.primary,
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  label,
+                  label.tr(),
                   style: TextStyle(
                     color: context.ridonsInk,
                     fontWeight: FontWeight.w700,
@@ -1651,10 +1680,10 @@ class _PaymentOption extends StatelessWidget {
 Future<void> _openNeedHelpDialog(
   BuildContext context,
   HomeMapViewModel viewModel, {
-  String defaultSubject = 'Need help with my ride',
+  String defaultSubject = 'need_help_with_ride',
   String category = 'ride',
 }) async {
-  final subject = TextEditingController(text: defaultSubject);
+  final subject = TextEditingController(text: defaultSubject.tr());
   final body = TextEditingController();
   var submitting = false;
 
@@ -1664,20 +1693,20 @@ Future<void> _openNeedHelpDialog(
       return StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: const Text('Need help?'),
+            title: Text('need_help'.tr()),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 RidonsTextField(
                   controller: subject,
-                  label: 'Subject',
-                  hint: 'What do you need help with?',
+                  label: 'subject',
+                  hint: 'what_do_you_need_help_with',
                 ),
                 const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Details',
+                    'details'.tr(),
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: context.ridonsInk,
@@ -1690,8 +1719,8 @@ Future<void> _openNeedHelpDialog(
                   maxLines: 4,
                   minLines: 3,
                   textInputAction: TextInputAction.newline,
-                  decoration: const InputDecoration(
-                    hintText: 'Describe what happened (optional)',
+                  decoration: InputDecoration(
+                    hintText: 'describe_happened_optional'.tr(),
                   ),
                 ),
               ],
@@ -1701,7 +1730,7 @@ Future<void> _openNeedHelpDialog(
                 onPressed: submitting
                     ? null
                     : () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr()),
               ),
               TextButton(
                 onPressed: submitting
@@ -1711,7 +1740,7 @@ Future<void> _openNeedHelpDialog(
                         if (subj.length < 3) {
                           RidonsNotice.show(
                             context,
-                            'Please enter a short subject (3+ characters).',
+                            'short_subject_required',
                             tone: RidonsNoticeTone.warning,
                           );
                           return;
@@ -1727,10 +1756,7 @@ Future<void> _openNeedHelpDialog(
                         if (!dialogContext.mounted) return;
                         if (id == null) {
                           setState(() => submitting = false);
-                          RidonsNotice.error(
-                            context,
-                            'Could not reach support. Try again shortly.',
-                          );
+                          RidonsNotice.error(context, 'support_unavailable');
                           return;
                         }
                         Navigator.pop(dialogContext, true);
@@ -1741,7 +1767,7 @@ Future<void> _openNeedHelpDialog(
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Send'),
+                    : Text('send'.tr()),
               ),
             ],
           );
@@ -1754,10 +1780,7 @@ Future<void> _openNeedHelpDialog(
   body.dispose();
 
   if (sent == true && context.mounted) {
-    RidonsNotice.success(
-      context,
-      'Support ticket sent. Our team will follow up.',
-    );
+    RidonsNotice.success(context, 'support_ticket_sent');
   }
 }
 
@@ -1769,7 +1792,7 @@ Future<void> _callDriver(BuildContext context, String phone) async {
     mode: LaunchMode.externalApplication,
   );
   if (!launched && context.mounted) {
-    RidonsNotice.error(context, 'Calling is not available on this device.');
+    RidonsNotice.error(context, 'calling_unavailable');
   }
 }
 
@@ -1782,12 +1805,14 @@ Future<void> _shareTrip(
   if (link == null || link.isEmpty) {
     RidonsNotice.error(
       context,
-      viewModel.shareError ?? 'Could not share this trip.',
+      (viewModel.shareError ?? 'could_not_share_trip').tr(),
     );
     return;
   }
 
-  final text = Uri.encodeComponent('Track my Ridons trip: $link');
+  final text = Uri.encodeComponent(
+    'track_trip_message'.tr(namedArgs: {'link': link}),
+  );
   final whatsapp = Uri.parse('whatsapp://send?text=$text');
   final openedWhatsApp = await launchUrl(
     whatsapp,
@@ -1801,6 +1826,6 @@ Future<void> _shareTrip(
     mode: LaunchMode.externalApplication,
   );
   if (!openedFallback && context.mounted) {
-    RidonsNotice.error(context, 'WhatsApp is not available on this device.');
+    RidonsNotice.error(context, 'whatsapp_unavailable');
   }
 }

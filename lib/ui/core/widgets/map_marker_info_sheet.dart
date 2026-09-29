@@ -1,4 +1,6 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+
 import '../theme/ridons_colors.dart';
 
 /// Shows marker details without hiding the map behind a dialog.
@@ -28,9 +30,7 @@ Future<void> showMapMarkerInfoSheet(
         return Material(
           color: context.ridonsSheet,
           clipBehavior: Clip.antiAlias,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(28),
-          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
@@ -73,7 +73,7 @@ Future<void> showMapMarkerInfoSheet(
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Close',
+                    tooltip: 'close'.tr(),
                     onPressed: () => Navigator.of(sheetContext).pop(),
                     icon: const Icon(Icons.close_rounded),
                   ),
@@ -88,7 +88,7 @@ Future<void> showMapMarkerInfoSheet(
                     children: [
                       Expanded(
                         child: Text(
-                          entry.key,
+                          entry.key.tr(),
                           style: theme.textTheme.bodyLarge?.copyWith(
                             color: context.ridonsMuted,
                           ),

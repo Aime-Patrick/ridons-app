@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,10 +25,8 @@ class AccountView extends ConsumerWidget {
     final user = session?.user;
     final name =
         user?.displayName ??
-        (user?.role.isDriver == true ? 'Driver' : 'Passenger');
-    final idLabel = user == null
-        ? '—'
-        : user.roleIdCaption;
+        (user?.role.isDriver == true ? 'driver'.tr() : 'passenger'.tr());
+    final idLabel = user == null ? '—' : user.roleIdCaption;
 
     return ColoredBox(
       color: context.ridonsPage,
@@ -43,7 +42,7 @@ class AccountView extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
               Text(
-                'Account',
+                'account'.tr(),
                 style: TextStyle(
                   color: context.ridonsInk,
                   fontSize: 28,
@@ -112,63 +111,63 @@ class AccountView extends ConsumerWidget {
               const SizedBox(height: 20),
               _OutlineTile(
                 icon: Icons.person_outline_rounded,
-                label: 'Profile',
+                label: 'profile',
                 onTap: () => _open(context, const ProfileSettingsView()),
               ),
               const SizedBox(height: 10),
               _OutlineTile(
                 icon: Icons.notifications_none_rounded,
-                label: 'Notification settings',
+                label: 'notification_settings',
                 showChevron: false,
                 onTap: () => _open(context, const NotificationsSettingsView()),
               ),
               const SizedBox(height: 10),
               _OutlineTile(
                 icon: Icons.language_rounded,
-                label: 'Language',
+                label: 'language',
                 onTap: () => _open(context, const LanguageSettingsView()),
               ),
               const SizedBox(height: 10),
               _OutlineTile(
                 icon: Icons.dark_mode_outlined,
-                label: 'Appearance',
+                label: 'appearance',
                 subtitle: switch (ref.watch(themeModeProvider).asData?.value ??
                     ThemeMode.system) {
-                  ThemeMode.light => 'Light',
-                  ThemeMode.dark => 'Dark',
-                  ThemeMode.system => 'System',
+                  ThemeMode.light => 'light',
+                  ThemeMode.dark => 'dark',
+                  ThemeMode.system => 'system',
                 },
                 onTap: () => _open(context, const AppearanceSettingsView()),
               ),
               const SizedBox(height: 10),
               _OutlineTile(
                 icon: Icons.lock_outline_rounded,
-                label: 'Privacy & security',
+                label: 'privacy_security',
                 onTap: () => _open(context, const PrivacySettingsView()),
               ),
               const SizedBox(height: 10),
               _OutlineTile(
                 icon: Icons.info_outline_rounded,
-                label: 'About Ridons',
+                label: 'about_ridons',
                 onTap: () => _open(context, const AboutRidonsView()),
               ),
               const SizedBox(height: 18),
               _OutlineTile(
                 icon: Icons.health_and_safety_outlined,
-                label: 'Safety toolkit',
-                subtitle: 'SOS · Trip share · Contacts',
+                label: 'safety_toolkit',
+                subtitle: 'safety_toolkit_summary',
                 onTap: () => _open(context, const SafetyToolkitView()),
               ),
               const SizedBox(height: 10),
               _OutlineTile(
                 icon: Icons.help_outline_rounded,
-                label: 'Help center',
+                label: 'help_center',
                 onTap: () => _open(context, const HelpCenterView()),
               ),
               const SizedBox(height: 10),
               _OutlineTile(
                 icon: Icons.headset_mic_outlined,
-                label: 'Contact support',
+                label: 'contact_support',
                 onTap: () => _open(context, const ContactSupportView()),
               ),
               const SizedBox(height: 8),
@@ -181,7 +180,7 @@ class AccountView extends ConsumerWidget {
                     context.go(AppRoutes.onboarding);
                   },
                   icon: const Icon(Icons.logout_rounded, size: 18),
-                  label: const Text('Sign out'),
+                  label: Text('sign_out'.tr()),
                   style: TextButton.styleFrom(
                     foregroundColor: RidonsColors.primary,
                     textStyle: const TextStyle(
@@ -257,7 +256,7 @@ class _OutlineTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      label,
+                      label.tr(),
                       style: TextStyle(
                         color: context.ridonsInk,
                         fontWeight: FontWeight.w600,
@@ -266,7 +265,7 @@ class _OutlineTile extends StatelessWidget {
                     ),
                     if (subtitle != null)
                       Text(
-                        subtitle!,
+                        subtitle!.tr(),
                         style: TextStyle(
                           color: context.ridonsMuted,
                           fontSize: 12,

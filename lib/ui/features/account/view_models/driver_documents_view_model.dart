@@ -30,7 +30,7 @@ class DriverDocumentsViewModel extends ChangeNotifier {
       documents = snapshot.documents;
       canApprove = snapshot.canApprove;
     } catch (error) {
-      errorMessage = _message(error, 'Could not load your documents.');
+      errorMessage = _message(error, 'could_not_load_documents');
     } finally {
       loading = false;
       notifyListeners();
@@ -54,7 +54,7 @@ class DriverDocumentsViewModel extends ChangeNotifier {
       await load();
       return true;
     } catch (error) {
-      errorMessage = _message(error, 'Could not upload this document.');
+      errorMessage = _message(error, 'could_not_upload_document');
       return false;
     } finally {
       uploading = null;

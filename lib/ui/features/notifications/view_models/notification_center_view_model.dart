@@ -45,7 +45,7 @@ class NotificationCenterViewModel extends ChangeNotifier {
       items = page.items;
       unreadCount = page.unreadCount;
     } catch (_) {
-      errorMessage = 'Could not load notifications.';
+      errorMessage = 'could_not_load_notifications';
     } finally {
       loading = false;
       notifyListeners();
@@ -73,7 +73,7 @@ class NotificationCenterViewModel extends ChangeNotifier {
       items = [for (final item in items) item.copyWith(read: true)];
       unreadCount = 0;
     } catch (_) {
-      errorMessage = 'Could not mark notifications as read.';
+      errorMessage = 'could_not_mark_notifications';
     } finally {
       busy = false;
       notifyListeners();

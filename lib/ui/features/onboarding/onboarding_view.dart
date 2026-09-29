@@ -86,9 +86,8 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
                 child: Image.asset(
                   'assets/image/landing_image.jpg',
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    color: RidonsColors.primaryDarker,
-                  ),
+                  errorBuilder: (_, _, _) =>
+                      Container(color: RidonsColors.primaryDarker),
                 ),
               ),
             ),
@@ -205,10 +204,7 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
               left: contentLeft + 12,
               width: roleRowWidth,
               top: constraints.maxHeight * 0.61,
-              child: _buildRoleCards(
-                scale: roleScale,
-                height: roleHeight,
-              ),
+              child: _buildRoleCards(scale: roleScale, height: roleHeight),
             ),
           ],
         );
@@ -220,10 +216,7 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const RidonsLogo(
-          kind: RidonsLogoKind.wordmark,
-          height: 32,
-        ),
+        const RidonsLogo(kind: RidonsLogoKind.wordmark, height: 32),
         const SizedBox(height: 4),
         FittedBox(
           fit: BoxFit.scaleDown,
@@ -266,18 +259,15 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
     );
   }
 
-  Widget _buildRoleCards({
-    required double scale,
-    required double height,
-  }) {
+  Widget _buildRoleCards({required double scale, required double height}) {
     return SizedBox(
       height: height,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           RidonsRoleCard(
-            title: 'Get a ride',
-            description: 'Offer your price, pick from the drivers',
+            title: tr('get_a_ride'),
+            description: tr('get_a_ride_description'),
             imageAsset: 'assets/image/passenger_avatar.png',
             isSelected: _selectedRole == AppRole.passenger,
             onTap: () => _onRoleSelected(AppRole.passenger),
@@ -285,8 +275,8 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
           ),
           SizedBox(width: 16 * scale),
           RidonsRoleCard(
-            title: 'Drive & Earn',
-            description: 'Get offers, pick from the passengers',
+            title: tr('drive_and_earn'),
+            description: tr('drive_and_earn_description'),
             imageAsset: 'assets/image/driver_avatar.png',
             isSelected: _selectedRole == AppRole.driver,
             onTap: () => _onRoleSelected(AppRole.driver),
@@ -308,7 +298,7 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
             TextButton(
               onPressed: _onSkip,
               style: _linkButtonStyle(),
-            child: _buildActionText(context, 'Skip'),
+              child: _buildActionText(context, tr('skip_onboarding')),
             ),
             TextButton(
               onPressed: _onSignIn,
@@ -334,21 +324,17 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
     );
   }
 
-  Widget _buildActionText(
-    BuildContext context,
-    String text, {
-    Color? color,
-  }) {
+  Widget _buildActionText(BuildContext context, String text, {Color? color}) {
     final resolved = color ?? context.ridonsInk;
     return Text(
       text,
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: resolved,
-            decoration: TextDecoration.underline,
-            decorationColor: resolved,
-          ),
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: resolved,
+        decoration: TextDecoration.underline,
+        decorationColor: resolved,
+      ),
     );
   }
 
@@ -359,33 +345,27 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Choose a language/Hitamo ururimi',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: context.ridonsInk,
-              ),
+          tr('choose_language'),
+          style: Theme.of(context).textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.w700, color: context.ridonsInk),
         ),
         const SizedBox(height: 18),
         RidonsLanguageTile(
-          title: 'Kinyarwanda',
+          title: tr('kinyarwanda'),
           flag: '🇷🇼',
           isSelected: _selectedLocale.languageCode == 'rw',
           onTap: () => setState(() => _selectedLocale = const Locale('rw')),
         ),
         const SizedBox(height: 12),
         RidonsLanguageTile(
-          title: 'English',
+          title: tr('english'),
           flag: '🇬🇧',
           isSelected: _selectedLocale.languageCode == 'en',
           onTap: () => setState(() => _selectedLocale = const Locale('en')),
         ),
         const SizedBox(height: 22),
-        RidonsButton(
-          label: tr('continue'),
-          onPressed: _onLanguageContinue,
-        ),
+        RidonsButton(label: tr('continue'), onPressed: _onLanguageContinue),
       ],
     );
   }
-
 }

@@ -66,24 +66,21 @@ class _AccountDetailsViewState extends ConsumerState<AccountDetailsView> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Account',
+                  'account_settings'.tr(),
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: context.ridonsInk,
-                      ),
+                    fontWeight: FontWeight.w700,
+                    color: context.ridonsInk,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  "Let's get to know you",
-                  style: TextStyle(
-                    color: context.ridonsInk,
-                    fontSize: 14,
-                  ),
+                  'lets_get_to_know_you'.tr(),
+                  style: TextStyle(color: context.ridonsInk, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
                 RidonsTextField(
                   controller: _firstName,
-                  label: 'First name',
+                  label: 'first_name'.tr(),
                   textInputAction: TextInputAction.next,
                   autofocus: true,
                   enabled: !vm.savingProfile,
@@ -91,14 +88,14 @@ class _AccountDetailsViewState extends ConsumerState<AccountDetailsView> {
                 const SizedBox(height: 12),
                 RidonsTextField(
                   controller: _lastName,
-                  label: 'Last name',
+                  label: 'last_name'.tr(),
                   textInputAction: TextInputAction.done,
                   enabled: !vm.savingProfile,
                 ),
                 if (vm.errorMessage != null) ...[
                   const SizedBox(height: 12),
                   Text(
-                    vm.errorMessage!,
+                    vm.errorMessage!.tr(),
                     style: const TextStyle(
                       color: RidonsColors.primary,
                       fontSize: 13,
@@ -107,7 +104,7 @@ class _AccountDetailsViewState extends ConsumerState<AccountDetailsView> {
                 ],
                 const SizedBox(height: 22),
                 RidonsButton(
-                  label: 'Finish',
+                  label: 'finish'.tr(),
                   isLoading: vm.savingProfile,
                   onPressed: _finish,
                 ),

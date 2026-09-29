@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,12 +24,12 @@ class NotificationInboxView extends ConsumerWidget {
               child: Row(
                 children: [
                   const Expanded(
-                    child: RidonsBackHeader(title: 'Notifications'),
+                    child: RidonsBackHeader(title: 'notifications'),
                   ),
                   if (center.unreadCount > 0)
                     TextButton(
                       onPressed: center.busy ? null : center.markAllRead,
-                      child: const Text('Mark all read'),
+                      child: Text('mark_all_read'.tr()),
                     ),
                 ],
               ),
@@ -70,7 +71,7 @@ class _NotificationList extends StatelessWidget {
           const SizedBox(height: 12),
           Center(
             child: Text(
-              center.errorMessage ?? 'You are all caught up.',
+              (center.errorMessage ?? 'all_caught_up').tr(),
               textAlign: TextAlign.center,
               style: TextStyle(color: context.ridonsMuted),
             ),

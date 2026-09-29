@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../theme/ridons_colors.dart';
 
@@ -39,66 +40,63 @@ class RidonsButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (leading != null) ...[leading!, const SizedBox(width: 10)],
-              Text(label),
+              Text(label.tr()),
             ],
           );
 
     return switch (variant) {
       RidonsButtonVariant.primary => ElevatedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: RidonsColors.primary,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: Theme.of(context).brightness ==
-                    Brightness.dark
-                ? RidonsColors.primary.withValues(alpha: 0.35)
-                : const Color(0xFFF4B4B6),
-            disabledForegroundColor: Colors.white,
-            elevation: 0,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-            minimumSize: const Size.fromHeight(56),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(100),
-            ),
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: RidonsColors.primary,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor:
+              Theme.of(context).brightness == Brightness.dark
+              ? RidonsColors.primary.withValues(alpha: 0.35)
+              : const Color(0xFFF4B4B6),
+          disabledForegroundColor: Colors.white,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          minimumSize: const Size.fromHeight(56),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(100),
           ),
-          child: child,
         ),
+        child: child,
+      ),
       RidonsButtonVariant.secondary => ElevatedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).colorScheme.surfaceContainerHighest
-                : const Color(0xFFE2E8F0),
-            foregroundColor: Theme.of(context).colorScheme.onSurface,
-            minimumSize: const Size.fromHeight(56),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(100),
-            ),
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.surfaceContainerHighest
+              : const Color(0xFFE2E8F0),
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          minimumSize: const Size.fromHeight(56),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(100),
           ),
-          child: child,
         ),
+        child: child,
+      ),
       RidonsButtonVariant.outline => OutlinedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: context.ridonsInk,
-            backgroundColor: context.ridonsDark
-                ? RidonsColors.darkFill
-                : RidonsColors.surface,
-            minimumSize: const Size.fromHeight(56),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(100),
-            ),
-            side: BorderSide(
-              color: context.ridonsLine,
-              width: 1,
-            ),
+        onPressed: isLoading ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: context.ridonsInk,
+          backgroundColor: context.ridonsDark
+              ? RidonsColors.darkFill
+              : RidonsColors.surface,
+          minimumSize: const Size.fromHeight(56),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(100),
           ),
-          child: child,
+          side: BorderSide(color: context.ridonsLine, width: 1),
         ),
+        child: child,
+      ),
     };
   }
 }

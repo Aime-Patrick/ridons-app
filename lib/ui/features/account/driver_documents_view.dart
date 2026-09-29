@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -47,42 +48,35 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                type.label,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                _documentTypeLabel(type),
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               Text(
-                'Upload a clear photo or PDF. Make sure all text is visible.',
+                'document_upload_description'.tr(),
                 style: TextStyle(color: context.ridonsMuted),
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                onPressed: () => Navigator.pop(
-                  sheetContext,
-                  _DocumentPickChoice.camera,
-                ),
+                onPressed: () =>
+                    Navigator.pop(sheetContext, _DocumentPickChoice.camera),
                 icon: const Icon(Icons.camera_alt_outlined),
-                label: const Text('Take a photo'),
+                label: Text('take_photo'.tr()),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: () => Navigator.pop(
-                  sheetContext,
-                  _DocumentPickChoice.gallery,
-                ),
+                onPressed: () =>
+                    Navigator.pop(sheetContext, _DocumentPickChoice.gallery),
                 icon: const Icon(Icons.photo_library_outlined),
-                label: const Text('Choose from gallery'),
+                label: Text('choose_gallery'.tr()),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: () => Navigator.pop(
-                  sheetContext,
-                  _DocumentPickChoice.pdf,
-                ),
+                onPressed: () =>
+                    Navigator.pop(sheetContext, _DocumentPickChoice.pdf),
                 icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: const Text('Choose a PDF'),
+                label: Text('choose_pdf'.tr()),
               ),
             ],
           ),
@@ -99,14 +93,10 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
       if (picked == null || !mounted) return;
       final path = picked.path;
       if (path == null || path.isEmpty) {
-        _showUploadMessage('Could not access the selected PDF.');
+        _showUploadMessage('could_not_access_pdf'.tr(), success: false);
         return;
       }
-      await _upload(
-        type: type,
-        filePath: path,
-        fileName: picked.name,
-      );
+      await _upload(type: type, filePath: path, fileName: picked.name);
       return;
     }
 
@@ -119,11 +109,7 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
     );
     if (picked == null || !mounted) return;
 
-    await _upload(
-      type: type,
-      filePath: picked.path,
-      fileName: picked.name,
-    );
+    await _upload(type: type, filePath: picked.path, fileName: picked.name);
   }
 
   Future<void> _upload({
@@ -142,13 +128,13 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
     if (!mounted) return;
     _showUploadMessage(
       success
-          ? '${type.label} uploaded for review.'
-          : viewModel.errorMessage ?? 'Could not upload this document.',
+          ? '${_documentTypeLabel(type)} ${'uploaded_for_review'.tr()}'
+          : (viewModel.errorMessage ?? 'could_not_upload_document').tr(),
+      success: success,
     );
   }
 
-  void _showUploadMessage(String message) {
-    final success = message.endsWith('uploaded for review.');
+  void _showUploadMessage(String message, {required bool success}) {
     if (success) {
       RidonsNotice.success(context, message);
     } else {
@@ -162,11 +148,12 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
     final session = ref.watch(authSessionProvider).asData?.value;
     final verificationStatus = session?.user.verificationStatus;
     return AccountSubpage(
-      title: widget.onboarding && verificationStatus == VerificationStatus.rejected
-          ? 'Update your documents'
+      title:
+          widget.onboarding && verificationStatus == VerificationStatus.rejected
+          ? 'update_documents'
           : widget.onboarding
-              ? 'Verify your driver account'
-              : 'Driver documents',
+          ? 'verify_driver_account'
+          : 'driver_documents',
       showBack: !widget.onboarding,
       child: RefreshIndicator(
         color: RidonsColors.primary,
@@ -175,7 +162,7 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
             Text(
-              'Upload the documents required to start accepting rides.',
+              'upload_documents_description'.tr(),
               style: TextStyle(color: context.ridonsMuted, height: 1.4),
             ),
             const SizedBox(height: 16),
@@ -204,7 +191,7 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  viewModel.errorMessage!,
+                  viewModel.errorMessage!.tr(),
                   style: const TextStyle(color: RidonsColors.primary),
                 ),
               ),
@@ -220,7 +207,7 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
                         await viewModel.load();
                       },
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Check verification status'),
+                label: Text('check_verification_status'.tr()),
               ),
               const SizedBox(height: 8),
               TextButton(
@@ -228,7 +215,7 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
                   await ref.read(authSessionProvider.notifier).clear();
                   if (context.mounted) context.go(AppRoutes.onboarding);
                 },
-                child: const Text('Sign out'),
+                child: Text('sign_out'.tr()),
               ),
             ],
           ],
@@ -239,6 +226,21 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
 }
 
 enum _DocumentPickChoice { camera, gallery, pdf }
+
+String _documentTypeLabel(DriverDocumentType type) {
+  return switch (type) {
+    DriverDocumentType.nationalId => 'national_id'.tr(),
+    DriverDocumentType.drivingLicense => 'driving_license'.tr(),
+    DriverDocumentType.vehicleRegistration => 'vehicle_registration'.tr(),
+    DriverDocumentType.insurance => 'insurance'.tr(),
+  };
+}
+
+String _documentStatusLabel(DriverDocumentStatus? status, String? reason) {
+  final label = (status?.name ?? 'pending').tr();
+  final cleanReason = reason?.trim() ?? '';
+  return cleanReason.isEmpty ? label : '$label · ${cleanReason.tr()}';
+}
 
 class _VerificationBanner extends StatelessWidget {
   const _VerificationBanner({
@@ -256,13 +258,13 @@ class _VerificationBanner extends StatelessWidget {
     final complete = viewModel.canApprove;
     final rejected = status == VerificationStatus.rejected;
     final title = rejected
-        ? 'Some documents need changes before approval.'
+        ? 'documents_need_changes'
         : complete
-            ? 'All documents are ready for admin review.'
-            : 'Upload all required documents to continue.';
+        ? 'documents_ready_review'
+        : 'upload_required_documents';
     final detail = rejected && (reason ?? '').trim().isNotEmpty
         ? reason!.trim()
-        : 'Your documents are reviewed manually before you can go online.';
+        : 'documents_manual_review';
     return DecoratedBox(
       decoration: BoxDecoration(
         color: complete && !rejected
@@ -291,7 +293,7 @@ class _VerificationBanner extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                '$title\n$detail',
+                '${title.tr()}\n${detail.tr()}',
                 style: TextStyle(
                   color: context.ridonsInk,
                   fontWeight: FontWeight.w600,
@@ -337,11 +339,14 @@ class _DocumentTile extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: Icon(Icons.description_outlined, color: context.ridonsInk),
-        title: Text(type.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(
+          _documentTypeLabel(type),
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
         subtitle: Text(
           document == null
-              ? 'Required · not uploaded'
-              : '${status?.name ?? 'pending'}${document!.rejectReason == null ? '' : ' · ${document!.rejectReason}'}',
+              ? 'required_not_uploaded'.tr()
+              : _documentStatusLabel(status, document?.rejectReason),
           style: TextStyle(color: statusColor, fontSize: 12),
         ),
         trailing: uploading
@@ -351,10 +356,14 @@ class _DocumentTile extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             : IconButton(
-                tooltip: document == null ? 'Upload' : 'Replace document',
+                tooltip: document == null
+                    ? 'upload'.tr()
+                    : 'replace_document'.tr(),
                 onPressed: onUpload,
                 icon: Icon(
-                  document == null ? Icons.file_upload_outlined : Icons.refresh_rounded,
+                  document == null
+                      ? Icons.file_upload_outlined
+                      : Icons.refresh_rounded,
                 ),
               ),
       ),

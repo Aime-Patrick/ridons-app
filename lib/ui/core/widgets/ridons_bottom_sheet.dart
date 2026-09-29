@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../theme/ridons_colors.dart';
 
@@ -39,11 +40,11 @@ class RidonsBottomSheet extends StatelessWidget {
           ),
         if (title != null) ...[
           Text(
-            title!,
+            title!.tr(),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: context.ridonsInk,
-                ),
+              fontWeight: FontWeight.w700,
+              color: context.ridonsInk,
+            ),
           ),
           const SizedBox(height: 8),
         ],

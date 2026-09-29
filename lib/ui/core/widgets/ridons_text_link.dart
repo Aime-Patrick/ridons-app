@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/ridons_colors.dart';
@@ -19,25 +20,24 @@ class RidonsTextLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final linkStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.w700,
-          decoration: underline ? TextDecoration.underline : null,
-          decorationColor: Theme.of(context).colorScheme.primary,
-        );
+      color: Theme.of(context).colorScheme.primary,
+      fontWeight: FontWeight.w700,
+      decoration: underline ? TextDecoration.underline : null,
+      decorationColor: Theme.of(context).colorScheme.primary,
+    );
 
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (prefix != null)
           Text(
-            prefix!,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: context.ridonsMuted,
-                ),
+            prefix!.tr(),
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: context.ridonsMuted),
           ),
         GestureDetector(
           onTap: onTap,
-          child: Text(text, style: linkStyle),
+          child: Text(text.tr(), style: linkStyle),
         ),
       ],
     );

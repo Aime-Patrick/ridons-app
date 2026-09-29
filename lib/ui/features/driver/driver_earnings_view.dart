@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -85,16 +86,13 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
   String _errorLabel(Object error) {
     if (error is DioException) {
       final status = error.response?.statusCode;
-      if (status == 401) return 'Your session expired. Please log in again.';
+      if (status == 401) return 'session_expired';
       if (status == 403) {
-        return 'Your driver verification is not approved for this session.';
+        return 'verification_not_approved';
       }
-      return apiErrorMessage(
-        error,
-        fallback: 'Could not load earnings. Pull down to retry.',
-      );
+      return apiErrorMessage(error, fallback: 'could_not_load_earnings');
     }
-    return 'Could not load earnings. Pull down to retry.';
+    return 'could_not_load_earnings';
   }
 
   static final _money = NumberFormat('#,###');
@@ -115,7 +113,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                   children: [
                     Text(
-                      'Earnings',
+                      'earnings'.tr(),
                       style: TextStyle(
                         color: context.ridonsInk,
                         fontSize: 28,
@@ -125,22 +123,22 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
                     if (_error != null) ...[
                       const SizedBox(height: 16),
                       Text(
-                        _error!,
+                        _error!.tr(),
                         style: TextStyle(color: RidonsColors.primary),
                       ),
                       const SizedBox(height: 8),
                       OutlinedButton(
                         onPressed: () => _load(),
-                        child: const Text('Retry'),
+                        child: Text('retry'.tr()),
                       ),
                     ] else ...[
                       const SizedBox(height: 16),
-                      _tile(context, 'Today', _today),
+                      _tile(context, 'today', _today),
                       const SizedBox(height: 10),
-                      _tile(context, 'This week', _week),
+                      _tile(context, 'this_week', _week),
                       const SizedBox(height: 20),
                       Text(
-                        'Recent ratings',
+                        'recent_ratings'.tr(),
                         style: TextStyle(
                           color: context.ridonsInk,
                           fontSize: 20,
@@ -174,7 +172,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(color: context.ridonsMuted)),
+                Text(label.tr(), style: TextStyle(color: context.ridonsMuted)),
                 Text(
                   '${_money.format(stats.total)} RWF',
                   style: TextStyle(
@@ -187,7 +185,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
             ),
           ),
           Text(
-            '${stats.trips} trips',
+            'trips_count'.tr(namedArgs: {'count': '${stats.trips}'}),
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ],
@@ -197,7 +195,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
 
   Widget _emptyRatings(BuildContext context) {
     return Text(
-      'No ratings received yet.',
+      'no_ratings'.tr(),
       style: TextStyle(color: context.ridonsMuted),
     );
   }
@@ -228,17 +226,14 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
               children: [
                 Text(
                   item.comment.trim().isEmpty
-                      ? 'No comment'
+                      ? 'no_comment'.tr()
                       : item.comment.trim(),
-                style: TextStyle(color: context.ridonsInk),
+                  style: TextStyle(color: context.ridonsInk),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${DateFormat('MMM d, yyyy').format(item.createdAt)} · ${item.rideId}',
-                  style: TextStyle(
-                    color: context.ridonsMuted,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: context.ridonsMuted, fontSize: 12),
                 ),
               ],
             ),

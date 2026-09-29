@@ -1,11 +1,14 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/ride_offer.dart';
 import '../../../data/services/compass_service.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/ridons_button.dart';
+import '../../core/widgets/ridons_animated_marker.dart';
 import '../../core/widgets/ridons_map_view.dart';
 import '../../core/widgets/map_marker_info_sheet.dart';
 import '../../core/widgets/ridons_route_endpoints.dart';
@@ -39,7 +42,9 @@ class DriverTripView extends StatelessWidget {
                     vertical: 10,
                   ),
                   child: Text(
-                    viewModel.etaChip,
+                    viewModel.etaChip.tr(
+                      namedArgs: {'minutes': '${viewModel.etaMinutes ?? ''}'},
+                    ),
                     style: const TextStyle(
                       color: RidonsColors.primary,
                       fontWeight: FontWeight.w800,
@@ -71,6 +76,20 @@ class _TripMap extends StatefulWidget {
 class _TripMapState extends State<_TripMap> {
   final MapController controller = MapController();
   final CompassService compassService = CompassService();
+  var _followLocation = true;
+
+  void _pauseLocationFollow() {
+    if (_followLocation) setState(() => _followLocation = false);
+  }
+
+  void _recenterOnDriver() {
+    final point = widget.viewModel.driverPoint;
+    if (point == null) return;
+    setState(() => _followLocation = true);
+    try {
+      controller.move(point, controller.camera.zoom);
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +106,10 @@ class _TripMapState extends State<_TripMap> {
       controller: controller,
       center: you,
       initialZoom: 15.4,
+      followLocation: _followLocation,
+      followPoint: you,
+      onRecenter: _recenterOnDriver,
+      onMapInteraction: _pauseLocationFollow,
       deviceHeadingStream: compassService.headingStream,
       layers: [
         PolylineLayer(
@@ -100,86 +123,89 @@ class _TripMapState extends State<_TripMap> {
             ),
           ],
         ),
-        MarkerLayer(
-          markers: [
-            Marker(
-              point: you,
-              width: 44,
-              height: 44,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => showMapMarkerInfoSheet(
-                  context,
-                  title: 'Driver',
-                  subtitle: viewModel.user.displayName,
-                  details: {
-                    'Status': 'Active',
-                    'Location':
-                        '${you.latitude.toStringAsFixed(5)}, ${you.longitude.toStringAsFixed(5)}',
-                    'Ride': ride.rideId,
-                  },
-                ),
-                child: const Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircleAvatar(
-                      backgroundColor: RidonsColors.navy,
-                      child: Icon(
-                        Icons.two_wheeler,
-                        color: Colors.white,
-                        size: 12,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Marker(
-              point: dest,
-              width: 44,
-              height: 44,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => showMapMarkerInfoSheet(
-                  context,
-                  title: 'Passenger',
-                  subtitle: ride.passengerName,
-                  details: {
-                    if (ride.passengerPhone.isNotEmpty)
-                      'Phone': ride.passengerPhone,
-                    'Location': viewModel.passengerPoint == null
-                        ? (ride.fromName.isNotEmpty
-                              ? ride.fromName
-                              : '${ride.from.latitude.toStringAsFixed(5)}, ${ride.from.longitude.toStringAsFixed(5)}')
-                        : '${viewModel.passengerPoint!.latitude.toStringAsFixed(5)}, ${viewModel.passengerPoint!.longitude.toStringAsFixed(5)}',
-                    'Ride': ride.rideId,
-                  },
-                ),
-                child: Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircleAvatar(
-                      backgroundColor: RidonsColors.primaryLight,
-                      foregroundColor: RidonsColors.primaryDark,
-                      child: Text(
-                        ride.passengerName.isEmpty
-                            ? 'P'
-                            : ride.passengerName[0].toUpperCase(),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+        RidonsAnimatedMarker(
+          point: you,
+          child: _driverMarkerChild(
+            viewModel: viewModel,
+            ride: ride,
+            point: you,
+          ),
+        ),
+        RidonsAnimatedMarker(
+          point: dest,
+          child: _passengerMarkerChild(viewModel: viewModel, ride: ride),
         ),
       ],
+    );
+  }
+
+  Widget _driverMarkerChild({
+    required DriverHomeViewModel viewModel,
+    required ActiveRide ride,
+    required LatLng point,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => showMapMarkerInfoSheet(
+        context,
+        title: 'driver',
+        subtitle: viewModel.user.displayName,
+        details: {
+          'status': 'active'.tr(),
+          'location':
+              '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}',
+          'ride': ride.rideId,
+        },
+      ),
+      child: const Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircleAvatar(
+            backgroundColor: RidonsColors.navy,
+            child: Icon(Icons.two_wheeler, color: Colors.white, size: 12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _passengerMarkerChild({
+    required DriverHomeViewModel viewModel,
+    required ActiveRide ride,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => showMapMarkerInfoSheet(
+        context,
+        title: 'passenger',
+        subtitle: ride.passengerName,
+        details: {
+          if (ride.passengerPhone.isNotEmpty) 'phone': ride.passengerPhone,
+          'location': viewModel.passengerPoint == null
+              ? (ride.fromName.isNotEmpty
+                    ? ride.fromName
+                    : '${ride.from.latitude.toStringAsFixed(5)}, ${ride.from.longitude.toStringAsFixed(5)}')
+              : '${viewModel.passengerPoint!.latitude.toStringAsFixed(5)}, ${viewModel.passengerPoint!.longitude.toStringAsFixed(5)}',
+          'ride': ride.rideId,
+        },
+      ),
+      child: Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircleAvatar(
+            backgroundColor: RidonsColors.primaryLight,
+            foregroundColor: RidonsColors.primaryDark,
+            child: Text(
+              ride.passengerName.isEmpty
+                  ? 'P'
+                  : ride.passengerName[0].toUpperCase(),
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 10),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -201,14 +227,12 @@ class _TripSheet extends StatelessWidget {
       snapSizes: RidonsTripSheetHost.defaultSnapSizes,
       child: RidonsTripSheet(
         title: driving
-            ? 'Drive to destination'
+            ? 'drive_to_destination'
             : arrived
-          ? 'Passenger reached'
-          : 'Heading to passenger',
+            ? 'passenger_reached'
+            : 'heading_to_passenger',
         trailing: Icon(
-          driving || arrived
-              ? Icons.route_rounded
-              : Icons.lock_rounded,
+          driving || arrived ? Icons.route_rounded : Icons.lock_rounded,
           size: 18,
           color: RidonsColors.primary,
         ),
@@ -220,13 +244,13 @@ class _TripSheet extends StatelessWidget {
             if (driving) ...[
               const SizedBox(height: 12),
               RidonsButton(
-                label: 'Complete trip',
+                label: 'complete_trip',
                 isLoading: viewModel.busy,
                 onPressed: viewModel.startTrip,
               ),
               const SizedBox(height: 10),
               RidonsButton(
-                label: 'Trip was canceled',
+                label: 'trip_was_canceled',
                 variant: RidonsButtonVariant.secondary,
                 onPressed: viewModel.cancelTrip,
               ),
@@ -237,13 +261,13 @@ class _TripSheet extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _MetaCol(
-                      label: 'Agreed fare',
+                      label: 'agreed_fare',
                       value: '${ride.fare} Rwf',
                     ),
                   ),
                   Expanded(
                     child: _MetaCol(
-                      label: 'Payment method',
+                      label: 'payment_method',
                       value: _payLabel(ride.paymentMethod),
                       alignEnd: true,
                     ),
@@ -253,13 +277,13 @@ class _TripSheet extends StatelessWidget {
               const SizedBox(height: 12),
               if (arrived)
                 RidonsButton(
-                  label: 'Start ride',
+                  label: 'start_ride',
                   isLoading: viewModel.busy,
                   onPressed: viewModel.startTrip,
                 ),
               const SizedBox(height: 10),
               RidonsButton(
-                label: 'Trip was canceled',
+                label: 'trip_was_canceled',
                 variant: RidonsButtonVariant.secondary,
                 onPressed: viewModel.cancelTrip,
               ),
@@ -272,12 +296,12 @@ class _TripSheet extends StatelessWidget {
 
   static String _payLabel(String raw) {
     final value = raw.trim().toLowerCase().replaceAll('_', ' ');
-    if (value.isEmpty) return 'Not specified';
+    if (value.isEmpty) return 'not_specified'.tr();
     if (value.contains('momo') || value.contains('mobile money')) {
-      if (value.contains('cash')) return 'Cash or MoMo';
-      return 'Mobile Money';
+      if (value.contains('cash')) return 'cash_or_momo'.tr();
+      return 'mobile_money'.tr();
     }
-    if (value.contains('cash')) return 'Cash';
+    if (value.contains('cash')) return 'cash'.tr();
     return raw.trim();
   }
 }
@@ -296,11 +320,12 @@ class _MetaCol extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment:
-          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: alignEnd
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         Text(
-          label,
+          label.tr(),
           textAlign: alignEnd ? TextAlign.right : TextAlign.left,
           style: TextStyle(color: context.ridonsMuted, fontSize: 12),
         ),
@@ -352,7 +377,7 @@ class _PassengerCard extends StatelessWidget {
                   children: [
                     Text(
                       ride.passengerName.isEmpty
-                          ? 'Passenger'
+                          ? 'passenger'.tr()
                           : ride.passengerName,
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
@@ -378,38 +403,40 @@ class _PassengerCard extends StatelessWidget {
           Offstage(
             offstage: true,
             child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: ride.fromName.isEmpty ? 'Pickup' : ride.fromName,
-                    style: const TextStyle(
-                      color: RidonsColors.primary,
-                      fontWeight: FontWeight.w700,
+              alignment: Alignment.centerLeft,
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: ride.fromName.isEmpty
+                          ? 'pickup'.tr()
+                          : ride.fromName,
+                      style: const TextStyle(
+                        color: RidonsColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  TextSpan(
-                    text: '  →  ',
-                    style: TextStyle(color: context.ridonsMuted),
-                  ),
-                  TextSpan(
-                    text: ride.toName.isEmpty ? 'Dropoff' : ride.toName,
-                    style: TextStyle(
-                      color: context.ridonsInk,
-                      fontWeight: FontWeight.w700,
+                    TextSpan(
+                      text: '  →  ',
+                      style: TextStyle(color: context.ridonsMuted),
                     ),
-                  ),
-                ],
+                    TextSpan(
+                      text: ride.toName.isEmpty ? 'dropoff'.tr() : ride.toName,
+                      style: TextStyle(
+                        color: context.ridonsInk,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
-          ),
           RidonsRouteEndpoints(
-            pickup: ride.fromName.isEmpty ? 'Pickup' : ride.fromName,
-            destination: ride.toName.isEmpty ? 'Dropoff' : ride.toName,
+            pickup: ride.fromName.isEmpty ? 'pickup'.tr() : ride.fromName,
+            destination: ride.toName.isEmpty ? 'dropoff'.tr() : ride.toName,
             pickupColor: RidonsColors.primary,
             destinationColor: context.ridonsInk,
           ),
@@ -424,7 +451,7 @@ class _PassengerCard extends StatelessWidget {
                           Uri(scheme: 'tel', path: ride.passengerPhone),
                         ),
                   icon: const Icon(Icons.call_outlined),
-                  label: const Text('Call'),
+                  label: Text('call'.tr()),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -441,7 +468,7 @@ class _PassengerCard extends StatelessWidget {
                           Uri(scheme: 'sms', path: ride.passengerPhone),
                         ),
                   icon: const Icon(Icons.chat_bubble_outline),
-                  label: const Text('Message'),
+                  label: Text('message'.tr()),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                     padding: const EdgeInsets.symmetric(horizontal: 10),

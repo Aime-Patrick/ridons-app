@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/ridons_colors.dart';
@@ -87,7 +88,7 @@ class RidonsRoleCard extends StatelessWidget {
                       ),
                       SizedBox(height: 8 * scale),
                       Text(
-                        title,
+                        title.tr(),
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
                           fontSize: 20 * scale,
@@ -98,7 +99,7 @@ class RidonsRoleCard extends StatelessWidget {
                       ),
                       SizedBox(height: 8 * scale),
                       Text(
-                        description,
+                        description.tr(),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.clip,

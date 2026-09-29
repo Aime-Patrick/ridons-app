@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../theme/ridons_colors.dart';
 
@@ -37,11 +38,11 @@ class RidonsTextField extends StatelessWidget {
       children: [
         if (label != null) ...[
           Text(
-            label!,
+            label!.tr(),
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: context.ridonsInk,
-                ),
+              fontWeight: FontWeight.w600,
+              color: context.ridonsInk,
+            ),
           ),
           const SizedBox(height: 8),
         ],
@@ -54,7 +55,7 @@ class RidonsTextField extends StatelessWidget {
           enabled: enabled,
           autofocus: autofocus,
           decoration: InputDecoration(
-            hintText: hint,
+            hintText: hint?.tr(),
             prefixIcon: prefix,
             suffixIcon: suffix,
           ),

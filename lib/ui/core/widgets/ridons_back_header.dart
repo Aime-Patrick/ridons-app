@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 /// Back chevron + optional title used on auth screens.
 class RidonsBackHeader extends StatelessWidget {
-  const RidonsBackHeader({
-    super.key,
-    this.title,
-    this.onBack,
-  });
+  const RidonsBackHeader({super.key, this.title, this.onBack});
 
   final String? title;
   final VoidCallback? onBack;
@@ -24,10 +21,9 @@ class RidonsBackHeader extends StatelessWidget {
         if (title != null)
           Expanded(
             child: Text(
-              title!,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              title!.tr(),
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
       ],

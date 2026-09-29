@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../theme/ridons_colors.dart';
 
@@ -19,7 +20,7 @@ class RidonsNotificationBell extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         IconButton(
-          tooltip: 'Notifications',
+          tooltip: 'notifications'.tr(),
           onPressed: onPressed,
           icon: const Icon(Icons.notifications_none_rounded),
         ),

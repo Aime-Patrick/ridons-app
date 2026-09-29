@@ -57,6 +57,7 @@ class DriverHomeViewModel extends ChangeNotifier {
   bool hideEarnings = true;
   bool busy = false;
   String? errorMessage;
+  int? counteredAmount;
   DriverStats stats = const DriverStats();
   List<DriverQuest> quests = const [];
   List<RideOffer> offers = const [];
@@ -77,6 +78,8 @@ class DriverHomeViewModel extends ChangeNotifier {
 
   Timer? _inboxPoll;
   Timer? _pingTimer;
+  DateTime? _lastLocationPingAt;
+  var _locationPingBusy = false;
   bool _inboxRefreshing = false;
   bool _statusBusy = false;
   StreamSubscription<Position>? _gps;
@@ -86,8 +89,8 @@ class DriverHomeViewModel extends ChangeNotifier {
 
   String get etaChip {
     final minutes = etaMinutes;
-    if (minutes == null) return 'On the way';
-    return '$minutes min to pickup';
+    if (minutes == null) return 'on_the_way';
+    return 'minutes_to_pickup';
   }
 
   int fareFor(RideOffer offer) =>
@@ -123,15 +126,7 @@ class DriverHomeViewModel extends ChangeNotifier {
       _fix = position;
       driverPoint = LatLng(position.latitude, position.longitude);
       if (online || onTrip) {
-        unawaited(
-          _geo.ping(
-            lat: position.latitude,
-            lng: position.longitude,
-            headingDeg: position.heading.isFinite ? position.heading : 0,
-            speedKmh: position.speed.isFinite ? position.speed * 3.6 : 0,
-            rideId: ride?.rideId,
-          ),
-        );
+        unawaited(_pingCurrentLocation());
       }
       _maybeDetectTripProgress(
         position.speed.isFinite ? position.speed * 3.6 : 0,
@@ -154,7 +149,7 @@ class DriverHomeViewModel extends ChangeNotifier {
         );
         if (!backgroundReady) {
           online = previous;
-          errorMessage = 'Allow background location to stay online.';
+          errorMessage = 'allow_background_location';
           return;
         }
         await _location.requestNotifications();
@@ -164,7 +159,7 @@ class DriverHomeViewModel extends ChangeNotifier {
       final fix = await _location.freshPosition() ?? _fix;
       if (value && fix == null) {
         online = previous;
-        errorMessage = 'Turn on location to go online.';
+        errorMessage = 'turn_on_location';
         return;
       }
       var error = await _geo.setOnline(
@@ -191,13 +186,13 @@ class DriverHomeViewModel extends ChangeNotifier {
         online = previous;
         switch (error) {
           case 'verification_required':
-            errorMessage = 'Your documents need admin approval.';
+            errorMessage = 'documents_need_approval';
             break;
           case 'unauthorized':
-            errorMessage = 'Session expired. Please log in again.';
+            errorMessage = 'session_expired';
             break;
           default:
-            errorMessage = 'Could not update online status.';
+            errorMessage = 'could_not_update_online';
         }
         notifyListeners();
         return;
@@ -213,17 +208,7 @@ class DriverHomeViewModel extends ChangeNotifier {
         });
         _pingTimer?.cancel();
         _pingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-          final pos = _fix;
-          if (pos == null) return;
-          unawaited(
-            _geo.ping(
-              lat: pos.latitude,
-              lng: pos.longitude,
-              headingDeg: pos.heading.isFinite ? pos.heading : 0,
-              speedKmh: pos.speed.isFinite ? pos.speed * 3.6 : 0,
-              rideId: ride?.rideId,
-            ),
-          );
+          unawaited(_pingCurrentLocation());
         });
         unawaited(refreshInbox());
       } else {
@@ -234,6 +219,31 @@ class DriverHomeViewModel extends ChangeNotifier {
     } finally {
       onlineBusy = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _pingCurrentLocation() async {
+    if (!online && !onTrip) return;
+    final now = DateTime.now();
+    final last = _lastLocationPingAt;
+    if (_locationPingBusy ||
+        (last != null && now.difference(last) < const Duration(seconds: 4))) {
+      return;
+    }
+    final pos = _fix;
+    if (pos == null) return;
+    _locationPingBusy = true;
+    _lastLocationPingAt = now;
+    try {
+      await _geo.ping(
+        lat: pos.latitude,
+        lng: pos.longitude,
+        headingDeg: pos.heading.isFinite ? pos.heading : 0,
+        speedKmh: pos.speed.isFinite ? pos.speed * 3.6 : 0,
+        rideId: ride?.rideId,
+      );
+    } finally {
+      _locationPingBusy = false;
     }
   }
 
@@ -280,7 +290,7 @@ class DriverHomeViewModel extends ChangeNotifier {
       offers = next;
     } catch (_) {
       if (online && !onTrip) {
-        errorMessage = 'Could not load offers. We will keep trying.';
+        errorMessage = 'keep_trying_offers';
       }
     } finally {
       _inboxRefreshing = false;
@@ -304,7 +314,7 @@ class DriverHomeViewModel extends ChangeNotifier {
         await refreshInbox();
       }
     } catch (_) {
-      errorMessage = 'Could not refresh. Pull down to try again.';
+      errorMessage = 'could_not_refresh';
     }
     notifyListeners();
   }
@@ -338,7 +348,7 @@ class DriverHomeViewModel extends ChangeNotifier {
           driverAvatarUrl: user.avatarUrl,
         );
         busy = false;
-        errorMessage = 'Counter sent. Waiting for the passenger.';
+        errorMessage = 'counter_sent_driver';
         notifyListeners();
         return;
       }
@@ -369,7 +379,7 @@ class DriverHomeViewModel extends ChangeNotifier {
         ),
       );
     } catch (_) {
-      errorMessage = 'Offer was taken or expired.';
+      errorMessage = 'offer_expired';
     } finally {
       busy = false;
       notifyListeners();
@@ -468,6 +478,7 @@ class DriverHomeViewModel extends ChangeNotifier {
       for (final offer in offers) {
         if (offer.requestId != requestId) continue;
         offer.offeredPrice = FarePolicy.normalize(price);
+        counteredAmount = offer.offeredPrice;
         offer.negotiationRound =
             (message.data['round'] as num?)?.toInt() ??
             offer.negotiationRound + 1;
@@ -475,7 +486,7 @@ class DriverHomeViewModel extends ChangeNotifier {
             (message.data['maxRounds'] as num?)?.toInt() ??
             offer.maxNegotiationRounds;
         localFares.remove(requestId);
-        errorMessage = 'Passenger countered at ${offer.offeredPrice} RWF.';
+        errorMessage = 'passenger_countered_at';
         notifyListeners();
         return;
       }
@@ -608,7 +619,7 @@ class DriverHomeViewModel extends ChangeNotifier {
       skipPassengerRating();
     } catch (_) {
       passengerRatingBusy = false;
-      passengerRatingError = 'Could not submit your rating. Please try again.';
+      passengerRatingError = 'could_not_submit_rating';
       notifyListeners();
     }
   }

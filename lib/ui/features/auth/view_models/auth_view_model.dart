@@ -9,7 +9,7 @@ import '../../../../domain/models/session_user.dart';
 
 class AuthViewModel extends ChangeNotifier {
   AuthViewModel({required AuthRepository authRepository})
-      : _auth = authRepository;
+    : _auth = authRepository;
 
   final AuthRepository _auth;
 
@@ -37,7 +37,7 @@ class AuthViewModel extends ChangeNotifier {
   Future<bool> sendCode(String localDigits) async {
     errorMessage = null;
     if (!isValidRwandaLocal(localDigits)) {
-      errorMessage = 'Enter a valid Rwanda phone number.';
+      errorMessage = 'valid_rwanda_phone';
       notifyListeners();
       return false;
     }
@@ -53,7 +53,7 @@ class AuthViewModel extends ChangeNotifier {
       errorMessage = e.message;
       return false;
     } catch (_) {
-      errorMessage = 'Could not send the code.';
+      errorMessage = 'could_not_send_code';
       return false;
     } finally {
       sending = false;
@@ -70,7 +70,7 @@ class AuthViewModel extends ChangeNotifier {
     phoneTaken = false;
     final value = (code ?? otpCode).trim();
     if (value.length != 4) {
-      errorMessage = 'Enter the 4-digit code.';
+      errorMessage = 'four_digit_code';
       notifyListeners();
       return null;
     }
@@ -90,7 +90,7 @@ class AuthViewModel extends ChangeNotifier {
       phoneTaken = e.isPhoneTaken;
       return null;
     } catch (_) {
-      errorMessage = 'Could not verify the code.';
+      errorMessage = 'could_not_verify_code';
       return null;
     } finally {
       verifying = false;
@@ -105,7 +105,7 @@ class AuthViewModel extends ChangeNotifier {
   }) async {
     errorMessage = null;
     if (firstName.trim().isEmpty) {
-      errorMessage = 'Enter your first name.';
+      errorMessage = 'enter_first_name';
       notifyListeners();
       return null;
     }
@@ -122,7 +122,7 @@ class AuthViewModel extends ChangeNotifier {
       errorMessage = e.message;
       return null;
     } catch (_) {
-      errorMessage = 'Could not save your name.';
+      errorMessage = 'could_not_save_name';
       return null;
     } finally {
       savingProfile = false;
@@ -139,7 +139,7 @@ class AuthViewModel extends ChangeNotifier {
       notifyListeners();
       return null;
     } catch (_) {
-      errorMessage = 'Could not save language.';
+      errorMessage = 'could_not_save_language';
       notifyListeners();
       return null;
     }
@@ -156,7 +156,7 @@ class AuthViewModel extends ChangeNotifier {
       errorMessage = e.message;
       return null;
     } catch (_) {
-      errorMessage = 'Could not save the avatar.';
+      errorMessage = 'could_not_save_avatar';
       return null;
     } finally {
       savingProfile = false;
@@ -175,7 +175,7 @@ class AuthViewModel extends ChangeNotifier {
       errorMessage = e.message;
       return null;
     } catch (_) {
-      errorMessage = 'Could not upload the photo.';
+      errorMessage = 'could_not_upload_photo';
       return null;
     } finally {
       savingProfile = false;

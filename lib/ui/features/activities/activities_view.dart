@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -98,7 +99,7 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
             pickup: pickup,
             dropoff: dropoff,
             when: item.when,
-            driverName: widget.isDriver ? 'Passenger' : 'Driver',
+            driverName: widget.isDriver ? 'passenger' : 'driver',
             fareRwf: item.fare,
             pickupPoint: item.from,
             dropoffPoint: item.to,
@@ -115,7 +116,7 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not load trips. Pull down to retry.';
+        _error = 'could_not_load_trips';
         _loading = false;
         _refreshing = false;
       });
@@ -156,7 +157,7 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
                   ),
                 ),
                 Text(
-                  'Filter trips',
+                  'filter_trips'.tr(),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 20,
@@ -169,7 +170,7 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
                     color: context.ridonsSheet,
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(_filterLabel(option)),
+                      title: Text(_filterLabel(option).tr()),
                       trailing: _filter == option
                           ? const Icon(Icons.check, color: RidonsColors.primary)
                           : null,
@@ -193,9 +194,9 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
 
   static String _filterLabel(_ActivityFilter filter) {
     return switch (filter) {
-      _ActivityFilter.all => 'All trips',
-      _ActivityFilter.today => 'Today',
-      _ActivityFilter.week => 'This week',
+      _ActivityFilter.all => 'all_trips',
+      _ActivityFilter.today => 'today',
+      _ActivityFilter.week => 'this_week',
     };
   }
 
@@ -214,7 +215,7 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Activities',
+                      'activities'.tr(),
                       style: TextStyle(
                         color: context.ridonsInk,
                         fontSize: 28,
@@ -242,75 +243,68 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
                       child: _error != null
                           ? ListView(
                               physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+                              padding: const EdgeInsets.fromLTRB(
+                                24,
+                                48,
+                                24,
+                                24,
+                              ),
                               children: [
                                 Text(
-                                  _error!,
+                                  _error!.tr(),
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: context.ridonsMuted,
-                                  ),
+                                  style: TextStyle(color: context.ridonsMuted),
                                 ),
                                 const SizedBox(height: 16),
                                 Center(
                                   child: OutlinedButton(
                                     onPressed: () => _load(),
-                                    child: const Text('Retry'),
+                                    child: Text('retry'.tr()),
                                   ),
                                 ),
                               ],
                             )
                           : trips.isEmpty
-                              ? ListView(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.fromLTRB(
-                                    24,
-                                    48,
-                                    24,
-                                    24,
-                                  ),
-                                  children: [
-                                    Text(
-                                      'No trips in this filter.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: context.ridonsMuted,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Pull down to refresh.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: context.ridonsMuted,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : ListView.separated(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    8,
-                                    16,
-                                    24,
-                                  ),
-                                  itemCount: trips.length,
-                                  separatorBuilder: (_, _) =>
-                                      const SizedBox(height: 14),
-                                  itemBuilder: (context, index) {
-                                    return _ActivityTripCard(
-                                      trip: trips[index],
-                                      onRebook: widget.onRebook == null
-                                          ? null
-                                          : () =>
-                                              widget.onRebook!(trips[index]),
-                                    );
-                                  },
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(
+                                24,
+                                48,
+                                24,
+                                24,
+                              ),
+                              children: [
+                                Text(
+                                  'no_trips_filter'.tr(),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: context.ridonsMuted),
                                 ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'pull_to_refresh'.tr(),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: context.ridonsMuted,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                              itemCount: trips.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 14),
+                              itemBuilder: (context, index) {
+                                return _ActivityTripCard(
+                                  trip: trips[index],
+                                  onRebook: widget.onRebook == null
+                                      ? null
+                                      : () => widget.onRebook!(trips[index]),
+                                );
+                              },
+                            ),
                     ),
             ),
           ],
@@ -329,10 +323,13 @@ class _ActivityTripCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final isToday = trip.when.year == now.year &&
+    final isToday =
+        trip.when.year == now.year &&
         trip.when.month == now.month &&
         trip.when.day == now.day;
-    final dayLabel = isToday ? 'Today' : DateFormat('d MMM').format(trip.when);
+    final dayLabel = isToday
+        ? 'today'.tr()
+        : DateFormat('d MMM').format(trip.when);
     final timeLabel = DateFormat('hh:mma').format(trip.when);
 
     return Material(
@@ -361,34 +358,34 @@ class _ActivityTripCard extends StatelessWidget {
                 Offstage(
                   offstage: true,
                   child: Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: trip.pickup,
-                        style: TextStyle(
-                          color: context.ridonsInk,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: trip.pickup,
+                          style: TextStyle(
+                            color: context.ridonsInk,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      TextSpan(
-                        text: '  →  ',
-                        style: TextStyle(
-                          color: context.ridonsMuted,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
+                        TextSpan(
+                          text: '  →  ',
+                          style: TextStyle(
+                            color: context.ridonsMuted,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      TextSpan(
-                        text: trip.dropoff,
-                        style: TextStyle(
-                          color: context.ridonsInk,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
+                        TextSpan(
+                          text: trip.dropoff,
+                          style: TextStyle(
+                            color: context.ridonsInk,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   ),
                 ),
                 RidonsRouteEndpoints(
@@ -400,10 +397,7 @@ class _ActivityTripCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text.rich(
                   TextSpan(
-                    style: TextStyle(
-                      color: context.ridonsMuted,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: context.ridonsMuted, fontSize: 13),
                     children: [
                       TextSpan(text: dayLabel),
                       const TextSpan(text: '  '),
@@ -415,7 +409,7 @@ class _ActivityTripCard extends StatelessWidget {
                         ),
                       ),
                       const TextSpan(text: '  '),
-                      TextSpan(text: trip.driverName),
+                      TextSpan(text: trip.driverName.tr()),
                     ],
                   ),
                 ),
@@ -444,8 +438,8 @@ class _ActivityTripCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(100),
                           ),
                         ),
-                        child: const Text(
-                          'Rebook',
+                        child: Text(
+                          'rebook'.tr(),
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),
@@ -461,10 +455,7 @@ class _ActivityTripCard extends StatelessWidget {
 }
 
 class _TripMapSnapshot extends StatefulWidget {
-  const _TripMapSnapshot({
-    required this.pickup,
-    required this.dropoff,
-  });
+  const _TripMapSnapshot({required this.pickup, required this.dropoff});
 
   final LatLng pickup;
   final LatLng dropoff;
@@ -549,7 +540,7 @@ class _TripMapSnapshotState extends State<_TripMapSnapshot> {
               ),
             ),
             children: [
-              const RidonsTileLayer(),
+              ...RidonsMapTiles.layers(context),
               if (route.length >= 2)
                 PolylineLayer(
                   polylines: [

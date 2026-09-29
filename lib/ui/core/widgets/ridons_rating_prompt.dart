@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/ridons_colors.dart';
@@ -13,7 +14,7 @@ class RidonsRatingPrompt extends StatelessWidget {
     required this.onChanged,
     required this.onCommentChanged,
     required this.onSubmit,
-    this.submitLabel = 'Submit rating',
+    this.submitLabel = 'submit_rating',
     this.isLoading = false,
     this.errorMessage,
   });
@@ -41,7 +42,7 @@ class RidonsRatingPrompt extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            title,
+            title.tr(),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: context.ridonsInk,
@@ -53,7 +54,7 @@ class RidonsRatingPrompt extends StatelessWidget {
           RidonsStarRating(value: value, onChanged: onChanged, size: 32),
           const SizedBox(height: 4),
           RidonsTextField(
-            hint: 'Add a comment (optional)',
+            hint: 'add_comment_optional',
             onChanged: onCommentChanged,
             keyboardType: TextInputType.multiline,
             textInputAction: TextInputAction.newline,
@@ -61,7 +62,7 @@ class RidonsRatingPrompt extends StatelessWidget {
           if (errorMessage != null) ...[
             const SizedBox(height: 8),
             Text(
-              errorMessage!,
+              errorMessage!.tr(),
               textAlign: TextAlign.center,
               style: const TextStyle(color: RidonsColors.primary, fontSize: 12),
             ),

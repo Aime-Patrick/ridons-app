@@ -37,7 +37,7 @@ class AccountSubpage extends StatelessWidget {
               child: showBack
                   ? RidonsBackHeader(title: title)
                   : Text(
-                      title,
+                      title.tr(),
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w800),
                     ),
@@ -88,7 +88,7 @@ class _ProfileSettingsViewState extends ConsumerState<ProfileSettingsView> {
     if (session == null) {
       RidonsNotice.error(
         context,
-        vm.errorMessage ?? 'Could not save profile.',
+        (vm.errorMessage ?? 'could_not_save_profile').tr(),
       );
       return;
     }
@@ -103,7 +103,7 @@ class _ProfileSettingsViewState extends ConsumerState<ProfileSettingsView> {
     final session = ref.watch(authSessionProvider).asData?.value;
     final phone = session?.user.phone ?? '';
     return AccountSubpage(
-      title: 'Profile',
+      title: 'profile',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
@@ -142,32 +142,32 @@ class _ProfileSettingsViewState extends ConsumerState<ProfileSettingsView> {
           const SizedBox(height: 8),
           TextButton(
             onPressed: () => showProfilePhotoSheet(context, ref),
-            child: const Text('Upload image or use avatar'),
+            child: Text('upload_image_or_avatar'.tr()),
           ),
           const SizedBox(height: 16),
           RidonsTextField(
             controller: _firstName,
-            label: 'First name',
+            label: 'first_name',
             textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: 12),
           RidonsTextField(
             controller: _lastName,
-            label: 'Last name',
+            label: 'last_name',
             textInputAction: TextInputAction.done,
           ),
           const SizedBox(height: 12),
-          RidonsTextField(label: 'Phone', hint: phone, enabled: false),
+          RidonsTextField(label: 'phone', hint: phone, enabled: false),
           const SizedBox(height: 12),
           _InfoCard(
             label: session?.user.role.isDriver == true
-                ? 'Driver ID'
-                : 'Passenger ID',
+                ? 'driver_id'
+                : 'passenger_id',
             value: session?.user.publicIdLabel ?? '—',
           ),
           const SizedBox(height: 24),
           RidonsButton(
-            label: 'Save',
+            label: 'save',
             isLoading: vm.savingProfile,
             onPressed: _save,
           ),
@@ -216,15 +216,15 @@ class _NotificationsSettingsViewState
   @override
   Widget build(BuildContext context) {
     return AccountSubpage(
-      title: 'Notifications',
+      title: 'notifications',
       child: !_ready
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 _ToggleCard(
-                  title: 'Ride updates',
-                  subtitle: 'Match found, driver on the way, arrival.',
+                  title: 'ride_updates',
+                  subtitle: 'ride_updates_summary',
                   value: _rides,
                   onChanged: (value) async {
                     setState(() => _rides = value);
@@ -233,8 +233,8 @@ class _NotificationsSettingsViewState
                 ),
                 const SizedBox(height: 10),
                 _ToggleCard(
-                  title: 'Fare offers',
-                  subtitle: 'Drivers viewing and bidding on your price.',
+                  title: 'fare_offers',
+                  subtitle: 'fare_offers_summary',
                   value: _offers,
                   onChanged: (value) async {
                     setState(() => _offers = value);
@@ -243,8 +243,8 @@ class _NotificationsSettingsViewState
                 ),
                 const SizedBox(height: 10),
                 _ToggleCard(
-                  title: 'Safety alerts',
-                  subtitle: 'SOS and trip-share reminders.',
+                  title: 'safety_alerts',
+                  subtitle: 'safety_alerts_summary',
                   value: _safety,
                   onChanged: (value) async {
                     setState(() => _safety = value);
@@ -264,12 +264,12 @@ class LanguageSettingsView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final current = context.locale.languageCode;
     return AccountSubpage(
-      title: 'Language',
+      title: 'language',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
           RidonsLanguageTile(
-            title: 'English',
+            title: 'english'.tr(),
             flag: '🇬🇧',
             outlined: true,
             isSelected: current == 'en',
@@ -277,7 +277,7 @@ class LanguageSettingsView extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           RidonsLanguageTile(
-            title: 'Kinyarwanda',
+            title: 'kinyarwanda'.tr(),
             flag: '🇷🇼',
             outlined: true,
             isSelected: current == 'rw',
@@ -313,24 +313,14 @@ class AppearanceSettingsView extends ConsumerWidget {
       (
         ThemeMode.system,
         Icons.brightness_auto_rounded,
-        'System',
-        'Match the phone light or dark setting',
+        'system',
+        'system_theme',
       ),
-      (
-        ThemeMode.light,
-        Icons.light_mode_outlined,
-        'Light',
-        'Always use light mode',
-      ),
-      (
-        ThemeMode.dark,
-        Icons.dark_mode_outlined,
-        'Dark',
-        'Always use dark mode',
-      ),
+      (ThemeMode.light, Icons.light_mode_outlined, 'light', 'always_light'),
+      (ThemeMode.dark, Icons.dark_mode_outlined, 'dark', 'always_dark'),
     ];
     return AccountSubpage(
-      title: 'Appearance',
+      title: 'appearance',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
@@ -390,7 +380,7 @@ class _ThemeChoiceTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      title.tr(),
                       style: TextStyle(
                         color: context.ridonsInk,
                         fontWeight: FontWeight.w700,
@@ -399,7 +389,7 @@ class _ThemeChoiceTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      subtitle,
+                      subtitle.tr(),
                       style: TextStyle(
                         color: context.ridonsMuted,
                         fontSize: 12,
@@ -427,19 +417,19 @@ class PrivacySettingsView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authSessionProvider).asData?.value?.user;
     return AccountSubpage(
-      title: 'Privacy & security',
+      title: 'privacy_security',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
-          _InfoCard(label: 'Phone number', value: user?.phone ?? '—'),
+          _InfoCard(label: 'phone_number', value: user?.phone ?? '—'),
           const SizedBox(height: 10),
           _InfoCard(
-            label: user?.role.isDriver == true ? 'Driver ID' : 'Passenger ID',
+            label: user?.role.isDriver == true ? 'driver_id' : 'passenger_id',
             value: user?.publicIdLabel ?? '—',
           ),
           const SizedBox(height: 20),
           Text(
-            'Your number is only shared with a matched driver for that trip. Sign out to clear this device’s session.',
+            'privacy_description'.tr(),
             style: TextStyle(color: context.ridonsMuted, height: 1.4),
           ),
         ],
@@ -454,12 +444,12 @@ class AboutRidonsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AccountSubpage(
-      title: 'About Ridons',
+      title: 'about_ridons',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
           Text(
-            'Ridons',
+            'app_name'.tr(),
             style: TextStyle(
               color: context.ridonsInk,
               fontSize: 22,
@@ -467,10 +457,10 @@ class AboutRidonsView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          const Text('Version 1.0.0'),
+          Text('version'.tr()),
           const SizedBox(height: 16),
           Text(
-            'Set your price, ride smart. Ridons connects passengers and moto drivers in Kigali with a negotiated fare — not a take-it-or-leave-it meter.',
+            'about_description'.tr(),
             style: TextStyle(color: context.ridonsMuted, height: 1.45),
           ),
         ],
@@ -504,15 +494,15 @@ class _SafetyToolkitViewState extends ConsumerState<SafetyToolkitView> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Emergency contact'),
+          title: Text('emergency_contact'.tr()),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              RidonsTextField(controller: name, label: 'Name'),
+              RidonsTextField(controller: name, label: 'name'),
               const SizedBox(height: 10),
               RidonsTextField(
                 controller: phone,
-                label: 'Phone',
+                label: 'phone',
                 keyboardType: TextInputType.phone,
               ),
             ],
@@ -520,11 +510,11 @@ class _SafetyToolkitViewState extends ConsumerState<SafetyToolkitView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text('cancel'.tr()),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Save'),
+              child: Text('save'.tr()),
             ),
           ],
         );
@@ -541,29 +531,29 @@ class _SafetyToolkitViewState extends ConsumerState<SafetyToolkitView> {
   @override
   Widget build(BuildContext context) {
     return AccountSubpage(
-      title: 'Safety toolkit',
+      title: 'safety_toolkit',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
           RidonsButton(
-            label: 'Call 112 (SOS)',
+            label: 'call_sos',
             onPressed: () => _launch(Uri(scheme: 'tel', path: '112')),
           ),
           const SizedBox(height: 10),
           RidonsButton(
-            label: 'Share this trip',
+            label: 'share_trip',
             variant: RidonsButtonVariant.secondary,
             onPressed: () async {
               const text =
                   'I am on a Ridons trip. Track me if I do not arrive.';
               await Clipboard.setData(const ClipboardData(text: text));
               if (!context.mounted) return;
-              RidonsNotice.success(context, 'Trip share text copied.');
+              RidonsNotice.success(context, 'trip_share_copied');
             },
           ),
           const SizedBox(height: 22),
           Text(
-            'Emergency contacts',
+            'emergency_contacts'.tr(),
             style: TextStyle(
               color: context.ridonsInk,
               fontWeight: FontWeight.w800,
@@ -573,7 +563,7 @@ class _SafetyToolkitViewState extends ConsumerState<SafetyToolkitView> {
           const SizedBox(height: 8),
           if (_contacts.isEmpty)
             Text(
-              'No contacts yet.',
+              'no_contacts'.tr(),
               style: TextStyle(color: context.ridonsMuted),
             ),
           for (final contact in _contacts)
@@ -597,7 +587,7 @@ class _SafetyToolkitViewState extends ConsumerState<SafetyToolkitView> {
           TextButton.icon(
             onPressed: _addContact,
             icon: const Icon(Icons.add),
-            label: const Text('Add contact'),
+            label: Text('add_contact'.tr()),
           ),
         ],
       ),
@@ -611,21 +601,12 @@ class HelpCenterView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const faqs = [
-      (
-        'How do I set my fare?',
-        'On Home, choose pickup and dropoff, then Continue. Adjust the offer before you send it to drivers.',
-      ),
-      (
-        'How do I pay?',
-        'Pay the driver in cash or Mobile Money, then confirm “I’ve paid” in the app.',
-      ),
-      (
-        'How do I rebook?',
-        'Open Activities and tap Rebook. Ridons loads the same trip the other way around.',
-      ),
+      ('faq_set_fare_q', 'faq_set_fare_a'),
+      ('faq_pay_q', 'faq_pay_a'),
+      ('faq_rebook_q', 'faq_rebook_a'),
     ];
     return AccountSubpage(
-      title: 'Help center',
+      title: 'help_center',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
@@ -640,13 +621,13 @@ class HelpCenterView extends StatelessWidget {
                 ),
                 child: ExpansionTile(
                   title: Text(
-                    faq.$1,
+                    faq.$1.tr(),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   children: [
                     Text(
-                      faq.$2,
+                      faq.$2.tr(),
                       style: TextStyle(color: context.ridonsMuted, height: 1.4),
                     ),
                   ],
@@ -665,7 +646,7 @@ class ContactSupportView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AccountSubpage(
-      title: 'Contact support',
+      title: 'contact_support',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
@@ -674,7 +655,7 @@ class ContactSupportView extends StatelessWidget {
             child: ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.mail_outline, color: context.ridonsInk),
-              title: const Text('Email'),
+              title: Text('email'.tr()),
               subtitle: const Text('support@ridons.app'),
               onTap: () => _launch(
                 Uri(
@@ -690,7 +671,7 @@ class ContactSupportView extends StatelessWidget {
             child: ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.call_outlined, color: context.ridonsInk),
-              title: const Text('Call'),
+              title: Text('call'.tr()),
               subtitle: const Text('+250 788 000 000'),
               onTap: () => _launch(Uri(scheme: 'tel', path: '+250788000000')),
             ),
@@ -727,13 +708,13 @@ class _ToggleCard extends StatelessWidget {
         onChanged: onChanged,
         activeThumbColor: RidonsColors.primary,
         title: Text(
-          title,
+          title.tr(),
           style: TextStyle(
             color: context.ridonsInk,
             fontWeight: FontWeight.w700,
           ),
         ),
-        subtitle: Text(subtitle),
+        subtitle: Text(subtitle.tr()),
       ),
     );
   }
@@ -759,7 +740,7 @@ class _InfoCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
+            label.tr(),
             style: TextStyle(color: context.ridonsMuted, fontSize: 12),
           ),
           const SizedBox(height: 4),

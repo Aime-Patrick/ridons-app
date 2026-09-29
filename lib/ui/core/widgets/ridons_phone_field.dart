@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../theme/ridons_colors.dart';
 
@@ -37,10 +38,8 @@ class RidonsPhoneField extends StatelessWidget {
         children: [
           Text(
             '🇷🇼  $countryCode',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: ink,
-                ),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600, color: ink),
           ),
           Icon(Icons.keyboard_arrow_down, size: 20, color: muted),
           Container(
@@ -58,14 +57,12 @@ class RidonsPhoneField extends StatelessWidget {
               keyboardType: TextInputType.phone,
               keyboardAppearance: dark ? Brightness.dark : Brightness.light,
               cursorColor: RidonsColors.primary,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: ink,
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(color: ink, fontWeight: FontWeight.w600),
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: onChanged,
               decoration: InputDecoration(
-                hintText: '788 888 888',
+                hintText: 'phone_hint'.tr(),
                 hintStyle: TextStyle(color: muted, fontWeight: FontWeight.w400),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,

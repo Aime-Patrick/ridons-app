@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -86,9 +88,14 @@ class LocationService {
 
   Stream<Position> positionStream({bool background = false}) {
     return Geolocator.getPositionStream(
-      locationSettings: _settings(distanceFilter: 5, background: background),
-    ).asyncMap((position) async {
-      await remember(position.latitude, position.longitude);
+      locationSettings: _settings(
+        distanceFilter: background ? 5 : 1,
+        background: background,
+      ),
+    ).map((position) {
+      // Persistence must not delay the live location stream delivered to the
+      // map and presence publisher.
+      unawaited(remember(position.latitude, position.longitude));
       return position;
     });
   }
@@ -149,13 +156,14 @@ class LocationService {
       return AndroidSettings(
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: distanceFilter,
-        intervalDuration: const Duration(seconds: 4),
+        intervalDuration: Duration(seconds: background ? 4 : 1),
         forceLocationManager: false,
         timeLimit: timeLimit,
         foregroundNotificationConfig: background
             ? const ForegroundNotificationConfig(
                 notificationTitle: 'Ridons driver mode',
-                notificationText: 'Your live location is active while you are online.',
+                notificationText:
+                    'Your live location is active while you are online.',
                 notificationChannelName: 'Ridons driver location',
                 enableWakeLock: true,
                 enableWifiLock: true,

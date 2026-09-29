@@ -101,7 +101,8 @@ class _RidonsOtpFieldState extends State<RidonsOtpField>
       MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
   void _syncCaret() {
-    final show = widget.enabled &&
+    final show =
+        widget.enabled &&
         _focusNode.hasFocus &&
         _controller.text.length < widget.length &&
         !_reduceMotion;
@@ -160,9 +161,7 @@ class _RidonsOtpFieldState extends State<RidonsOtpField>
       animation: _shake,
       builder: (context, child) {
         final t = _shake.value;
-        final dx = reduce
-            ? 0.0
-            : math.sin(t * math.pi * 8) * 7 * (1 - t);
+        final dx = reduce ? 0.0 : math.sin(t * math.pi * 8) * 7 * (1 - t);
         return Transform.translate(offset: Offset(dx, 0), child: child);
       },
       child: LayoutBuilder(
@@ -173,8 +172,7 @@ class _RidonsOtpFieldState extends State<RidonsOtpField>
               : 280.0;
           final cell = ((maxW - gap * (widget.length - 1)) / widget.length)
               .clamp(48.0, 64.0);
-          final rowWidth =
-              cell * widget.length + gap * (widget.length - 1);
+          final rowWidth = cell * widget.length + gap * (widget.length - 1);
 
           return Align(
             alignment: Alignment.center,
@@ -186,7 +184,8 @@ class _RidonsOtpFieldState extends State<RidonsOtpField>
                   Row(
                     children: List.generate(widget.length, (index) {
                       final filled = index < code.length;
-                      final active = focused &&
+                      final active =
+                          focused &&
                           widget.enabled &&
                           index == code.length &&
                           index < widget.length;
@@ -270,7 +269,7 @@ class _RidonsOtpFieldState extends State<RidonsOtpField>
                                       ContextMenuController.removeAny();
                                       _paste();
                                     },
-                                    label: 'Paste',
+                                    label: 'paste',
                                   ),
                                 ],
                               );
@@ -314,10 +313,10 @@ class _OtpCell extends StatelessWidget {
     final borderColor = hasError
         ? RidonsColors.primary
         : active
-            ? RidonsColors.primary
-            : filled
-                ? RidonsColors.primary.withValues(alpha: 0.55)
-                : context.ridonsLine;
+        ? RidonsColors.primary
+        : filled
+        ? RidonsColors.primary.withValues(alpha: 0.55)
+        : context.ridonsLine;
     final width = active || hasError ? 1.8 : 1.0;
 
     return AnimatedContainer(
@@ -345,9 +344,7 @@ class _OtpCell extends StatelessWidget {
               ),
             )
           : FadeTransition(
-              opacity: reduceMotion
-                  ? const AlwaysStoppedAnimation(1)
-                  : caret,
+              opacity: reduceMotion ? const AlwaysStoppedAnimation(1) : caret,
               child: active
                   ? Container(
                       width: 2,
@@ -374,8 +371,9 @@ class _OtpDigitsFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final clipped =
-        digits.length > maxLength ? digits.substring(0, maxLength) : digits;
+    final clipped = digits.length > maxLength
+        ? digits.substring(0, maxLength)
+        : digits;
     return TextEditingValue(
       text: clipped,
       selection: TextSelection.collapsed(offset: clipped.length),

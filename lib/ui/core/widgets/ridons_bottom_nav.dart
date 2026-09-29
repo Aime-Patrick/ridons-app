@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../../../domain/models/app_role.dart';
 
@@ -41,34 +42,32 @@ class RidonsBottomNav extends StatelessWidget {
       currentIndex: index,
       type: BottomNavigationBarType.fixed,
       onTap: (i) => onChanged(visible[i]),
-      items: [
-        for (final tab in visible) _item(tab),
-      ],
+      items: [for (final tab in visible) _item(tab)],
     );
   }
 
   BottomNavigationBarItem _item(RidonsNavTab tab) {
     return switch (tab) {
-      RidonsNavTab.home => const BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home_rounded),
-          label: 'Home',
-        ),
-      RidonsNavTab.earnings => const BottomNavigationBarItem(
-          icon: Icon(Icons.bar_chart_outlined),
-          activeIcon: Icon(Icons.bar_chart_rounded),
-          label: 'Earnings',
-        ),
-      RidonsNavTab.activities => const BottomNavigationBarItem(
-          icon: Icon(Icons.calendar_today_outlined),
-          activeIcon: Icon(Icons.calendar_today_rounded),
-          label: 'Activities',
-        ),
-      RidonsNavTab.account => const BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline_rounded),
-          activeIcon: Icon(Icons.person_rounded),
-          label: 'Account',
-        ),
+      RidonsNavTab.home => BottomNavigationBarItem(
+        icon: const Icon(Icons.home_outlined),
+        activeIcon: const Icon(Icons.home_rounded),
+        label: 'home'.tr(),
+      ),
+      RidonsNavTab.earnings => BottomNavigationBarItem(
+        icon: const Icon(Icons.bar_chart_outlined),
+        activeIcon: const Icon(Icons.bar_chart_rounded),
+        label: 'earnings'.tr(),
+      ),
+      RidonsNavTab.activities => BottomNavigationBarItem(
+        icon: const Icon(Icons.calendar_today_outlined),
+        activeIcon: const Icon(Icons.calendar_today_rounded),
+        label: 'activities'.tr(),
+      ),
+      RidonsNavTab.account => BottomNavigationBarItem(
+        icon: const Icon(Icons.person_outline_rounded),
+        activeIcon: const Icon(Icons.person_rounded),
+        label: 'account'.tr(),
+      ),
     };
   }
 }

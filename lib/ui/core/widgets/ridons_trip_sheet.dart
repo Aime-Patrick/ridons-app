@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/ridons_colors.dart';
@@ -32,7 +33,7 @@ class RidonsTripSheet extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                title,
+                title.tr(),
                 style: TextStyle(
                   color: context.ridonsInk,
                   fontSize: 18,
@@ -107,9 +108,7 @@ class RidonsTripSheetHost extends StatelessWidget {
           color: context.ridonsSheet,
           elevation: 12,
           shadowColor: const Color(0x33000000),
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           clipBehavior: Clip.antiAlias,
           child: SingleChildScrollView(
             controller: scrollController,

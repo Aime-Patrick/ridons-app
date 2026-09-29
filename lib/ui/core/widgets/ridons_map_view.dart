@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -13,7 +14,7 @@ import 'ridons_tile_layer.dart';
 /// Role-specific screens provide only their layers and actions. Keeping the
 /// map lifecycle here ensures both flows use the same tile source, gestures,
 /// camera configuration, and map-ready behavior.
-class RidonsMapView extends StatelessWidget {
+class RidonsMapView extends StatefulWidget {
   const RidonsMapView({
     super.key,
     required this.controller,
@@ -25,6 +26,9 @@ class RidonsMapView extends StatelessWidget {
     this.onTap,
     this.onMapReady,
     this.deviceHeadingStream,
+    this.followLocation = false,
+    this.followPoint,
+    this.onMapInteraction,
   });
 
   final MapController controller;
@@ -36,32 +40,96 @@ class RidonsMapView extends StatelessWidget {
   final ValueChanged<LatLng>? onTap;
   final VoidCallback? onMapReady;
   final Stream<double>? deviceHeadingStream;
+  final bool followLocation;
+  final LatLng? followPoint;
+  final VoidCallback? onMapInteraction;
+
+  @override
+  State<RidonsMapView> createState() => _RidonsMapViewState();
+}
+
+class _RidonsMapViewState extends State<RidonsMapView> {
+  late bool _following = widget.followLocation;
+  var _mapReady = false;
+
+  @override
+  void didUpdateWidget(covariant RidonsMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.followLocation) {
+      _following = false;
+      return;
+    }
+    if (!oldWidget.followLocation && widget.followLocation) {
+      _following = true;
+    }
+    if (_following && !_samePoint(oldWidget.followPoint, widget.followPoint)) {
+      _scheduleFollow(widget.followPoint);
+    }
+  }
+
+  bool _samePoint(LatLng? a, LatLng? b) {
+    if (a == null || b == null) return a == b;
+    return a.latitude == b.latitude && a.longitude == b.longitude;
+  }
+
+  void _scheduleFollow(LatLng? point) {
+    if (point == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_mapReady || !_following) return;
+      try {
+        widget.controller.move(point, widget.controller.camera.zoom);
+      } catch (_) {}
+    });
+  }
+
+  void _handleMapReady() {
+    _mapReady = true;
+    _scheduleFollow(widget.followPoint);
+    widget.onMapReady?.call();
+  }
+
+  void _handlePositionChanged(MapCamera _, bool hasGesture) {
+    if (!hasGesture) return;
+    if (_following) {
+      _following = false;
+      widget.onMapInteraction?.call();
+    }
+  }
+
+  void _recenter() {
+    _following = true;
+    widget.onRecenter?.call();
+    _scheduleFollow(widget.followPoint);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final hasLocationControl = onRecenter != null;
+    final hasLocationControl = widget.onRecenter != null;
     return Stack(
       fit: StackFit.expand,
       children: [
         FlutterMap(
-          mapController: controller,
+          mapController: widget.controller,
           options: MapOptions(
             // Start north-up. The compass tracks manual map rotation and can
             // reset the map without entering a navigation/follow mode.
-            initialCenter: center,
-            initialZoom: initialZoom,
-            onMapReady: onMapReady,
-            onTap: onTap == null ? null : (_, point) => onTap!(point),
+            initialCenter: widget.center,
+            initialZoom: widget.initialZoom,
+            onMapReady: _handleMapReady,
+            onPositionChanged: _handlePositionChanged,
+            onTap: widget.onTap == null
+                ? null
+                : (_, point) => widget.onTap!(point),
           ),
-          children: [...RidonsMapTiles.layers(context), ...layers],
+          children: [...RidonsMapTiles.layers(context), ...widget.layers],
         ),
         if (hasLocationControl)
           Positioned(
-            bottom: bottomControlsOffset,
+            bottom: widget.bottomControlsOffset,
             right: 12,
             child: _MapControlButton(
-              tooltip: 'My location',
-              onPressed: onRecenter!,
+              tooltip: 'my_location'.tr(),
+              onPressed: _recenter,
               icon: Icon(
                 Icons.my_location_rounded,
                 color: Theme.of(context).colorScheme.primary,
@@ -72,20 +140,18 @@ class RidonsMapView extends StatelessWidget {
           top: hasLocationControl
               ? null
               : MediaQuery.paddingOf(context).top + 12,
-          bottom: hasLocationControl
-              ? bottomControlsOffset + 64
-              : null,
+          bottom: hasLocationControl ? widget.bottomControlsOffset + 64 : null,
           right: 12,
           child: _MapControlButton(
-            tooltip: 'Reset map to north',
+            tooltip: 'reset_map_north'.tr(),
             onPressed: () {
               try {
-                controller.rotate(0);
+                widget.controller.rotate(0);
               } catch (_) {}
             },
             icon: _NorthCompass(
-              controller: controller,
-              deviceHeadingStream: deviceHeadingStream,
+              controller: widget.controller,
+              deviceHeadingStream: widget.deviceHeadingStream,
             ),
           ),
         ),
@@ -111,20 +177,13 @@ class _MapControlButton extends StatelessWidget {
       color: Theme.of(context).colorScheme.surface,
       elevation: 4,
       shape: const CircleBorder(),
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        icon: icon,
-      ),
+      child: IconButton(tooltip: tooltip, onPressed: onPressed, icon: icon),
     );
   }
 }
 
 class _NorthCompass extends StatefulWidget {
-  const _NorthCompass({
-    required this.controller,
-    this.deviceHeadingStream,
-  });
+  const _NorthCompass({required this.controller, this.deviceHeadingStream});
 
   final MapController controller;
   final Stream<double>? deviceHeadingStream;

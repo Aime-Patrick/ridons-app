@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/routing/app_router.dart';
@@ -29,52 +30,60 @@ class _WidgetsLabViewState extends State<WidgetsLabView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Shared widgets'),
+        title: Text('shared_widgets'.tr()),
         actions: [
           TextButton(
             onPressed: () => context.go(AppRoutes.home),
-            child: const Text('Shell'),
+            child: Text('shell'.tr()),
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('Buttons', style: Theme.of(context).textTheme.titleMedium),
+          Text('buttons'.tr(), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          RidonsButton(label: 'Continue', onPressed: () {}),
+          RidonsButton(label: 'continue', onPressed: () {}),
           const SizedBox(height: 8),
           RidonsButton(
-            label: 'Continue with Google',
+            label: 'continue_with_google',
             variant: RidonsButtonVariant.outline,
             leading: const Icon(Icons.g_mobiledata, size: 28),
             onPressed: () {},
           ),
           const SizedBox(height: 8),
           RidonsButton(
-            label: 'Report a problem',
+            label: 'report_a_problem',
             variant: RidonsButtonVariant.secondary,
             onPressed: () {},
           ),
           const SizedBox(height: 24),
-          Text('Phone', style: Theme.of(context).textTheme.titleMedium),
+          Text('phone'.tr(), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           RidonsPhoneField(controller: _phone),
           const SizedBox(height: 24),
-          Text('OTP', style: Theme.of(context).textTheme.titleMedium),
+          Text('otp'.tr(), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           RidonsOtpField(onChanged: (c) => setState(() => _otp = c)),
-          Text('code: $_otp', style: Theme.of(context).textTheme.bodySmall),
+          Text(
+            'code_value'.tr(namedArgs: {'code': _otp}),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
           const SizedBox(height: 24),
-          Text('Price offer', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'price_offer'.tr(),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: 8),
           RidonsPriceAdjuster(
             amountRwf: _price,
-            onDecrement: () => setState(() => _price = (_price - 100).clamp(500, 50000)),
-            onIncrement: () => setState(() => _price = (_price + 100).clamp(500, 50000)),
+            onDecrement: () =>
+                setState(() => _price = (_price - 100).clamp(500, 50000)),
+            onIncrement: () =>
+                setState(() => _price = (_price + 100).clamp(500, 50000)),
           ),
           const SizedBox(height: 24),
-          Text('Driver', style: Theme.of(context).textTheme.titleMedium),
+          Text('driver'.tr(), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           const RidonsDriverCard(
             name: 'Jean Bosco Nsabimana',
@@ -82,13 +91,13 @@ class _WidgetsLabViewState extends State<WidgetsLabView> {
             plate: 'RAD 123 A',
           ),
           const SizedBox(height: 24),
-          Text('Rating', style: Theme.of(context).textTheme.titleMedium),
+          Text('rating'.tr(), style: Theme.of(context).textTheme.titleMedium),
           RidonsStarRating(
             value: _stars,
             onChanged: (v) => setState(() => _stars = v),
           ),
           const SizedBox(height: 24),
-          Text('Places', style: Theme.of(context).textTheme.titleMedium),
+          Text('places'.tr(), style: Theme.of(context).textTheme.titleMedium),
           RidonsLocationTile(
             title: 'Remera Bus Park',
             subtitle: 'KG 11 Ave, Kigali',
@@ -100,32 +109,31 @@ class _WidgetsLabViewState extends State<WidgetsLabView> {
             onTap: () {},
           ),
           const SizedBox(height: 24),
-          Text('Sheet', style: Theme.of(context).textTheme.titleMedium),
+          Text('sheet'.tr(), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           RidonsBottomSheet(
-            title: 'Route',
+            title: 'route',
             child: Column(
               children: [
-                const RidonsTextField(hint: 'My current location'),
+                const RidonsTextField(hint: 'my_location'),
                 const SizedBox(height: 8),
-                const RidonsTextField(hint: 'Choose dropoff location'),
+                const RidonsTextField(hint: 'choose_dropoff_location'),
                 const SizedBox(height: 12),
-                RidonsButton(label: 'Continue', onPressed: () {}),
+                RidonsButton(label: 'continue', onPressed: () {}),
               ],
             ),
           ),
           const SizedBox(height: 16),
           RidonsTextLink(
-            prefix: 'Already have an account? ',
-            text: 'Sign In',
+            prefix: 'already_have_account',
+            text: 'sign_in',
             onTap: () {},
           ),
           const SizedBox(height: 24),
           Text(
-            'Brand primary #C91D22 · driver navy #0F172A',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: RidonsColors.textSecondary,
-                ),
+            'brand_colors'.tr(),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: RidonsColors.textSecondary),
           ),
         ],
       ),

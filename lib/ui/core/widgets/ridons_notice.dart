@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../theme/ridons_colors.dart';
 
@@ -22,6 +23,8 @@ class RidonsNotice {
     if (messenger == null || message.trim().isEmpty) return;
 
     final colors = _colors(context, tone);
+    final localizedMessage = message.tr();
+    final localizedAction = actionLabel?.tr();
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -41,7 +44,7 @@ class RidonsNotice {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  message,
+                  localizedMessage,
                   style: TextStyle(
                     color: colors.foreground,
                     fontWeight: FontWeight.w600,
@@ -50,10 +53,10 @@ class RidonsNotice {
               ),
             ],
           ),
-          action: actionLabel == null || onAction == null
+          action: localizedAction == null || onAction == null
               ? null
               : SnackBarAction(
-                  label: actionLabel,
+                  label: localizedAction,
                   textColor: colors.foreground,
                   onPressed: onAction,
                 ),
@@ -61,56 +64,41 @@ class RidonsNotice {
       );
   }
 
-  static void success(BuildContext context, String message) => show(
-        context,
-        message,
-        tone: RidonsNoticeTone.success,
-      );
+  static void success(BuildContext context, String message) =>
+      show(context, message, tone: RidonsNoticeTone.success);
 
-  static void info(BuildContext context, String message) => show(
-        context,
-        message,
-        tone: RidonsNoticeTone.info,
-      );
+  static void info(BuildContext context, String message) =>
+      show(context, message, tone: RidonsNoticeTone.info);
 
-  static void warning(BuildContext context, String message) => show(
-        context,
-        message,
-        tone: RidonsNoticeTone.warning,
-      );
+  static void warning(BuildContext context, String message) =>
+      show(context, message, tone: RidonsNoticeTone.warning);
 
-  static void error(BuildContext context, String message) => show(
-        context,
-        message,
-        tone: RidonsNoticeTone.error,
-      );
+  static void error(BuildContext context, String message) =>
+      show(context, message, tone: RidonsNoticeTone.error);
 
-  static _NoticeColors _colors(
-    BuildContext context,
-    RidonsNoticeTone tone,
-  ) {
+  static _NoticeColors _colors(BuildContext context, RidonsNoticeTone tone) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return switch (tone) {
       RidonsNoticeTone.success => _NoticeColors(
-          background: dark ? const Color(0xFF14532D) : const Color(0xFF166534),
-          foreground: Colors.white,
-          icon: Icons.check_circle_outline_rounded,
-        ),
+        background: dark ? const Color(0xFF14532D) : const Color(0xFF166534),
+        foreground: Colors.white,
+        icon: Icons.check_circle_outline_rounded,
+      ),
       RidonsNoticeTone.warning => _NoticeColors(
-          background: dark ? const Color(0xFF78350F) : const Color(0xFFB45309),
-          foreground: Colors.white,
-          icon: Icons.warning_amber_rounded,
-        ),
+        background: dark ? const Color(0xFF78350F) : const Color(0xFFB45309),
+        foreground: Colors.white,
+        icon: Icons.warning_amber_rounded,
+      ),
       RidonsNoticeTone.error => _NoticeColors(
-          background: dark ? const Color(0xFF7F1D1D) : RidonsColors.primaryDark,
-          foreground: Colors.white,
-          icon: Icons.error_outline_rounded,
-        ),
+        background: dark ? const Color(0xFF7F1D1D) : RidonsColors.primaryDark,
+        foreground: Colors.white,
+        icon: Icons.error_outline_rounded,
+      ),
       RidonsNoticeTone.info => _NoticeColors(
-          background: dark ? RidonsColors.darkFill : RidonsColors.navy,
-          foreground: dark ? RidonsColors.darkInk : Colors.white,
-          icon: Icons.info_outline_rounded,
-        ),
+        background: dark ? RidonsColors.darkFill : RidonsColors.navy,
+        foreground: dark ? RidonsColors.darkInk : Colors.white,
+        icon: Icons.info_outline_rounded,
+      ),
     };
   }
 }
