@@ -10,8 +10,9 @@ import '../../core/widgets/widgets.dart';
 
 
 /// Animated Brand Splash Screen.
-/// 1. Shows initial "R" icon with smooth scale & fade.
-/// 2. Staggers reveal of remaining letters "i", "d", "o", "n", "s" to form "Ridons".
+/// 1. Scales the single "R" into the center and holds it briefly.
+/// 2. Moves that same "R" to the left.
+/// 3. Staggers reveal of the remaining letters "i", "d", "o", "n", "s".
 /// 3. Transitions smoothly to the Onboarding flow.
 class SplashView extends ConsumerStatefulWidget {
   const SplashView({super.key});
@@ -25,12 +26,9 @@ class _SplashViewState extends ConsumerState<SplashView>
   bool _leaving = false;
   late final AnimationController _controller;
 
-  // Initial "R" icon animation
-  late final Animation<double> _iconScale;
-  late final Animation<double> _iconOpacity;
-
-  // Transition from standalone icon to full logo
-  late final Animation<double> _iconToWordmarkTransition;
+  // One R instance: scale in, hold in the center, then move left.
+  late final Animation<double> _rScale;
+  late final Animation<double> _rSlide;
 
   // Staggered animations for letters: i, d, o, n, s
   late final Animation<double> _letterIOpacity;
@@ -61,37 +59,31 @@ class _SplashViewState extends ConsumerState<SplashView>
       duration: const Duration(milliseconds: 4200),
     );
 
-    // 0.0 - 0.26 (~0 to 1.1s): the app icon settles into the gradient.
-    _iconScale = Tween<double>(begin: 0.7, end: 1.0).animate(
+    // 0.0 - 0.18 (~0 to 0.75s): the R scales into the center.
+    _rScale = Tween<double>(begin: 0.7, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.26, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 0.18, curve: Curves.easeOutCubic),
       ),
     );
 
-    _iconOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+    // 0.32 - 0.50 (~1.35 to 2.1s): the same R moves from center to left.
+    _rSlide = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.16, curve: Curves.easeOut),
-      ),
-    );
-
-    // 0.25 - 0.43: gently transition from the standalone icon to the wordmark.
-    _iconToWordmarkTransition = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.25, 0.43, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.32, 0.50, curve: Curves.easeInOutCubic),
       ),
     );
 
     // Staggered letters
+    // The R has finished moving before the first remaining letter appears.
     // Each letter overlaps the previous one slightly so the wordmark flows
     // together instead of feeling like five separate steps.
-    // 'i' (0.34 - 0.50)
+    // 'i' (0.52 - 0.62)
     _letterIOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.34, 0.50, curve: Curves.easeOutCubic),
+        curve: const Interval(0.52, 0.62, curve: Curves.easeOutCubic),
       ),
     );
     _letterISlide = Tween<Offset>(
@@ -100,15 +92,15 @@ class _SplashViewState extends ConsumerState<SplashView>
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.34, 0.50, curve: Curves.easeOutCubic),
+        curve: const Interval(0.52, 0.62, curve: Curves.easeOutCubic),
       ),
     );
 
-    // 'd' (0.42 - 0.58)
+    // 'd' (0.60 - 0.70)
     _letterDOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.42, 0.58, curve: Curves.easeOutCubic),
+        curve: const Interval(0.60, 0.70, curve: Curves.easeOutCubic),
       ),
     );
     _letterDSlide = Tween<Offset>(
@@ -117,15 +109,15 @@ class _SplashViewState extends ConsumerState<SplashView>
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.42, 0.58, curve: Curves.easeOutCubic),
+        curve: const Interval(0.60, 0.70, curve: Curves.easeOutCubic),
       ),
     );
 
-    // 'o' (0.50 - 0.66)
+    // 'o' (0.68 - 0.78)
     _letterOOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.50, 0.66, curve: Curves.easeOutCubic),
+        curve: const Interval(0.68, 0.78, curve: Curves.easeOutCubic),
       ),
     );
     _letterOSlide = Tween<Offset>(
@@ -134,15 +126,15 @@ class _SplashViewState extends ConsumerState<SplashView>
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.50, 0.66, curve: Curves.easeOutCubic),
+        curve: const Interval(0.68, 0.78, curve: Curves.easeOutCubic),
       ),
     );
 
-    // 'n' (0.58 - 0.74)
+    // 'n' (0.76 - 0.86)
     _letterNOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.58, 0.74, curve: Curves.easeOutCubic),
+        curve: const Interval(0.76, 0.86, curve: Curves.easeOutCubic),
       ),
     );
     _letterNSlide = Tween<Offset>(
@@ -151,15 +143,15 @@ class _SplashViewState extends ConsumerState<SplashView>
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.58, 0.74, curve: Curves.easeOutCubic),
+        curve: const Interval(0.76, 0.86, curve: Curves.easeOutCubic),
       ),
     );
 
-    // 's' (0.66 - 0.82)
+    // 's' (0.84 - 0.94)
     _letterSOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.66, 0.82, curve: Curves.easeOutCubic),
+        curve: const Interval(0.84, 0.94, curve: Curves.easeOutCubic),
       ),
     );
     _letterSSlide = Tween<Offset>(
@@ -168,11 +160,11 @@ class _SplashViewState extends ConsumerState<SplashView>
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.66, 0.82, curve: Curves.easeOutCubic),
+        curve: const Interval(0.84, 0.94, curve: Curves.easeOutCubic),
       ),
     );
 
-    // Final breathing hold (0.82 - 1.0), kept intentionally very subtle.
+    // Final breathing hold (0.94 - 1.0), kept intentionally very subtle.
     _finalPulse = TweenSequence<double>([
       TweenSequenceItem(
         tween: Tween<double>(begin: 1.0, end: 1.015),
@@ -185,7 +177,7 @@ class _SplashViewState extends ConsumerState<SplashView>
     ]).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.82, 1.0, curve: Curves.easeInOut),
+        curve: const Interval(0.94, 1.0, curve: Curves.easeInOut),
       ),
     );
 
@@ -224,9 +216,11 @@ class _SplashViewState extends ConsumerState<SplashView>
     super.dispose();
   }
 
-  // Individual letter SVGs with exact path coordinates from assets/brand/logo_full.svg
+  // Individual letter SVGs with exact path coordinates from assets/brand/logo_full.svg.
+  // The R is cropped to its own viewBox so the same widget can move from the
+  // center into the final wordmark position without being recreated.
   static const _letterR = '''
-<svg width="148" height="36" viewBox="0 0 148 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="28" height="36" viewBox="0 0 28 36" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M25.8319 13.4146C25.8319 18.95 22.4408 22.9894 16.9553 24.3358C18.4015 27.2282 21.4435 28.9237 25.5825 28.9237H26.8293V35.4066H25.3332C16.0078 35.4066 9.47501 28.9736 9.47501 19.8477V18.3516H12.7165C16.4566 18.3516 18.8503 16.4566 18.8503 13.4146C18.8503 10.3228 16.5563 8.47765 12.7165 8.47765H6.98159V35.4066H0V1.99474H12.7165C20.5957 1.99474 25.8319 6.58264 25.8319 13.4146Z" fill="#FBFBFB"/>
 </svg>''';
 
@@ -259,6 +253,7 @@ class _SplashViewState extends ConsumerState<SplashView>
   Widget build(BuildContext context) {
     const wordmarkWidth = 220.0;
     const wordmarkHeight = wordmarkWidth * (36.0 / 148.0); // ~53.5
+    const wordmarkTop = (90.0 - wordmarkHeight) / 2;
 
     return Scaffold(
       body: RidonsSplashBackground(
@@ -266,7 +261,9 @@ class _SplashViewState extends ConsumerState<SplashView>
           child: AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {
-              final isRevealingWordmark = _iconToWordmarkTransition.value > 0.0;
+              const rWidth = wordmarkWidth * (28.0 / 148.0);
+              const centerRLeft = (wordmarkWidth - rWidth) / 2;
+              final rLeft = centerRLeft * (1.0 - _rSlide.value);
 
               return ScaleTransition(
                 scale: _finalPulse,
@@ -276,111 +273,85 @@ class _SplashViewState extends ConsumerState<SplashView>
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Initial centered "R" Icon (Logo-Icon.svg)
-                      if (_iconToWordmarkTransition.value < 1.0)
-                        Opacity(
-                          opacity: (_iconOpacity.value *
-                                  (1.0 - _iconToWordmarkTransition.value))
-                              .clamp(0.0, 1.0),
-                          child: Transform.scale(
-                            scale: _iconScale.value,
-                            child: const RidonsLogo(
-                              kind: RidonsLogoKind.icon,
-                              height: 76,
-                            ),
+                      // The only R in the animation. It scales in, holds in
+                      // the center, then moves to the final left position.
+                      Positioned(
+                        left: rLeft,
+                        top: wordmarkTop,
+                        width: rWidth,
+                        height: wordmarkHeight,
+                        child: Transform.scale(
+                          scale: _rScale.value,
+                          child: SvgPicture.string(
+                            _letterR,
+                            width: rWidth,
+                            height: wordmarkHeight,
+                            fit: BoxFit.contain,
                           ),
                         ),
+                      ),
 
-                      // Wordmark container with letter R + staggered letters (i, d, o, n, s)
-                      if (isRevealingWordmark)
-                        Opacity(
-                          opacity: _iconToWordmarkTransition.value,
-                          child: SizedBox(
+                      // The remaining letters reveal beside the R.
+                      FadeTransition(
+                        opacity: _letterIOpacity,
+                        child: SlideTransition(
+                          position: _letterISlide,
+                          child: SvgPicture.string(
+                            _letterI,
                             width: wordmarkWidth,
                             height: wordmarkHeight,
-                            child: Stack(
-                              children: [
-                                // Letter 'R'
-                                SvgPicture.string(
-                                  _letterR,
-                                  width: wordmarkWidth,
-                                  height: wordmarkHeight,
-                                  fit: BoxFit.contain,
-                                ),
-
-                                // Letter 'i'
-                                FadeTransition(
-                                  opacity: _letterIOpacity,
-                                  child: SlideTransition(
-                                    position: _letterISlide,
-                                    child: SvgPicture.string(
-                                      _letterI,
-                                      width: wordmarkWidth,
-                                      height: wordmarkHeight,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                ),
-
-                                // Letter 'd'
-                                FadeTransition(
-                                  opacity: _letterDOpacity,
-                                  child: SlideTransition(
-                                    position: _letterDSlide,
-                                    child: SvgPicture.string(
-                                      _letterD,
-                                      width: wordmarkWidth,
-                                      height: wordmarkHeight,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                ),
-
-                                // Letter 'o'
-                                FadeTransition(
-                                  opacity: _letterOOpacity,
-                                  child: SlideTransition(
-                                    position: _letterOSlide,
-                                    child: SvgPicture.string(
-                                      _letterO,
-                                      width: wordmarkWidth,
-                                      height: wordmarkHeight,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                ),
-
-                                // Letter 'n'
-                                FadeTransition(
-                                  opacity: _letterNOpacity,
-                                  child: SlideTransition(
-                                    position: _letterNSlide,
-                                    child: SvgPicture.string(
-                                      _letterN,
-                                      width: wordmarkWidth,
-                                      height: wordmarkHeight,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                ),
-
-                                // Letter 's'
-                                FadeTransition(
-                                  opacity: _letterSOpacity,
-                                  child: SlideTransition(
-                                    position: _letterSSlide,
-                                    child: SvgPicture.string(
-                                      _letterS,
-                                      width: wordmarkWidth,
-                                      height: wordmarkHeight,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                            fit: BoxFit.contain,
                           ),
                         ),
+                      ),
+                      FadeTransition(
+                        opacity: _letterDOpacity,
+                        child: SlideTransition(
+                          position: _letterDSlide,
+                          child: SvgPicture.string(
+                            _letterD,
+                            width: wordmarkWidth,
+                            height: wordmarkHeight,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      FadeTransition(
+                        opacity: _letterOOpacity,
+                        child: SlideTransition(
+                          position: _letterOSlide,
+                          child: SvgPicture.string(
+                            _letterO,
+                            width: wordmarkWidth,
+                            height: wordmarkHeight,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      FadeTransition(
+                        opacity: _letterNOpacity,
+                        child: SlideTransition(
+                          position: _letterNSlide,
+                          child: SvgPicture.string(
+                            _letterN,
+                            width: wordmarkWidth,
+                            height: wordmarkHeight,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      FadeTransition(
+                        opacity: _letterSOpacity,
+                        child: SlideTransition(
+                          position: _letterSSlide,
+                          child: SvgPicture.string(
+                            _letterS,
+                            width: wordmarkWidth,
+                            height: wordmarkHeight,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
