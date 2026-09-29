@@ -32,7 +32,7 @@ class RidonsTextLink extends StatelessWidget {
           Text(
             prefix!,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: RidonsColors.textSecondary,
+                  color: context.ridonsMuted,
                 ),
           ),
         GestureDetector(

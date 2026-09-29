@@ -23,7 +23,6 @@ class MainShellView extends ConsumerStatefulWidget {
 class _MainShellViewState extends ConsumerState<MainShellView> {
   RidonsNavTab _tab = RidonsNavTab.home;
   final _homeKey = GlobalKey<HomeMapViewState>();
-  var _driverOnTrip = false;
 
   @override
   Widget build(BuildContext context) {
@@ -38,13 +37,7 @@ class _MainShellViewState extends ConsumerState<MainShellView> {
         index: _stackIndex(isDriver),
         children: [
           if (isDriver)
-            DriverHomeView(
-              onTripChanged: (active) {
-                if (active != _driverOnTrip) {
-                  setState(() => _driverOnTrip = active);
-                }
-              },
-            )
+            const DriverHomeView()
           else
             HomeMapView(key: _homeKey),
           if (isDriver) const DriverEarningsView(),
@@ -73,13 +66,14 @@ class _MainShellViewState extends ConsumerState<MainShellView> {
           const AccountView(),
         ],
       ),
-      bottomNavigationBar: _driverOnTrip
-          ? null
-          : RidonsBottomNav(
-              current: _tab,
-              role: role,
-              onChanged: (t) => setState(() => _tab = t),
-            ),
+      // Keep navigation available during an active trip. The trip state is
+      // owned by DriverHomeViewModel, so changing tabs does not cancel or
+      // lose the active ride.
+      bottomNavigationBar: RidonsBottomNav(
+        current: _tab,
+        role: role,
+        onChanged: (t) => setState(() => _tab = t),
+      ),
     );
   }
 

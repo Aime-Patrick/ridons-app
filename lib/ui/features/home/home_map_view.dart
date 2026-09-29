@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/providers/session_providers.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../../data/services/location_service.dart';
+import '../../../data/services/compass_service.dart';
 import '../../../data/services/places_service.dart';
 import '../../../data/services/routing_service.dart';
 import '../../../domain/models/geo_place.dart';
@@ -16,6 +17,7 @@ import '../notifications/notification_inbox_view.dart';
 import '../../core/widgets/map_marker_info_sheet.dart';
 import '../../core/widgets/ridons_notification_bell.dart';
 import '../../core/widgets/ridons_map_view.dart';
+import '../../core/widgets/ridons_trip_sheet.dart';
 import 'view_models/home_map_view_model.dart';
 import 'widgets/ride_flow_panels.dart';
 
@@ -29,6 +31,7 @@ class HomeMapView extends ConsumerStatefulWidget {
 
 class HomeMapViewState extends ConsumerState<HomeMapView> {
   late final HomeMapViewModel _viewModel;
+  final CompassService _compassService = CompassService();
   final MapController _mapController = MapController();
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
@@ -143,7 +146,9 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
       RideStage.preview => _viewModel.dropoff == null ? 0.24 : 0.34,
       RideStage.estimate => 0.40,
       RideStage.offering => 0.38,
-      RideStage.matched => 0.52,
+      // The matched/driver-on-the-way content remains scrollable, but should
+      // not cover most of the map before the passenger expands it.
+      RideStage.matched => 0.44,
       RideStage.payment => 0.44,
       RideStage.success => 0.52,
       _ => 0.34,
@@ -153,7 +158,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
   List<double> get _sheetSnapSizes {
     // Keep a stable snap list so DraggableScrollableSheet does not
     // rewrite extent during build when the stage changes.
-    return const [0.1, 0.24, 0.28, 0.34, 0.38, 0.40, 0.44, 0.52, 0.82];
+    return RidonsTripSheetHost.defaultSnapSizes;
   }
 
   void _maybeResizeSheet() {
@@ -165,10 +170,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
       return;
     }
     final target = _sheetInitialSize.clamp(_sheetMinSize, _sheetMaxSize);
-    final tooFar =
-        _sheetController.isAttached &&
-        (_sheetController.size - target).abs() > 0.03;
-    if (_sheetStage == stage && _sheetHasDropoff == hasDropoff && !tooFar) {
+    if (_sheetStage == stage && _sheetHasDropoff == hasDropoff) {
       return;
     }
     _sheetStage = stage;
@@ -242,6 +244,9 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
               child: _PassengerMap(
                 controller: _mapController,
                 viewModel: _viewModel,
+                sheetFraction: sheetFraction,
+                onRecenter: askingLocation || searching ? null : _recenterOnYou,
+                deviceHeadingStream: _compassService.headingStream,
                 user: ref.watch(authSessionProvider).asData?.value?.user,
                 token: ref.watch(authSessionProvider).asData?.value?.token,
                 onMapTap: askingLocation ? null : _collapseSheet,
@@ -283,58 +288,19 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
             ),
             if (showRideSheet)
               Positioned.fill(
-                child: DraggableScrollableSheet(
+                child: RidonsTripSheetHost(
                   controller: _sheetController,
-                  // Keep initial size stable so didUpdateWidget does not
-                  // replace extent (and notify listeners) mid-build.
                   initialChildSize: 0.34,
                   minChildSize: _sheetMinSize,
                   maxChildSize: _sheetMaxSize,
-                  snap: true,
                   snapSizes: _sheetSnapSizes,
-                  builder: (context, scrollController) {
-                    final bottomInset = MediaQuery.paddingOf(context).bottom;
-                    return Material(
-                      color: context.ridonsSheet,
-                      elevation: 12,
-                      shadowColor: const Color(0x33000000),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(24),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: SingleChildScrollView(
-                        controller: scrollController,
-                        physics: const ClampingScrollPhysics(),
-                        padding: EdgeInsets.fromLTRB(0, 4, 0, 4 + bottomInset),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Center(
-                              child: Container(
-                                width: 40,
-                                height: 4,
-                                margin: const EdgeInsets.only(bottom: 4),
-                                decoration: BoxDecoration(
-                                  color: context.ridonsLine,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ),
-                            RideFlowPanel(
-                              viewModel: _viewModel,
-                              decorate: false,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                  // Keep initial size stable so didUpdateWidget does not
+                  // replace extent mid-build.
+                  child: RideFlowPanel(
+                    viewModel: _viewModel,
+                    decorate: false,
+                  ),
                 ),
-              ),
-            if (!askingLocation && !searching)
-              _MyLocationButton(
-                sheetFraction: sheetFraction,
-                onPressed: _recenterOnYou,
               ),
             if (searching || success)
               Positioned.fill(child: RideFlowPanel(viewModel: _viewModel)),
@@ -441,6 +407,9 @@ class _PassengerMap extends StatelessWidget {
   const _PassengerMap({
     required this.controller,
     required this.viewModel,
+    required this.sheetFraction,
+    required this.deviceHeadingStream,
+    this.onRecenter,
     this.user,
     this.token,
     this.onMapTap,
@@ -449,6 +418,9 @@ class _PassengerMap extends StatelessWidget {
 
   final MapController controller;
   final HomeMapViewModel viewModel;
+  final double sheetFraction;
+  final Stream<double> deviceHeadingStream;
+  final VoidCallback? onRecenter;
   final SessionUser? user;
   final String? token;
   final VoidCallback? onMapTap;
@@ -473,6 +445,9 @@ class _PassengerMap extends StatelessWidget {
       controller: controller,
       center: viewModel.mapCenter,
       initialZoom: 15.4,
+      bottomControlsOffset: _mapControlBottom(context, sheetFraction),
+      onRecenter: onRecenter,
+      deviceHeadingStream: deviceHeadingStream,
       onMapReady: onMapReady,
       onTap: (point) {
         if (viewModel.stage == RideStage.pickOnMap) {
@@ -522,11 +497,13 @@ class _PassengerMap extends StatelessWidget {
               for (final driver in viewModel.nearbyDrivers)
                 Marker(
                   point: driver.point,
-                  width: driver.id == viewModel.focusedDriverId ? 44 : 32,
-                  height: driver.id == viewModel.focusedDriverId ? 44 : 32,
+                  // Keep a comfortable hit target while keeping the visual
+                  // avatar proportional to the map scale.
+                  width: 44,
+                  height: 44,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => showMapMarkerInfoDialog(
+                    onTap: () => showMapMarkerInfoSheet(
                       context,
                       title: 'Driver',
                       subtitle: driver.id,
@@ -536,8 +513,14 @@ class _PassengerMap extends StatelessWidget {
                         'Heading': '${driver.headingDeg.toStringAsFixed(0)}°',
                       },
                     ),
-                    child: _DriverMapMarker(
-                      assigned: driver.id == viewModel.focusedDriverId,
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: _DriverMapMarker(
+                          assigned: driver.id == viewModel.focusedDriverId,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -546,7 +529,7 @@ class _PassengerMap extends StatelessWidget {
                 you,
                 user: user,
                 token: token,
-                onTap: () => showMapMarkerInfoDialog(
+                onTap: () => showMapMarkerInfoSheet(
                   context,
                   title: 'Your location',
                   details: {
@@ -594,33 +577,39 @@ class _PassengerMap extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Color(0x66000000),
-                blurRadius: 6,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Container(
-            decoration: BoxDecoration(
+        child: Center(
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x66000000),
+                  blurRadius: 5,
+                  offset: Offset(0, 1),
+                ),
+              ],
             ),
-            child: ClipOval(
-              child: user != null && user.hasChosenAvatar
-                  ? PassengerAvatar(user: user, radius: 19, token: token)
-                  : const ColoredBox(
-                      color: Color(0xFF4285F4),
-                      child: Icon(
-                        Icons.person_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    ),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: ClipOval(
+                  child: user != null && user.hasChosenAvatar
+                      ? PassengerAvatar(user: user, radius: 9, token: token)
+                      : const ColoredBox(
+                          color: Color(0xFF4285F4),
+                          child: Icon(
+                            Icons.person_rounded,
+                            color: Colors.white,
+                            size: 12,
+                          ),
+                        ),
+                ),
+              ),
             ),
           ),
         ),
@@ -652,50 +641,23 @@ class _DriverMapMarker extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(
           color: assigned ? RidonsColors.accent : Colors.white,
-          width: assigned ? 3 : 2,
+          width: assigned ? 1.5 : 1,
         ),
         boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 4)],
       ),
       child: Icon(
         Icons.two_wheeler,
         color: Colors.white,
-        size: assigned ? 23 : 16,
+        size: assigned ? 12 : 10,
       ),
     );
   }
 }
 
-class _MyLocationButton extends StatelessWidget {
-  const _MyLocationButton({
-    required this.sheetFraction,
-    required this.onPressed,
-  });
-
-  final double sheetFraction;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final media = MediaQuery.of(context);
-    final height = media.size.height;
-    final topSafe = media.padding.top + 80;
-    final raw = height * sheetFraction + 12;
-    final bottom = raw.clamp(16.0, (height - topSafe - 56).clamp(16.0, height));
-    return Positioned(
-      right: 16,
-      bottom: bottom,
-      child: Material(
-        elevation: 4,
-        color: scheme.surface,
-        shadowColor: const Color(0x33000000),
-        shape: const CircleBorder(),
-        child: IconButton(
-          tooltip: 'My location',
-          onPressed: onPressed,
-          icon: Icon(Icons.my_location_rounded, color: scheme.primary),
-        ),
-      ),
-    );
-  }
+double _mapControlBottom(BuildContext context, double sheetFraction) {
+  final media = MediaQuery.of(context);
+  final height = media.size.height;
+  final topSafe = media.padding.top + 80;
+  final raw = height * sheetFraction + 12;
+  return raw.clamp(16.0, (height - topSafe - 56).clamp(16.0, height));
 }

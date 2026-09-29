@@ -72,15 +72,7 @@ class SignUpView extends StatelessWidget {
                     height: 20,
                   ),
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Google sign-in is coming soon.',
-                          style: TextStyle(color: context.ridonsInk),
-                        ),
-                        backgroundColor: context.ridonsFill,
-                      ),
-                    );
+                    RidonsNotice.info(context, 'Google sign-in is coming soon.');
                   },
                 ),
                 const SizedBox(height: 22),

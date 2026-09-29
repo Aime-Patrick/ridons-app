@@ -452,7 +452,11 @@ class _SearchSheetState extends State<_SearchSheet> {
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                       itemCount: viewModel.suggestions.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      separatorBuilder: (_, _) => Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: context.ridonsLine,
+                      ),
                       itemBuilder: (context, index) {
                         final place = viewModel.suggestions[index];
                         return RidonsLocationTile(
@@ -686,7 +690,7 @@ class _CounterOffersPanel extends StatelessWidget {
     final offers = viewModel.counterOffers;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: context.ridonsFill,
+        color: context.ridonsSheet,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: RidonsColors.primary.withValues(alpha: 0.35)),
       ),
@@ -811,7 +815,7 @@ class _CounterOfferTileState extends State<_CounterOfferTile> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: context.ridonsFill,
+              backgroundColor: RidonsColors.primaryLight,
               backgroundImage: resolvedAvatarUrl == null
                   ? null
                   : CachedNetworkImageProvider(resolvedAvatarUrl),
@@ -967,35 +971,33 @@ class _MatchedSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final driver = viewModel.matchedDriver;
-    return RidonsBottomSheet(
-      showHandle: false,
+    return RidonsTripSheet(
+      title: viewModel.rideStatusLabel,
       decorate: decorate,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-      child: Column(
+      trailing: Row(
         mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            viewModel.etaLabel,
+            style: const TextStyle(
+              color: RidonsColors.primary,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(
+            viewModel.liveRideStatus == 'matched'
+                ? Icons.lock_outline
+                : Icons.route_rounded,
+            size: 18,
+            color: context.ridonsInk,
+          ),
+        ],
+      ),
+      body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  viewModel.rideStatusLabel,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-              ),
-              Text(
-                viewModel.etaLabel,
-                style: const TextStyle(
-                  color: RidonsColors.primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(Icons.lock_outline, size: 18, color: context.ridonsInk),
-            ],
-          ),
-          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1071,15 +1073,13 @@ class _MatchedSheet extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          RidonsButton(
-            label: viewModel.liveRideStatus == 'completed'
-                ? 'Continue to payment'
-                : viewModel.rideStatusLabel,
-            onPressed: viewModel.liveRideStatus == 'completed'
-                ? viewModel.goToPayment
-                : null,
-          ),
+          if (viewModel.liveRideStatus == 'completed') ...[
+            const SizedBox(height: 10),
+            RidonsButton(
+              label: 'Continue to payment',
+              onPressed: viewModel.goToPayment,
+            ),
+          ],
         ],
       ),
     );
@@ -1302,9 +1302,7 @@ class _TripReceiptCard extends StatelessWidget {
                       ClipboardData(text: viewModel.receiptSummary),
                     );
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Record copied.')),
-                    );
+                    RidonsNotice.success(context, 'Record copied.');
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: ink,
@@ -1325,11 +1323,7 @@ class _TripReceiptCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('PDF download is coming soon.'),
-                      ),
-                    );
+                    RidonsNotice.info(context, 'PDF download is coming soon.');
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: ink,
@@ -1715,12 +1709,10 @@ Future<void> _openNeedHelpDialog(
                     : () async {
                         final subj = subject.text.trim();
                         if (subj.length < 3) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Please enter a short subject (3+ characters).',
-                              ),
-                            ),
+                          RidonsNotice.show(
+                            context,
+                            'Please enter a short subject (3+ characters).',
+                            tone: RidonsNoticeTone.warning,
                           );
                           return;
                         }
@@ -1735,12 +1727,9 @@ Future<void> _openNeedHelpDialog(
                         if (!dialogContext.mounted) return;
                         if (id == null) {
                           setState(() => submitting = false);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Could not reach support. Try again shortly.',
-                              ),
-                            ),
+                          RidonsNotice.error(
+                            context,
+                            'Could not reach support. Try again shortly.',
                           );
                           return;
                         }
@@ -1765,10 +1754,9 @@ Future<void> _openNeedHelpDialog(
   body.dispose();
 
   if (sent == true && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Support ticket sent. Our team will follow up.'),
-      ),
+    RidonsNotice.success(
+      context,
+      'Support ticket sent. Our team will follow up.',
     );
   }
 }
@@ -1781,9 +1769,7 @@ Future<void> _callDriver(BuildContext context, String phone) async {
     mode: LaunchMode.externalApplication,
   );
   if (!launched && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Calling is not available on this device.')),
-    );
+    RidonsNotice.error(context, 'Calling is not available on this device.');
   }
 }
 
@@ -1794,8 +1780,9 @@ Future<void> _shareTrip(
   final link = await viewModel.createTripShareLink();
   if (!context.mounted) return;
   if (link == null || link.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(viewModel.shareError ?? 'Could not share this trip.')),
+    RidonsNotice.error(
+      context,
+      viewModel.shareError ?? 'Could not share this trip.',
     );
     return;
   }
@@ -1814,8 +1801,6 @@ Future<void> _shareTrip(
     mode: LaunchMode.externalApplication,
   );
   if (!openedFallback && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('WhatsApp is not available on this device.')),
-    );
+    RidonsNotice.error(context, 'WhatsApp is not available on this device.');
   }
 }

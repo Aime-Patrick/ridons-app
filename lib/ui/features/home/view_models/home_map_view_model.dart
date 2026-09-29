@@ -184,7 +184,7 @@ class HomeMapViewModel extends ChangeNotifier {
       case 'en_route':
         return 'Driver on the way';
       case 'arrived':
-        return 'Driver is at pickup';
+        return 'Driver has arrived';
       case 'in_progress':
         return 'Trip in progress';
       case 'completed':

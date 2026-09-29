@@ -354,15 +354,21 @@ class TripApi {
   }
 
   Future<List<ReceivedRating>> receivedRatings() async {
-    final response = await _api.dio.get<Map<String, dynamic>>(
-      '/driver/ratings',
-    );
-    final raw = response.data?['ratings'];
-    if (raw is! List) return const [];
-    return raw
-        .whereType<Map>()
-        .map((item) => ReceivedRating.fromJson(Map<String, dynamic>.from(item)))
-        .toList(growable: false);
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/driver/ratings',
+      );
+      final raw = response.data?['ratings'];
+      if (raw is! List) return const [];
+      return raw
+          .whereType<Map>()
+          .map((item) => ReceivedRating.fromJson(Map<String, dynamic>.from(item)))
+          .toList(growable: false);
+    } on DioException {
+      // Ratings are supplementary. A ratings service/database failure must
+      // not hide the driver's earnings cards.
+      return const [];
+    }
   }
 
   Future<List<TripHistoryItem>> myTrips({String period = 'all'}) async {

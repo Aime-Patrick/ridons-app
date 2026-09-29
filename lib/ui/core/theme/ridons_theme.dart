@@ -139,7 +139,9 @@ abstract final class RidonsTheme {
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: scheme.surface,
-        selectedItemColor: seed,
+        // Navigation selection uses the Ridons brand red in both themes and
+        // for both roles. Role colors still control the rest of the theme.
+        selectedItemColor: RidonsColors.primary,
         unselectedItemColor:
             isDark ? RidonsColors.darkMuted : RidonsColors.textSecondary,
         type: BottomNavigationBarType.fixed,

@@ -86,8 +86,9 @@ class _ProfileSettingsViewState extends ConsumerState<ProfileSettingsView> {
     );
     if (!mounted) return;
     if (session == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(vm.errorMessage ?? 'Could not save profile.')),
+      RidonsNotice.error(
+        context,
+        vm.errorMessage ?? 'Could not save profile.',
       );
       return;
     }
@@ -557,9 +558,7 @@ class _SafetyToolkitViewState extends ConsumerState<SafetyToolkitView> {
                   'I am on a Ridons trip. Track me if I do not arrive.';
               await Clipboard.setData(const ClipboardData(text: text));
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Trip share text copied.')),
-              );
+              RidonsNotice.success(context, 'Trip share text copied.');
             },
           ),
           const SizedBox(height: 22),

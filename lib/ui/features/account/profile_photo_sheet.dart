@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../domain/models/app_role.dart';
 import '../../../domain/models/session_user.dart';
 import '../../core/providers/session_providers.dart';
+import '../../core/widgets/widgets.dart';
 import 'passenger_avatar.dart';
 
 Future<void> showProfilePhotoSheet(BuildContext context, WidgetRef ref) {
@@ -89,7 +90,7 @@ Future<void> _upload(BuildContext context, WidgetRef ref) async {
   if (session == null) {
     final message =
         ref.read(authViewModelProvider).errorMessage ?? 'Could not upload.';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    RidonsNotice.error(context, message);
     return;
   }
   await ref.read(authSessionProvider.notifier).setSession(session);
@@ -137,9 +138,7 @@ Future<void> _pickAvatar(BuildContext context, WidgetRef ref) {
                                   .read(authViewModelProvider)
                                   .errorMessage ??
                               'Could not save avatar.';
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(message)),
-                          );
+                          RidonsNotice.error(context, message);
                           return;
                         }
                         await ref

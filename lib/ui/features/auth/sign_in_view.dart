@@ -80,15 +80,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
   }
 
   void _googleSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Google sign-in is coming soon.',
-          style: TextStyle(color: context.ridonsInk),
-        ),
-        backgroundColor: context.ridonsFill,
-      ),
-    );
+    RidonsNotice.info(context, 'Google sign-in is coming soon.');
   }
 
   TextStyle _bodyStyle({

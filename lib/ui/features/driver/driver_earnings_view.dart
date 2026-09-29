@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 
+import '../../../data/config/api_errors.dart';
 import '../../core/providers/session_providers.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../../domain/models/ride_offer.dart';
@@ -36,9 +38,13 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
     }
     try {
       final api = ref.read(tripApiProvider);
-      final today = await api.earnings(period: 'today');
-      final week = await api.earnings(period: 'week');
-      final ratings = await api.receivedRatings();
+      final today = await _withFreshDriverSession(
+        () => api.earnings(period: 'today'),
+      );
+      final week = await _withFreshDriverSession(
+        () => api.earnings(period: 'week'),
+      );
+      final ratings = await _withFreshDriverSession(api.receivedRatings);
       if (!mounted) return;
       setState(() {
         _today = today;
@@ -47,13 +53,48 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
         _error = null;
         _loading = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not load earnings. Pull down to retry.';
+        _error = _errorLabel(error);
         _loading = false;
       });
     }
+  }
+
+  Future<T> _withFreshDriverSession<T>(Future<T> Function() request) async {
+    try {
+      return await request();
+    } on DioException catch (error) {
+      final responseError = error.response?.data;
+      final code = responseError is Map
+          ? '${responseError['error'] ?? ''}'
+          : '';
+      final needsFreshClaims =
+          error.response?.statusCode == 403 &&
+          code == 'driver_verification_required';
+      if (!needsFreshClaims) rethrow;
+
+      final session = await ref.read(authRepositoryProvider).refreshSession();
+      if (session == null) rethrow;
+      await ref.read(authSessionProvider.notifier).setSession(session);
+      return request();
+    }
+  }
+
+  String _errorLabel(Object error) {
+    if (error is DioException) {
+      final status = error.response?.statusCode;
+      if (status == 401) return 'Your session expired. Please log in again.';
+      if (status == 403) {
+        return 'Your driver verification is not approved for this session.';
+      }
+      return apiErrorMessage(
+        error,
+        fallback: 'Could not load earnings. Pull down to retry.',
+      );
+    }
+    return 'Could not load earnings. Pull down to retry.';
   }
 
   static final _money = NumberFormat('#,###');
@@ -61,7 +102,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: RidonsColors.background,
+      color: context.ridonsPage,
       child: SafeArea(
         bottom: false,
         child: _loading
@@ -73,10 +114,10 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                   children: [
-                    const Text(
+                    Text(
                       'Earnings',
                       style: TextStyle(
-                        color: RidonsColors.navy,
+                        color: context.ridonsInk,
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
                       ),
@@ -85,7 +126,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
                       const SizedBox(height: 16),
                       Text(
                         _error!,
-                        style: const TextStyle(color: RidonsColors.primary),
+                        style: TextStyle(color: RidonsColors.primary),
                       ),
                       const SizedBox(height: 8),
                       OutlinedButton(
@@ -94,23 +135,23 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
                       ),
                     ] else ...[
                       const SizedBox(height: 16),
-                      _tile('Today', _today),
+                      _tile(context, 'Today', _today),
                       const SizedBox(height: 10),
-                      _tile('This week', _week),
+                      _tile(context, 'This week', _week),
                       const SizedBox(height: 20),
-                      const Text(
+                      Text(
                         'Recent ratings',
                         style: TextStyle(
-                          color: RidonsColors.navy,
+                          color: context.ridonsInk,
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       const SizedBox(height: 10),
                       if (_ratings.isEmpty)
-                        _emptyRatings()
+                        _emptyRatings(context)
                       else
-                        ..._ratings.map(_ratingTile),
+                        ..._ratings.map((item) => _ratingTile(context, item)),
                     ],
                   ],
                 ),
@@ -119,13 +160,13 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
     );
   }
 
-  Widget _tile(String label, DriverStats stats) {
+  Widget _tile(BuildContext context, String label, DriverStats stats) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.transparent,
+        color: context.ridonsSheet,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: RidonsColors.border),
+        border: Border.all(color: context.ridonsLine),
       ),
       child: Row(
         children: [
@@ -133,11 +174,11 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: RidonsColors.textSecondary)),
+                Text(label, style: TextStyle(color: context.ridonsMuted)),
                 Text(
                   '${_money.format(stats.total)} RWF',
-                  style: const TextStyle(
-                    color: RidonsColors.navy,
+                  style: TextStyle(
+                    color: context.ridonsInk,
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                   ),
@@ -154,20 +195,21 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
     );
   }
 
-  Widget _emptyRatings() {
-    return const Text(
+  Widget _emptyRatings(BuildContext context) {
+    return Text(
       'No ratings received yet.',
-      style: TextStyle(color: RidonsColors.textSecondary),
+      style: TextStyle(color: context.ridonsMuted),
     );
   }
 
-  Widget _ratingTile(ReceivedRating item) {
+  Widget _ratingTile(BuildContext context, ReceivedRating item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: RidonsColors.border),
+        color: context.ridonsSheet,
+        border: Border.all(color: context.ridonsLine),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,13 +230,13 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
                   item.comment.trim().isEmpty
                       ? 'No comment'
                       : item.comment.trim(),
-                  style: const TextStyle(color: RidonsColors.navy),
+                style: TextStyle(color: context.ridonsInk),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${DateFormat('MMM d, yyyy').format(item.createdAt)} · ${item.rideId}',
-                  style: const TextStyle(
-                    color: RidonsColors.textSecondary,
+                  style: TextStyle(
+                    color: context.ridonsMuted,
                     fontSize: 12,
                   ),
                 ),

@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/ride_offer.dart';
+import '../../../data/services/compass_service.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/ridons_button.dart';
-import '../../core/widgets/ridons_bottom_sheet.dart';
 import '../../core/widgets/ridons_map_view.dart';
 import '../../core/widgets/map_marker_info_sheet.dart';
+import '../../core/widgets/ridons_route_endpoints.dart';
+import '../../core/widgets/ridons_trip_sheet.dart';
 import 'view_models/driver_home_view_model.dart';
 
 class DriverTripView extends StatelessWidget {
@@ -49,8 +50,7 @@ class DriverTripView extends StatelessWidget {
             ),
           ),
         ),
-        Align(
-          alignment: Alignment.bottomCenter,
+        Positioned.fill(
           child: _TripSheet(viewModel: viewModel, ride: ride),
         ),
       ],
@@ -69,37 +69,13 @@ class _TripMap extends StatefulWidget {
 }
 
 class _TripMapState extends State<_TripMap> {
-  final MapController _controller = MapController();
-  LatLng? _lastFollowPoint;
-
-  @override
-  void didUpdateWidget(covariant _TripMap oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _followDriverIfNeeded();
-  }
-
-  void _followDriverIfNeeded() {
-    if (!widget.viewModel.inAppNavigation) return;
-    final point = widget.viewModel.driverPoint;
-    if (point == null ||
-        (_lastFollowPoint != null &&
-            _lastFollowPoint!.latitude == point.latitude &&
-            _lastFollowPoint!.longitude == point.longitude)) {
-      return;
-    }
-    _lastFollowPoint = point;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.viewModel.inAppNavigation) {
-        _controller.move(point, 16.2);
-      }
-    });
-  }
+  final MapController controller = MapController();
+  final CompassService compassService = CompassService();
 
   @override
   Widget build(BuildContext context) {
     final viewModel = widget.viewModel;
     final ride = widget.ride;
-    _followDriverIfNeeded();
     final you = viewModel.driverPoint ?? ride.from;
     final dest = viewModel.stage == DriverStage.driving
         ? ride.to
@@ -108,9 +84,10 @@ class _TripMapState extends State<_TripMap> {
         ? viewModel.routePoints
         : [you, dest];
     return RidonsMapView(
-      controller: _controller,
+      controller: controller,
       center: you,
       initialZoom: 15.4,
+      deviceHeadingStream: compassService.headingStream,
       layers: [
         PolylineLayer(
           polylines: [
@@ -131,7 +108,7 @@ class _TripMapState extends State<_TripMap> {
               height: 44,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => showMapMarkerInfoDialog(
+                onTap: () => showMapMarkerInfoSheet(
                   context,
                   title: 'Driver',
                   subtitle: viewModel.user.displayName,
@@ -142,9 +119,19 @@ class _TripMapState extends State<_TripMap> {
                     'Ride': ride.rideId,
                   },
                 ),
-                child: const CircleAvatar(
-                  backgroundColor: RidonsColors.navy,
-                  child: Icon(Icons.two_wheeler, color: Colors.white),
+                child: const Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircleAvatar(
+                      backgroundColor: RidonsColors.navy,
+                      child: Icon(
+                        Icons.two_wheeler,
+                        color: Colors.white,
+                        size: 12,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -154,7 +141,7 @@ class _TripMapState extends State<_TripMap> {
               height: 44,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => showMapMarkerInfoDialog(
+                onTap: () => showMapMarkerInfoSheet(
                   context,
                   title: 'Passenger',
                   subtitle: ride.passengerName,
@@ -169,14 +156,23 @@ class _TripMapState extends State<_TripMap> {
                     'Ride': ride.rideId,
                   },
                 ),
-                child: CircleAvatar(
-                  backgroundColor: RidonsColors.primaryLight,
-                  foregroundColor: RidonsColors.primaryDark,
-                  child: Text(
-                    ride.passengerName.isEmpty
-                        ? 'P'
-                        : ride.passengerName[0].toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircleAvatar(
+                      backgroundColor: RidonsColors.primaryLight,
+                      foregroundColor: RidonsColors.primaryDark,
+                      child: Text(
+                        ride.passengerName.isEmpty
+                            ? 'P'
+                            : ride.passengerName[0].toUpperCase(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -198,127 +194,121 @@ class _TripSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final driving = viewModel.stage == DriverStage.driving;
     final arrived = viewModel.stage == DriverStage.arrived;
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.only(bottom: 8),
-      child: RidonsBottomSheet(
-        showHandle: false,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.52,
-          ),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.zero,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        driving
-                            ? 'Drive to destination'
-                            : arrived
-                            ? 'Passenger reached'
-                            : 'Heading to passenger',
-                        style: TextStyle(
-                          color: context.ridonsInk,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+    return RidonsTripSheetHost(
+      initialChildSize: 0.44,
+      minChildSize: 0.1,
+      maxChildSize: 0.82,
+      snapSizes: RidonsTripSheetHost.defaultSnapSizes,
+      child: RidonsTripSheet(
+        title: driving
+            ? 'Drive to destination'
+            : arrived
+          ? 'Passenger reached'
+          : 'Heading to passenger',
+        trailing: Icon(
+          driving || arrived
+              ? Icons.route_rounded
+              : Icons.lock_rounded,
+          size: 18,
+          color: RidonsColors.primary,
+        ),
+        decorate: false,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _PassengerCard(ride: ride),
+            if (driving) ...[
+              const SizedBox(height: 12),
+              RidonsButton(
+                label: 'Complete trip',
+                isLoading: viewModel.busy,
+                onPressed: viewModel.startTrip,
+              ),
+              const SizedBox(height: 10),
+              RidonsButton(
+                label: 'Trip was canceled',
+                variant: RidonsButtonVariant.secondary,
+                onPressed: viewModel.cancelTrip,
+              ),
+            ] else ...[
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _MetaCol(
+                      label: 'Agreed fare',
+                      value: '${ride.fare} Rwf',
                     ),
-                    Icon(
-                      driving || arrived
-                          ? Icons.navigation_rounded
-                          : Icons.lock_rounded,
-                      size: 18,
-                      color: RidonsColors.primary,
+                  ),
+                  Expanded(
+                    child: _MetaCol(
+                      label: 'Payment method',
+                      value: _payLabel(ride.paymentMethod),
+                      alignEnd: true,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _PassengerCard(ride: ride),
-                if (driving) ...[
-                  const SizedBox(height: 12),
-                  RidonsButton(
-                    label: 'Complete trip',
-                    isLoading: viewModel.busy,
-                    onPressed: viewModel.startTrip,
-                  ),
-                  const SizedBox(height: 10),
-                  RidonsButton(
-                    label: 'Trip was canceled',
-                    variant: RidonsButtonVariant.secondary,
-                    onPressed: viewModel.cancelTrip,
-                  ),
-                ] else ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _MetaCol(
-                          label: 'Agreed fare',
-                          value: '${ride.fare} Rwf',
-                        ),
-                      ),
-                      Expanded(
-                        child: _MetaCol(
-                          label: 'Payment method',
-                          value: _payLabel(ride.paymentMethod),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  RidonsButton(
-                    label: arrived
-                        ? 'Start ride'
-                        : viewModel.inAppNavigation
-                        ? 'Following route to passenger'
-                        : 'Navigate to passenger',
-                    isLoading: viewModel.busy,
-                    onPressed: arrived
-                        ? viewModel.startTrip
-                        : viewModel.navigateToPickup,
-                  ),
-                  const SizedBox(height: 10),
-                  RidonsButton(
-                    label: 'Trip was canceled',
-                    variant: RidonsButtonVariant.secondary,
-                    onPressed: viewModel.cancelTrip,
                   ),
                 ],
-              ],
-            ),
-          ),
+              ),
+              const SizedBox(height: 12),
+              if (arrived)
+                RidonsButton(
+                  label: 'Start ride',
+                  isLoading: viewModel.busy,
+                  onPressed: viewModel.startTrip,
+                ),
+              const SizedBox(height: 10),
+              RidonsButton(
+                label: 'Trip was canceled',
+                variant: RidonsButtonVariant.secondary,
+                onPressed: viewModel.cancelTrip,
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 
   static String _payLabel(String raw) {
-    final value = raw.toLowerCase();
-    if (value.contains('momo') || value.contains('cash')) return 'Cash or MoMo';
-    return 'Cash or MoMo';
+    final value = raw.trim().toLowerCase().replaceAll('_', ' ');
+    if (value.isEmpty) return 'Not specified';
+    if (value.contains('momo') || value.contains('mobile money')) {
+      if (value.contains('cash')) return 'Cash or MoMo';
+      return 'Mobile Money';
+    }
+    if (value.contains('cash')) return 'Cash';
+    return raw.trim();
   }
 }
 
 class _MetaCol extends StatelessWidget {
-  const _MetaCol({required this.label, required this.value});
+  const _MetaCol({
+    required this.label,
+    required this.value,
+    this.alignEnd = false,
+  });
 
   final String label;
   final String value;
+  final bool alignEnd;
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: context.ridonsMuted, fontSize: 12)),
+        Text(
+          label,
+          textAlign: alignEnd ? TextAlign.right : TextAlign.left,
+          style: TextStyle(color: context.ridonsMuted, fontSize: 12),
+        ),
         Text(
           value,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: alignEnd ? TextAlign.right : TextAlign.left,
           style: TextStyle(
             color: context.ridonsInk,
             fontWeight: FontWeight.w800,
@@ -385,7 +375,9 @@ class _PassengerCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Align(
+          Offstage(
+            offstage: true,
+            child: Align(
             alignment: Alignment.centerLeft,
             child: Text.rich(
               TextSpan(
@@ -413,6 +405,13 @@ class _PassengerCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+          ),
+          ),
+          RidonsRouteEndpoints(
+            pickup: ride.fromName.isEmpty ? 'Pickup' : ride.fromName,
+            destination: ride.toName.isEmpty ? 'Dropoff' : ride.toName,
+            pickupColor: RidonsColors.primary,
+            destinationColor: context.ridonsInk,
           ),
           const SizedBox(height: 10),
           Row(

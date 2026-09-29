@@ -9,6 +9,7 @@ import '../../../domain/models/session_user.dart';
 import '../../core/providers/session_providers.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/ridons_colors.dart';
+import '../../core/widgets/widgets.dart';
 import 'account_settings_views.dart';
 import 'view_models/driver_documents_view_model.dart';
 
@@ -147,11 +148,12 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
   }
 
   void _showUploadMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
+    final success = message.endsWith('uploaded for review.');
+    if (success) {
+      RidonsNotice.success(context, message);
+    } else {
+      RidonsNotice.error(context, message);
+    }
   }
 
   @override

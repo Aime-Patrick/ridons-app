@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../data/services/routing_service.dart';
+import '../../../domain/models/geo_place.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/ridons_tile_layer.dart';
+import '../../core/widgets/ridons_route_endpoints.dart';
 import '../../core/providers/session_providers.dart';
 import '../../../data/services/places_service.dart';
 
@@ -74,14 +77,21 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
       final items = await ref.read(tripApiProvider).myTrips(period: period);
       final trips = <ActivityTrip>[];
       for (final item in items) {
-        var pickup = 'Pickup';
-        var dropoff = 'Dropoff';
+        var pickup = _coordinateLabel(item.from);
+        var dropoff = _coordinateLabel(item.to);
         try {
-          pickup =
-              (await _places.reverse(item.from.latitude, item.from.longitude))
-                  .name;
-          dropoff =
-              (await _places.reverse(item.to.latitude, item.to.longitude)).name;
+          final pickupPlace = await _places.reverse(
+            item.from.latitude,
+            item.from.longitude,
+          );
+          final dropoffPlace = await _places.reverse(
+            item.to.latitude,
+            item.to.longitude,
+          );
+          if (pickupPlace.name.trim().isNotEmpty) pickup = pickupPlace.name;
+          if (dropoffPlace.name.trim().isNotEmpty) {
+            dropoff = dropoffPlace.name;
+          }
         } catch (_) {}
         trips.add(
           ActivityTrip(
@@ -113,6 +123,11 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
   }
 
   List<ActivityTrip> get _visible => _trips;
+
+  static String _coordinateLabel(LatLng point) {
+    return '${point.latitude.toStringAsFixed(5)}, '
+        '${point.longitude.toStringAsFixed(5)}';
+  }
 
   Future<void> _openFilter() async {
     final selected = await showModalBottomSheet<_ActivityFilter>(
@@ -343,7 +358,9 @@ class _ActivityTripCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text.rich(
+                Offstage(
+                  offstage: true,
+                  child: Text.rich(
                   TextSpan(
                     children: [
                       TextSpan(
@@ -372,6 +389,13 @@ class _ActivityTripCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  ),
+                ),
+                RidonsRouteEndpoints(
+                  pickup: trip.pickup,
+                  destination: trip.dropoff,
+                  pickupColor: context.ridonsInk,
+                  destinationColor: context.ridonsInk,
                 ),
                 const SizedBox(height: 6),
                 Text.rich(
@@ -436,7 +460,7 @@ class _ActivityTripCard extends StatelessWidget {
   }
 }
 
-class _TripMapSnapshot extends StatelessWidget {
+class _TripMapSnapshot extends StatefulWidget {
   const _TripMapSnapshot({
     required this.pickup,
     required this.dropoff,
@@ -446,66 +470,132 @@ class _TripMapSnapshot extends StatelessWidget {
   final LatLng dropoff;
 
   @override
-  Widget build(BuildContext context) {
-    final mid = LatLng(
-      (pickup.latitude + dropoff.latitude) / 2 + 0.003,
-      (pickup.longitude + dropoff.longitude) / 2,
-    );
-    final route = [pickup, mid, dropoff];
-    return IgnorePointer(
-      child: FlutterMap(
-        options: MapOptions(
-          initialCenter: mid,
-          initialZoom: 12.4,
-          interactionOptions: const InteractionOptions(
-            flags: InteractiveFlag.none,
-          ),
-        ),
-        children: [
-          const RidonsTileLayer(),
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: route,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFFFBBF24)
-                    : RidonsColors.primaryDark,
-                strokeWidth: 4,
-              ),
-            ],
-          ),
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: pickup,
-                width: 18,
-                height: 18,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : RidonsColors.navy,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                ),
-              ),
-              Marker(
-                point: dropoff,
-                width: 18,
-                height: 18,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: RidonsColors.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+  State<_TripMapSnapshot> createState() => _TripMapSnapshotState();
+}
+
+class _TripMapSnapshotState extends State<_TripMapSnapshot> {
+  final MapController _controller = MapController();
+  late final Future<List<LatLng>> _routeFuture;
+  var _didFitRoute = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _routeFuture = _loadRoute();
+  }
+
+  Future<List<LatLng>> _loadRoute() async {
+    final result = await RoutingService().route(
+      GeoPlace(
+        name: 'Pickup',
+        latitude: widget.pickup.latitude,
+        longitude: widget.pickup.longitude,
       ),
+      GeoPlace(
+        name: 'Dropoff',
+        latitude: widget.dropoff.latitude,
+        longitude: widget.dropoff.longitude,
+      ),
+      alternatives: false,
+    );
+    // Do not draw a fake straight line when the road router is unavailable.
+    if (!result.method.startsWith('osrm_') || result.points.length < 2) {
+      return const [];
+    }
+    return result.points;
+  }
+
+  LatLng _fallbackCenter() {
+    return LatLng(
+      (widget.pickup.latitude + widget.dropoff.latitude) / 2,
+      (widget.pickup.longitude + widget.dropoff.longitude) / 2,
+    );
+  }
+
+  void _fitRoute(List<LatLng> route) {
+    if (_didFitRoute || route.length < 2) return;
+    _didFitRoute = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        _controller.fitCamera(
+          CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(route),
+            padding: const EdgeInsets.all(24),
+          ),
+        );
+      } catch (_) {}
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<LatLng>>(
+      future: _routeFuture,
+      builder: (context, snapshot) {
+        final route = snapshot.data ?? const <LatLng>[];
+        _fitRoute(route);
+        final center = route.length >= 2
+            ? (RoutingService.midpointAlong(route) ?? _fallbackCenter())
+            : _fallbackCenter();
+        return IgnorePointer(
+          child: FlutterMap(
+            mapController: _controller,
+            options: MapOptions(
+              initialCenter: center,
+              initialZoom: 13.2,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.none,
+              ),
+            ),
+            children: [
+              const RidonsTileLayer(),
+              if (route.length >= 2)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: route,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFFFBBF24)
+                          : RidonsColors.primaryDark,
+                      strokeWidth: 4,
+                    ),
+                  ],
+                ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: widget.pickup,
+                    width: 18,
+                    height: 18,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : RidonsColors.navy,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+                  Marker(
+                    point: widget.dropoff,
+                    width: 18,
+                    height: 18,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: RidonsColors.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

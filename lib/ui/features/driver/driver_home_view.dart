@@ -70,9 +70,9 @@ class DriverHomeViewState extends ConsumerState<DriverHomeView> {
     final vm = _vm;
     final session = ref.watch(authSessionProvider).asData?.value;
     if (vm == null || session == null) {
-      return const ColoredBox(
-        color: RidonsColors.background,
-        child: Center(child: CircularProgressIndicator()),
+      return ColoredBox(
+        color: context.ridonsPage,
+        child: const Center(child: CircularProgressIndicator()),
       );
     }
     if (vm.onTrip) {
@@ -94,7 +94,7 @@ class _DriverIdleHome extends ConsumerWidget {
     final notificationCenter = ref.watch(notificationCenterProvider);
     final stats = viewModel.stats;
     return ColoredBox(
-      color: RidonsColors.background,
+      color: context.ridonsPage,
       child: SafeArea(
         bottom: false,
         child: RefreshIndicator(
@@ -114,16 +114,16 @@ class _DriverIdleHome extends ConsumerWidget {
                       children: [
                         Text(
                           user.displayName,
-                          style: const TextStyle(
-                            color: RidonsColors.navy,
+                          style: TextStyle(
+                            color: context.ridonsInk,
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         Text(
                           'Driver ID · ${user.driverIdLabel}',
-                          style: const TextStyle(
-                            color: RidonsColors.textSecondary,
+                          style: TextStyle(
+                            color: context.ridonsMuted,
                             fontSize: 13,
                           ),
                         ),
@@ -188,10 +188,10 @@ class _DriverIdleHome extends ConsumerWidget {
               ],
               if (viewModel.quests.isNotEmpty) ...[
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   'Quests',
                   style: TextStyle(
-                    color: RidonsColors.navy,
+                    color: context.ridonsInk,
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                   ),
@@ -206,25 +206,25 @@ class _DriverIdleHome extends ConsumerWidget {
                 const SizedBox(height: 10),
                 Text(
                   viewModel.errorMessage!,
-                  style: const TextStyle(color: RidonsColors.primary),
+                  style: TextStyle(color: RidonsColors.primary),
                 ),
               ],
               const SizedBox(height: 22),
-              const Text(
+              Text(
                 'Available offers',
                 style: TextStyle(
-                  color: RidonsColors.navy,
+                  color: context.ridonsInk,
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 12),
               if (!viewModel.online)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
                   child: Text(
                     'Go online to receive passenger offers.',
-                    style: TextStyle(color: RidonsColors.textSecondary),
+                    style: TextStyle(color: context.ridonsMuted),
                   ),
                 )
               else if (viewModel.offers.isEmpty)
@@ -232,9 +232,9 @@ class _DriverIdleHome extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Column(
                     children: [
-                      const Text(
+                      Text(
                         'No offers nearby yet.',
-                        style: TextStyle(color: RidonsColors.textSecondary),
+                        style: TextStyle(color: context.ridonsMuted),
                       ),
                       const SizedBox(height: 6),
                       Text(
@@ -242,8 +242,8 @@ class _DriverIdleHome extends ConsumerWidget {
                             ? 'Gold and Platinum riders see new offers first.'
                             : 'Keep rating high to see offers before nearby riders.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: RidonsColors.textSecondary,
+                        style: TextStyle(
+                          color: context.ridonsMuted,
                           fontSize: 13,
                         ),
                       ),
@@ -617,10 +617,10 @@ class _QuestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: RidonsColors.surface,
+      color: context.ridonsSheet,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: RidonsColors.border),
+        side: BorderSide(color: context.ridonsLine),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -642,8 +642,8 @@ class _QuestCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     quest.title,
-                    style: const TextStyle(
-                      color: RidonsColors.navy,
+                    style: TextStyle(
+                      color: context.ridonsInk,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -666,7 +666,7 @@ class _QuestCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: quest.fraction,
                 minHeight: 6,
-                backgroundColor: RidonsColors.inputFill,
+                backgroundColor: context.ridonsFill,
                 color: quest.completed
                     ? RidonsColors.success
                     : RidonsColors.primary,
@@ -677,8 +677,8 @@ class _QuestCard extends StatelessWidget {
               quest.completed
                   ? '${quest.current} / ${quest.total} · Completed'
                   : '${quest.current} / ${quest.total}',
-              style: const TextStyle(
-                color: RidonsColors.textSecondary,
+              style: TextStyle(
+                color: context.ridonsMuted,
                 fontSize: 12,
               ),
             ),
@@ -728,10 +728,10 @@ class _OfferCard extends StatelessWidget {
             : 'Accept offer';
 
         return Material(
-          color: RidonsColors.surface,
+          color: context.ridonsSheet,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(22),
-            side: const BorderSide(color: RidonsColors.border),
+            side: BorderSide(color: context.ridonsLine),
           ),
           child: Padding(
             padding: EdgeInsets.fromLTRB(
@@ -746,11 +746,11 @@ class _OfferCard extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: (width * 0.07).clamp(22.0, 26.0).toDouble(),
-                      backgroundColor: RidonsColors.inputFill,
+                      backgroundColor: context.ridonsFill,
                       child: Text(
                         offer.displayName.isEmpty ? 'P' : offer.displayName[0],
-                        style: const TextStyle(
-                          color: RidonsColors.navy,
+                        style: TextStyle(
+                          color: context.ridonsInk,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -765,7 +765,7 @@ class _OfferCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: RidonsColors.navy,
+                              color: context.ridonsInk,
                               fontWeight: FontWeight.w800,
                               fontSize: titleFontSize,
                             ),
@@ -775,7 +775,7 @@ class _OfferCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: RidonsColors.textSecondary,
+                              color: context.ridonsMuted,
                               fontSize: detailFontSize,
                             ),
                           ),
@@ -815,14 +815,14 @@ class _OfferCard extends StatelessWidget {
                           fontSize: routeFontSize,
                         ),
                       ),
-                      const TextSpan(
+                      TextSpan(
                         text: '  →  ',
-                        style: TextStyle(color: RidonsColors.textSecondary),
+                        style: TextStyle(color: context.ridonsMuted),
                       ),
                       TextSpan(
                         text: offer.toName.isEmpty ? 'Dropoff' : offer.toName,
                         style: TextStyle(
-                          color: RidonsColors.navy,
+                          color: context.ridonsInk,
                           fontWeight: FontWeight.w700,
                           fontSize: routeFontSize,
                         ),
@@ -839,7 +839,7 @@ class _OfferCard extends StatelessWidget {
                     child: Text(
                       'Negotiation round ${offer.negotiationRound} of ${offer.maxNegotiationRounds}',
                       style: TextStyle(
-                        color: RidonsColors.textSecondary,
+                        color: context.ridonsMuted,
                         fontSize: labelFontSize,
                         fontWeight: FontWeight.w600,
                       ),
@@ -955,7 +955,7 @@ class _PriceCol extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            color: RidonsColors.textSecondary,
+            color: context.ridonsMuted,
             fontSize: labelFontSize,
           ),
         ),
@@ -966,7 +966,7 @@ class _PriceCol extends StatelessWidget {
             value,
             maxLines: 1,
             style: TextStyle(
-              color: RidonsColors.navy,
+              color: context.ridonsInk,
               fontWeight: FontWeight.w800,
               fontSize: valueFontSize,
             ),

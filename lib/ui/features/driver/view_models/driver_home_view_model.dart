@@ -69,8 +69,6 @@ class DriverHomeViewModel extends ChangeNotifier {
   bool passengerRatingBusy = false;
   String? passengerRatingError;
   List<LatLng> routePoints = const [];
-  List<RouteStep> routeSteps = const [];
-  bool inAppNavigation = false;
   int? etaMinutes;
   LatLng? driverPoint;
   LatLng? passengerPoint;
@@ -390,8 +388,6 @@ class DriverHomeViewModel extends ChangeNotifier {
         ride = null;
         stage = DriverStage.home;
         routePoints = const [];
-        routeSteps = const [];
-        inAppNavigation = false;
         if (online) await refreshInbox();
         notifyListeners();
         return;
@@ -412,18 +408,8 @@ class DriverHomeViewModel extends ChangeNotifier {
     ride = null;
     stage = DriverStage.home;
     routePoints = const [];
-    routeSteps = const [];
-    inAppNavigation = false;
     if (online) await refreshInbox();
     notifyListeners();
-  }
-
-  Future<void> navigateToPickup() async {
-    final current = ride;
-    if (current == null) return;
-    inAppNavigation = true;
-    notifyListeners();
-    await _refreshRoute(toDropoff: false);
   }
 
   Future<void> _enterRide(ActiveRide next) async {
@@ -432,7 +418,6 @@ class DriverHomeViewModel extends ChangeNotifier {
     passengerSpeedKmh = 0;
     offers = const [];
     stage = next.isDriving ? DriverStage.driving : DriverStage.locked;
-    inAppNavigation = false;
     if (next.status == 'matched') {
       try {
         await _trips.updateStatus(next.rideId, 'en_route');
@@ -466,7 +451,6 @@ class DriverHomeViewModel extends ChangeNotifier {
       steps: true,
     );
     routePoints = result.points;
-    routeSteps = result.steps;
     if (result.durationMin > 0) {
       etaMinutes = result.durationMin;
     }
@@ -507,7 +491,6 @@ class DriverHomeViewModel extends ChangeNotifier {
             ? DriverStage.driving
             : DriverStage.arrived;
         if (status == 'in_progress') {
-          inAppNavigation = false;
           unawaited(_refreshRoute(toDropoff: true));
         }
         notifyListeners();
@@ -522,8 +505,6 @@ class DriverHomeViewModel extends ChangeNotifier {
         ride = null;
         stage = DriverStage.home;
         routePoints = const [];
-        routeSteps = const [];
-        inAppNavigation = false;
         notifyListeners();
       }
     }
@@ -541,7 +522,7 @@ class DriverHomeViewModel extends ChangeNotifier {
       if (lat == null || lng == null) return;
       passengerPoint = LatLng(lat, lng);
       passengerSpeedKmh = (message.data['speedKmh'] as num?)?.toDouble() ?? 0;
-      if (inAppNavigation && stage == DriverStage.locked) {
+      if (stage == DriverStage.locked) {
         unawaited(_refreshRoute(toDropoff: false));
       }
       final driverSpeed = _fix?.speed;
@@ -586,7 +567,6 @@ class DriverHomeViewModel extends ChangeNotifier {
           ? DriverStage.arrived
           : DriverStage.locked;
       if (status == 'in_progress') {
-        inAppNavigation = false;
         await _refreshRoute(toDropoff: true);
       }
       notifyListeners();

@@ -65,7 +65,15 @@ String _serviceForPath(String path) {
   if (path.startsWith('/auth') || path == '/me' || path.startsWith('/me/')) {
     return 'identity';
   }
-  if (path.startsWith('/location') || path.startsWith('/driver')) {
+  if (path.startsWith('/driver/requests') ||
+      path.startsWith('/driver/rides') ||
+      path == '/driver/stats' ||
+      path == '/driver/quests' ||
+      path == '/driver/earnings' ||
+      path == '/driver/ratings') {
+    return 'trip';
+  }
+  if (path.startsWith('/location') || path == '/driver/online') {
     return 'location';
   }
   if (path.startsWith('/rides/request') || path.startsWith('/trips')) {
