@@ -21,6 +21,9 @@ enum DriverStage { home, locked, arrived, driving }
 
 const _pickupArrivalRadiusM = 60.0;
 const _journeyStartSpeedKmh = 5.0;
+const _routeDeviationThresholdM = 80.0;
+const _routeRefreshCooldown = Duration(seconds: 10);
+const _passengerRouteRefreshCooldown = Duration(seconds: 5);
 
 class DriverHomeViewModel extends ChangeNotifier {
   DriverHomeViewModel({
@@ -70,11 +73,16 @@ class DriverHomeViewModel extends ChangeNotifier {
   bool passengerRatingBusy = false;
   String? passengerRatingError;
   List<LatLng> routePoints = const [];
+  List<LatLng> actualTrackPoints = const [];
   int? etaMinutes;
+  double? routeDistanceKm;
+  double routeDeviationMeters = 0;
+  bool routeDeviated = false;
   LatLng? driverPoint;
   LatLng? passengerPoint;
   double passengerSpeedKmh = 0;
   Position? _fix;
+  double _speedKmh = 0;
 
   Timer? _inboxPoll;
   Timer? _pingTimer;
@@ -82,6 +90,11 @@ class DriverHomeViewModel extends ChangeNotifier {
   var _locationPingBusy = false;
   bool _inboxRefreshing = false;
   bool _statusBusy = false;
+  bool _routeRefreshing = false;
+  DateTime? _lastRouteRefreshAt;
+  DateTime? _lastPassengerRouteRefreshAt;
+  DateTime? _lastEtaRefreshAt;
+  int _routeRequestGeneration = 0;
   StreamSubscription<Position>? _gps;
   StreamSubscription<RealtimeMessage>? _ws;
 
@@ -123,14 +136,17 @@ class DriverHomeViewModel extends ChangeNotifier {
   void _startGpsTracking({required bool background}) {
     _gps?.cancel();
     _gps = _location.positionStream(background: background).listen((position) {
+      final previous = _fix;
+      _speedKmh = LocationService.speedKmh(position, previous);
       _fix = position;
       driverPoint = LatLng(position.latitude, position.longitude);
+      _recordActualPoint(driverPoint!);
       if (online || onTrip) {
         unawaited(_pingCurrentLocation());
       }
-      _maybeDetectTripProgress(
-        position.speed.isFinite ? position.speed * 3.6 : 0,
-      );
+      _maybeRefreshLiveEta(position);
+      _maybeRefreshRoute(position);
+      _maybeDetectTripProgress(_speedKmh);
       notifyListeners();
     });
   }
@@ -239,7 +255,7 @@ class DriverHomeViewModel extends ChangeNotifier {
         lat: pos.latitude,
         lng: pos.longitude,
         headingDeg: pos.heading.isFinite ? pos.heading : 0,
-        speedKmh: pos.speed.isFinite ? pos.speed * 3.6 : 0,
+        speedKmh: _speedKmh,
         rideId: ride?.rideId,
       );
     } finally {
@@ -398,6 +414,11 @@ class DriverHomeViewModel extends ChangeNotifier {
         ride = null;
         stage = DriverStage.home;
         routePoints = const [];
+        actualTrackPoints = const [];
+        routeDeviationMeters = 0;
+        routeDeviated = false;
+        routeDistanceKm = null;
+        _invalidateRouteRequests();
         if (online) await refreshInbox();
         notifyListeners();
         return;
@@ -418,6 +439,11 @@ class DriverHomeViewModel extends ChangeNotifier {
     ride = null;
     stage = DriverStage.home;
     routePoints = const [];
+    actualTrackPoints = const [];
+    routeDeviationMeters = 0;
+    routeDeviated = false;
+    routeDistanceKm = null;
+    _invalidateRouteRequests();
     if (online) await refreshInbox();
     notifyListeners();
   }
@@ -426,6 +452,12 @@ class DriverHomeViewModel extends ChangeNotifier {
     ride = next;
     passengerPoint = null;
     passengerSpeedKmh = 0;
+    actualTrackPoints = const [];
+    routeDeviationMeters = 0;
+    routeDeviated = false;
+    _invalidateRouteRequests();
+    _lastRouteRefreshAt = null;
+    _lastEtaRefreshAt = null;
     offers = const [];
     stage = next.isDriving ? DriverStage.driving : DriverStage.locked;
     if (next.status == 'matched') {
@@ -440,11 +472,21 @@ class DriverHomeViewModel extends ChangeNotifier {
     final dest = next.isDriving ? next.to : next.from;
     final quote = await _geo.pickupEta(driver: origin, pickup: dest);
     etaMinutes = quote?.minutes;
+    routeDistanceKm = quote?.distanceKm;
+    actualTrackPoints = [origin];
+  }
+
+  void _invalidateRouteRequests() {
+    _routeRequestGeneration++;
+    _lastRouteRefreshAt = null;
+    _lastPassengerRouteRefreshAt = null;
   }
 
   Future<void> _refreshRoute({required bool toDropoff}) async {
     final current = ride;
     if (current == null) return;
+    final requestGeneration = ++_routeRequestGeneration;
+    final rideId = current.rideId;
     final start = driverPoint ?? current.from;
     final end = toDropoff ? current.to : (passengerPoint ?? current.from);
     final result = await _routing.route(
@@ -459,11 +501,97 @@ class DriverHomeViewModel extends ChangeNotifier {
         longitude: end.longitude,
       ),
       steps: true,
+      useCache: false,
     );
+    // A newer location/status update may have requested another route while
+    // this response was in flight. Do not let the stale response replace it.
+    if (requestGeneration != _routeRequestGeneration ||
+        ride?.rideId != rideId) {
+      return;
+    }
     routePoints = result.points;
+    routeDistanceKm = result.distanceKm;
+    routeDeviationMeters = 0;
+    routeDeviated = false;
     if (result.durationMin > 0) {
       etaMinutes = result.durationMin;
     }
+    notifyListeners();
+  }
+
+  void _maybeRefreshRoute(Position position) {
+    final current = ride;
+    if (current == null || !onTrip || _routeRefreshing) return;
+    final point = LatLng(position.latitude, position.longitude);
+    if (routePoints.length < 2) return;
+    routeDeviationMeters = RoutingService.distanceToPolylineMeters(
+      point,
+      routePoints,
+    );
+    final reportedAccuracy = position.accuracy;
+    final accuracyBuffer = reportedAccuracy.isFinite && reportedAccuracy > 0
+        ? (reportedAccuracy * 1.5).clamp(0.0, 180.0)
+        : 0.0;
+    final deviationThreshold = math.max(
+      _routeDeviationThresholdM,
+      accuracyBuffer,
+    );
+    if (routeDeviationMeters < deviationThreshold) {
+      routeDeviated = false;
+      return;
+    }
+    routeDeviated = true;
+    final lastRefresh = _lastRouteRefreshAt;
+    if (lastRefresh != null &&
+        DateTime.now().difference(lastRefresh) < _routeRefreshCooldown) {
+      return;
+    }
+    _lastRouteRefreshAt = DateTime.now();
+    _routeRefreshing = true;
+    unawaited(
+      _refreshRoute(toDropoff: stage == DriverStage.driving).whenComplete(() {
+        _routeRefreshing = false;
+      }),
+    );
+  }
+
+  void _recordActualPoint(LatLng point) {
+    if (!onTrip) return;
+    final last = actualTrackPoints.isEmpty ? null : actualTrackPoints.last;
+    if (last != null && _distanceMeters(last, point) < 5) return;
+    final next = [...actualTrackPoints, point];
+    actualTrackPoints = List.unmodifiable(
+      next.length > 300 ? next.sublist(next.length - 300) : next,
+    );
+  }
+
+  void _maybeRefreshLiveEta(Position position) {
+    final current = ride;
+    if (current == null || !onTrip) return;
+    final now = DateTime.now();
+    final last = _lastEtaRefreshAt;
+    if (last != null && now.difference(last) < const Duration(seconds: 4)) {
+      return;
+    }
+    _lastEtaRefreshAt = now;
+    unawaited(_refreshLiveEta(position));
+  }
+
+  Future<void> _refreshLiveEta(Position position) async {
+    final current = ride;
+    if (current == null) return;
+    final destination = stage == DriverStage.driving
+        ? current.to
+        : (passengerPoint ?? current.from);
+    final quote = await _geo.pickupEta(
+      driver: LatLng(position.latitude, position.longitude),
+      pickup: destination,
+      speedKmh: _speedKmh > 1 ? _speedKmh : null,
+      rideId: current.rideId,
+    );
+    if (quote == null || ride?.rideId != current.rideId) return;
+    etaMinutes = quote.minutes;
+    routeDistanceKm = quote.distanceKm;
     notifyListeners();
   }
 
@@ -509,6 +637,12 @@ class DriverHomeViewModel extends ChangeNotifier {
       if (status == 'cancelled') {
         ride = null;
         stage = DriverStage.home;
+        routePoints = const [];
+        actualTrackPoints = const [];
+        routeDeviationMeters = 0;
+        routeDeviated = false;
+        routeDistanceKm = null;
+        _invalidateRouteRequests();
         notifyListeners();
       }
       if (status == 'completed') {
@@ -516,6 +650,11 @@ class DriverHomeViewModel extends ChangeNotifier {
         ride = null;
         stage = DriverStage.home;
         routePoints = const [];
+        actualTrackPoints = const [];
+        routeDeviationMeters = 0;
+        routeDeviated = false;
+        routeDistanceKm = null;
+        _invalidateRouteRequests();
         notifyListeners();
       }
     }
@@ -534,7 +673,13 @@ class DriverHomeViewModel extends ChangeNotifier {
       passengerPoint = LatLng(lat, lng);
       passengerSpeedKmh = (message.data['speedKmh'] as num?)?.toDouble() ?? 0;
       if (stage == DriverStage.locked) {
-        unawaited(_refreshRoute(toDropoff: false));
+        final now = DateTime.now();
+        final lastRefresh = _lastPassengerRouteRefreshAt;
+        if (lastRefresh == null ||
+            now.difference(lastRefresh) >= _passengerRouteRefreshCooldown) {
+          _lastPassengerRouteRefreshAt = now;
+          unawaited(_refreshRoute(toDropoff: false));
+        }
       }
       final driverSpeed = _fix?.speed;
       _maybeDetectTripProgress(

@@ -41,14 +41,30 @@ class DriverTripView extends StatelessWidget {
                     horizontal: 16,
                     vertical: 10,
                   ),
-                  child: Text(
-                    viewModel.etaChip.tr(
-                      namedArgs: {'minutes': '${viewModel.etaMinutes ?? ''}'},
-                    ),
-                    style: const TextStyle(
-                      color: RidonsColors.primary,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        viewModel.etaChip.tr(
+                          namedArgs: {
+                            'minutes': '${viewModel.etaMinutes ?? ''}',
+                          },
+                        ),
+                        style: const TextStyle(
+                          color: RidonsColors.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (viewModel.routeDistanceKm != null)
+                        Text(
+                          '${viewModel.routeDistanceKm!.toStringAsFixed(1)} km',
+                          style: const TextStyle(
+                            color: RidonsColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -102,6 +118,7 @@ class _TripMapState extends State<_TripMap> {
     final points = viewModel.routePoints.length >= 2
         ? viewModel.routePoints
         : [you, dest];
+    final showActualTrack = viewModel.actualTrackPoints.length >= 2;
     return RidonsMapView(
       controller: controller,
       center: you,
@@ -116,11 +133,23 @@ class _TripMapState extends State<_TripMap> {
           polylines: [
             Polyline(
               points: points,
-              color: Theme.of(context).brightness == Brightness.dark
+              color: showActualTrack
+                  ? (Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0x88FFFFFF)
+                        : const Color(0x66515A6B))
+                  : Theme.of(context).brightness == Brightness.dark
                   ? const Color(0xFFFBBF24)
                   : const Color(0xFF7A1014),
               strokeWidth: 6,
             ),
+            if (showActualTrack)
+              Polyline(
+                points: viewModel.actualTrackPoints,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFFFBBF24)
+                    : RidonsColors.primary,
+                strokeWidth: 5,
+              ),
           ],
         ),
         RidonsAnimatedMarker(

@@ -93,7 +93,10 @@ class HomeMapViewModel extends ChangeNotifier {
   bool searchingPlaces = false;
   List<LatLng> routePoints = const [];
   List<List<LatLng>> routeAlternatives = const [];
+  List<RouteResult> routeOptions = const [];
+  int selectedRouteIndex = 0;
   List<RouteStep> routeSteps = const [];
+  List<LatLng> driverTrackPoints = const [];
   List<LiveMapMarker> nearbyDrivers = const [];
   int offeredPrice = 0;
   FareEstimate? fareEstimate;
@@ -117,6 +120,7 @@ class HomeMapViewModel extends ChangeNotifier {
   int tripDurationMin = 0;
   String routeMethod = '';
   int? etaMinutes;
+  double? etaDistanceKm;
   String? focusedDriverId;
   String ratingComment = '';
   bool ratingBusy = false;
@@ -129,11 +133,13 @@ class HomeMapViewModel extends ChangeNotifier {
   Timer? _searchDebounce;
   Timer? _interp;
   Timer? _pingTimer;
+  Timer? _etaTimer;
   DateTime? _lastLocationPingAt;
   var _locationPingBusy = false;
   StreamSubscription<Position>? _gpsSub;
   StreamSubscription<RealtimeMessage>? _wsSub;
   Position? _lastFix;
+  double _gpsSpeedKmh = 0;
   final Map<String, _TrackedDriver> _tracked = {};
   bool _liveStarted = false;
   bool _pickupFollowsGps = true;
@@ -151,10 +157,20 @@ class HomeMapViewModel extends ChangeNotifier {
 
   String get etaLabel {
     final minutes =
-        etaMinutes ?? (tripDurationMin > 0 ? tripDurationMin : null);
+        etaMinutes ??
+        (stage == RideStage.matched
+            ? null
+            : (tripDurationMin > 0 ? tripDurationMin : null));
     if (minutes == null) return '—';
     if (minutes < 1) return '<1 min';
     return '$minutes min';
+  }
+
+  String get etaDistanceLabel {
+    final distance = etaDistanceKm;
+    if (distance == null) return '—';
+    if (distance < 0.1) return '<0.1 Km';
+    return '${distance.toStringAsFixed(1)} Km';
   }
 
   String get driverReceiptLabel {
@@ -198,6 +214,24 @@ class HomeMapViewModel extends ChangeNotifier {
 
   bool get hasRoute =>
       pickup != null && dropoff != null && routePoints.length >= 2;
+
+  bool get hasRouteAlternatives => routeOptions.length > 1;
+
+  void selectRoute(int index) {
+    if (index < 0 || index >= routeOptions.length) return;
+    selectedRouteIndex = index;
+    final selected = routeOptions[index];
+    routePoints = selected.points;
+    routeSteps = selected.steps;
+    tripKm = selected.distanceKm;
+    tripDurationMin = selected.durationMin;
+    routeMethod = selected.method;
+    routeAlternatives = [
+      for (var i = 0; i < routeOptions.length; i++)
+        if (i != index) routeOptions[i].points,
+    ];
+    notifyListeners();
+  }
 
   String get timerLabel {
     if (offerTimer == Duration.zero) return '';
@@ -384,6 +418,7 @@ class HomeMapViewModel extends ChangeNotifier {
     _gpsSub?.cancel();
     _gpsSub = _locationService.positionStream().listen((position) {
       final firstFix = _lastFix == null;
+      _gpsSpeedKmh = LocationService.speedKmh(position, _lastFix);
       _lastFix = position;
       if (_pickupFollowsGps && firstFix) {
         _applyGps(position);
@@ -408,6 +443,7 @@ class HomeMapViewModel extends ChangeNotifier {
     liveRequestId = active.requestId.isEmpty ? null : active.requestId;
     liveRideId = active.rideId;
     liveRideStatus = active.status;
+    driverTrackPoints = const [];
     agreedFare = active.fare;
     matchedDriver = MatchedDriver(
       name: active.driverName,
@@ -433,6 +469,7 @@ class HomeMapViewModel extends ChangeNotifier {
         ? RideStage.payment
         : RideStage.matched;
     await _realtime.subscribe('ride:${active.rideId}');
+    _startEtaRefresh();
     await _refreshEta();
     notifyListeners();
   }
@@ -454,15 +491,12 @@ class HomeMapViewModel extends ChangeNotifier {
     final heading = (fix != null && fix.heading.isFinite && fix.heading >= 0)
         ? fix.heading
         : 0.0;
-    final speedMps = (fix != null && fix.speed.isFinite)
-        ? math.max(0, fix.speed)
-        : 0.0;
     try {
       await _geoApi.ping(
         lat: lat,
         lng: lng,
         headingDeg: heading,
-        speedKmh: math.max(0, speedMps * 3.6),
+        speedKmh: math.max(0, _gpsSpeedKmh),
         rideId: liveRideId ?? liveRequestId,
       );
     } finally {
@@ -626,6 +660,10 @@ class HomeMapViewModel extends ChangeNotifier {
       }
       final existing = _tracked[id];
       final point = LatLng(lat, lng);
+      if (stage == RideStage.matched &&
+          (focusedDriverId == null || focusedDriverId == id)) {
+        _appendDriverTrack(point);
+      }
       final heading = (message.data['headingDeg'] as num?)?.toDouble() ?? 0;
       final speed = (message.data['speedKmh'] as num?)?.toDouble() ?? 0;
       if (existing == null) {
@@ -681,9 +719,20 @@ class HomeMapViewModel extends ChangeNotifier {
       return;
     }
     if (message.event == 'eta') {
+      final eventRideId = '${message.data['rideId'] ?? ''}';
+      if (liveRideId != null &&
+          liveRideId!.isNotEmpty &&
+          eventRideId.isNotEmpty &&
+          eventRideId != liveRideId) {
+        return;
+      }
       final minutes = (message.data['minutes'] as num?)?.toInt();
-      if (minutes != null && minutes != etaMinutes) {
-        etaMinutes = minutes;
+      final distance = (message.data['distanceKm'] as num?)?.toDouble();
+      if (minutes != null || distance != null) {
+        if (minutes != null) etaMinutes = minutes;
+        if (distance != null && distance.isFinite) {
+          etaDistanceKm = distance;
+        }
         notifyListeners();
       }
       return;
@@ -736,8 +785,16 @@ class HomeMapViewModel extends ChangeNotifier {
       liveRideStatus = status;
       if (status == 'completed') {
         stage = RideStage.payment;
+        _stopEtaRefresh();
+        etaMinutes = null;
+        etaDistanceKm = null;
       } else {
         stage = RideStage.matched;
+        _startEtaRefresh();
+        if (status == 'arrived') {
+          etaMinutes = 0;
+          etaDistanceKm = 0;
+        }
       }
       notifyListeners();
       return;
@@ -787,20 +844,59 @@ class HomeMapViewModel extends ChangeNotifier {
     existing.speedKmh = speedKmh;
   }
 
+  void _appendDriverTrack(LatLng point) {
+    final last = driverTrackPoints.isEmpty ? null : driverTrackPoints.last;
+    if (last != null && _metersBetween(last, point) < 5) return;
+    final next = [...driverTrackPoints, point];
+    driverTrackPoints = List.unmodifiable(
+      next.length > 300 ? next.sublist(next.length - 300) : next,
+    );
+  }
+
   Future<void> _refreshEta() async {
     final origin = pickup;
     final tracked = focusedDriverId == null ? null : _tracked[focusedDriverId!];
     final driver = tracked ?? (_tracked.isEmpty ? null : _tracked.values.first);
-    if (origin == null || driver == null) {
-      etaMinutes = null;
+    final destination = liveRideStatus == 'in_progress' ? dropoff : origin;
+    if (destination == null || driver == null) {
+      if (liveRideStatus != 'arrived') {
+        final hadValue = etaMinutes != null || etaDistanceKm != null;
+        etaMinutes = null;
+        etaDistanceKm = null;
+        if (hadValue) notifyListeners();
+      }
       return;
     }
+
+    final requestGeneration = ++_etaRequestGeneration;
     final quote = await _geoApi.pickupEta(
-      driver: driver.display,
-      pickup: LatLng(origin.latitude, origin.longitude),
+      // Use the latest GPS target. `display` is intentionally smoothed for
+      // rendering and can lag behind the driver's real position.
+      driver: driver.target,
+      pickup: LatLng(destination.latitude, destination.longitude),
       speedKmh: driver.speedKmh > 1 ? driver.speedKmh : 22,
+      rideId: liveRideId,
     );
-    etaMinutes = quote?.minutes;
+    if (requestGeneration != _etaRequestGeneration || quote == null) return;
+    etaMinutes = quote.minutes;
+    etaDistanceKm = quote.distanceKm;
+    notifyListeners();
+  }
+
+  int _etaRequestGeneration = 0;
+
+  void _startEtaRefresh() {
+    _etaTimer ??= Timer.periodic(const Duration(seconds: 4), (_) {
+      if (stage == RideStage.matched && liveRideStatus != 'arrived') {
+        unawaited(_refreshEta());
+      }
+    });
+  }
+
+  void _stopEtaRefresh() {
+    _etaTimer?.cancel();
+    _etaTimer = null;
+    _etaRequestGeneration++;
   }
 
   int _searchGen = 0;
@@ -1150,6 +1246,7 @@ class HomeMapViewModel extends ChangeNotifier {
   void showMatch({String? driverId, int? fare}) {
     stage = RideStage.matched;
     liveRideStatus = 'matched';
+    driverTrackPoints = const [];
     if (fare != null && fare > 0) agreedFare = fare;
     _ticker?.cancel();
     _matchTimer?.cancel();
@@ -1163,6 +1260,7 @@ class HomeMapViewModel extends ChangeNotifier {
     if (rideId != null && rideId.isNotEmpty) {
       unawaited(_realtime.subscribe('ride:$rideId'));
     }
+    _startEtaRefresh();
     unawaited(_refreshEta());
     notifyListeners();
   }
@@ -1270,11 +1368,15 @@ class HomeMapViewModel extends ChangeNotifier {
     }
     _ticker?.cancel();
     _matchTimer?.cancel();
+    _stopEtaRefresh();
     dropoff = null;
     pickCandidate = null;
     routePoints = const [];
     routeAlternatives = const [];
+    routeOptions = const [];
+    selectedRouteIndex = 0;
     routeSteps = const [];
+    driverTrackPoints = const [];
     offeredPrice = 0;
     fareEstimate = null;
     loadingFareEstimate = false;
@@ -1291,6 +1393,8 @@ class HomeMapViewModel extends ChangeNotifier {
     recordNumber = '';
     tripKm = 0;
     tripDurationMin = 0;
+    etaMinutes = null;
+    etaDistanceKm = null;
     routeMethod = '';
     liveRequestId = null;
     liveRideId = null;
@@ -1323,12 +1427,16 @@ class HomeMapViewModel extends ChangeNotifier {
   void cancelRide() {
     _ticker?.cancel();
     _matchTimer?.cancel();
+    _stopEtaRefresh();
     unawaited(_cancelLiveRequest());
     dropoff = null;
     pickCandidate = null;
     routePoints = const [];
     routeAlternatives = const [];
+    routeOptions = const [];
+    selectedRouteIndex = 0;
     routeSteps = const [];
+    driverTrackPoints = const [];
     _pickupFollowsGps = true;
     lastOfferMissed = false;
     lastOfferHadRiders = false;
@@ -1369,6 +1477,8 @@ class HomeMapViewModel extends ChangeNotifier {
       _routingService.cancelInFlight();
       routePoints = const [];
       routeAlternatives = const [];
+      routeOptions = const [];
+      selectedRouteIndex = 0;
       routeSteps = const [];
       tripKm = 0;
       tripDurationMin = 0;
@@ -1388,22 +1498,33 @@ class HomeMapViewModel extends ChangeNotifier {
     routeMethod = '';
     routePoints = const [];
     routeAlternatives = const [];
+    routeOptions = const [];
+    selectedRouteIndex = 0;
     routeSteps = const [];
     notifyListeners();
 
     try {
       final result = await _routingService.route(from, to);
       if (gen != _routeGen) return;
-      routePoints = result.points;
-      routeAlternatives = [for (final alt in result.alternatives) alt.points];
-      routeSteps = result.steps;
-      tripKm = result.distanceKm;
-      tripDurationMin = result.durationMin;
-      routeMethod = result.method;
+      routeOptions = [result, ...result.alternatives];
+      selectedRouteIndex = 0;
+      final selected = routeOptions.first;
+      routePoints = selected.points;
+      routeAlternatives = [
+        for (var i = 1; i < routeOptions.length; i++) routeOptions[i].points,
+      ];
+      routeSteps = selected.steps;
+      tripKm = selected.distanceKm;
+      tripDurationMin = selected.durationMin;
+      routeMethod = selected.method;
     } catch (_) {
       if (gen != _routeGen) return;
       // Only fall back to a straight line if OSRM truly failed.
       routePoints = quick.points;
+      routeOptions = [quick];
+      selectedRouteIndex = 0;
+      routeAlternatives = const [];
+      routeSteps = quick.steps;
       routeMethod = quick.method;
     }
     if (gen != _routeGen) return;
@@ -1439,6 +1560,7 @@ class HomeMapViewModel extends ChangeNotifier {
     _searchDebounce?.cancel();
     _interp?.cancel();
     _pingTimer?.cancel();
+    _stopEtaRefresh();
     unawaited(_gpsSub?.cancel());
     unawaited(_wsSub?.cancel());
     _nameDebounce?.cancel();

@@ -462,6 +462,9 @@ class _PassengerMap extends StatelessWidget {
             pickup.longitude != you.longitude);
     final showDrivers = viewModel.nearbyDrivers.isNotEmpty;
     final etaMid = RoutingService.midpointAlong(viewModel.routePoints);
+    final showDriverTrack =
+        viewModel.stage == RideStage.matched &&
+        viewModel.driverTrackPoints.length >= 2;
 
     return RidonsMapView(
       controller: controller,
@@ -509,11 +512,23 @@ class _PassengerMap extends StatelessWidget {
                   ),
               Polyline(
                 points: viewModel.routePoints,
-                color: Theme.of(context).brightness == Brightness.dark
+                color: showDriverTrack
+                    ? (Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0x88FFFFFF)
+                          : const Color(0x66515A6B))
+                    : Theme.of(context).brightness == Brightness.dark
                     ? const Color(0xFFFBBF24)
                     : RidonsColors.primaryDark,
                 strokeWidth: 5,
               ),
+              if (showDriverTrack)
+                Polyline(
+                  points: viewModel.driverTrackPoints,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFFBBF24)
+                      : RidonsColors.primary,
+                  strokeWidth: 5,
+                ),
             ],
           ),
         MarkerLayer(

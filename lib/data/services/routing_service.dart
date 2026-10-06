@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -24,20 +25,23 @@ class RoutingService {
     this.profile = 'driving',
     this.cacheTtl = const Duration(minutes: 8),
     this.maxCacheEntries = 48,
-  })  : _osrmBase =
-            (osrmBaseUrl ?? defaultOsrmBase).replaceAll(RegExp(r'/+$'), ''),
-        _dio = dio ??
-            Dio(
-              BaseOptions(
-                // Public demo often takes 4–8s from emulators; don't cut early.
-                connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 12),
-                headers: {
-                  'User-Agent': 'Ridons/1.0 (passenger app; https://ridons.app)',
-                  'Accept': 'application/json',
-                },
-              ),
-            );
+  }) : _osrmBase = (osrmBaseUrl ?? defaultOsrmBase).replaceAll(
+         RegExp(r'/+$'),
+         '',
+       ),
+       _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               // Public demo often takes 4–8s from emulators; don't cut early.
+               connectTimeout: const Duration(seconds: 10),
+               receiveTimeout: const Duration(seconds: 12),
+               headers: {
+                 'User-Agent': 'Ridons/1.0 (passenger app; https://ridons.app)',
+                 'Accept': 'application/json',
+               },
+             ),
+           );
 
   /// Public OSRM demo — fine for local/dev; replace in prod.
   static const defaultOsrmBase = 'https://router.project-osrm.org';
@@ -63,14 +67,17 @@ class RoutingService {
     GeoPlace to, {
     bool alternatives = true,
     bool steps = false,
+    bool useCache = true,
     CancelToken? cancelToken,
   }) async {
     final key = _cacheKey(from, to, alternatives: alternatives, steps: steps);
-    final hit = _cache[key];
-    if (hit != null && !hit.expired) {
-      _cache.remove(key);
-      _cache[key] = hit;
-      return hit.result;
+    if (useCache) {
+      final hit = _cache[key];
+      if (hit != null && !hit.expired) {
+        _cache.remove(key);
+        _cache[key] = hit;
+        return hit.result;
+      }
     }
 
     cancelInFlight();
@@ -86,7 +93,7 @@ class RoutingService {
         token: token,
       );
       if (result != null) {
-        _putCache(key, result);
+        if (useCache) _putCache(key, result);
         return result;
       }
       // One retry without alternatives (lighter payload).
@@ -99,7 +106,7 @@ class RoutingService {
           token: token,
         );
         if (retry != null) {
-          _putCache(key, retry);
+          if (useCache) _putCache(key, retry);
           return retry;
         }
       }
@@ -242,8 +249,7 @@ class RoutingService {
           );
         }
         final type = maneuver is Map ? '${maneuver['type'] ?? ''}' : '';
-        final modifier =
-            maneuver is Map ? '${maneuver['modifier'] ?? ''}' : '';
+        final modifier = maneuver is Map ? '${maneuver['modifier'] ?? ''}' : '';
         final name = '${step['name'] ?? ''}'.trim();
         final instruction = [
           if (type.isNotEmpty) type,
@@ -333,6 +339,57 @@ class RoutingService {
       acc += seg;
     }
     return points.last;
+  }
+
+  /// Returns the approximate distance from [point] to the nearest segment in
+  /// [polyline]. Useful for detecting when a moving vehicle leaves its route.
+  static double distanceToPolylineMeters(LatLng point, List<LatLng> polyline) {
+    if (polyline.isEmpty) return double.infinity;
+    if (polyline.length == 1) {
+      return _distanceMeters(point, polyline.first);
+    }
+
+    var nearest = double.infinity;
+    for (var i = 1; i < polyline.length; i++) {
+      final distance = _distanceToSegmentMeters(
+        point,
+        polyline[i - 1],
+        polyline[i],
+      );
+      if (distance < nearest) nearest = distance;
+    }
+    return nearest;
+  }
+
+  static double _distanceToSegmentMeters(LatLng point, LatLng a, LatLng b) {
+    final scaleLng = 111320 * math.cos(point.latitude * math.pi / 180);
+    const scaleLat = 111320.0;
+    final px = (point.longitude - a.longitude) * scaleLng;
+    final py = (point.latitude - a.latitude) * scaleLat;
+    final bx = (b.longitude - a.longitude) * scaleLng;
+    final by = (b.latitude - a.latitude) * scaleLat;
+    final lengthSquared = bx * bx + by * by;
+    if (lengthSquared <= 0) return math.sqrt(px * px + py * py);
+
+    final t = ((px * bx + py * by) / lengthSquared).clamp(0.0, 1.0);
+    final dx = px - bx * t;
+    final dy = py - by * t;
+    return math.sqrt(dx * dx + dy * dy);
+  }
+
+  static double _distanceMeters(LatLng a, LatLng b) {
+    const earth = 6371000.0;
+    final dLat = (b.latitude - a.latitude) * math.pi / 180;
+    final dLng = (b.longitude - a.longitude) * math.pi / 180;
+    final lat1 = a.latitude * math.pi / 180;
+    final lat2 = b.latitude * math.pi / 180;
+    final x =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1) *
+            math.cos(lat2) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    return 2 * earth * math.asin(math.sqrt(x));
   }
 
   /// Google-encoded polyline → [LatLng] list (OSRM default encoding).

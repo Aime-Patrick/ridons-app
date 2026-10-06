@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'package:ridons/data/services/routing_service.dart';
+import 'package:ridons/data/services/location_service.dart';
 import 'package:ridons/domain/models/geo_place.dart';
 
 void main() {
@@ -57,4 +59,45 @@ void main() {
     expect(mid!.latitude, closeTo(0, 0.0001));
     expect(mid.longitude, closeTo(1, 0.0001));
   });
+
+  test('distanceToPolylineMeters measures the nearest route segment', () {
+    final distance = RoutingService.distanceToPolylineMeters(
+      const LatLng(0.001, 0.5),
+      const [LatLng(0, 0), LatLng(0, 1)],
+    );
+    expect(distance, closeTo(111, 3));
+  });
+
+  test('speedKmh derives movement when GPS speed is unavailable', () {
+    final previous = _position(
+      latitude: 0,
+      timestamp: DateTime.utc(2026, 1, 1, 12),
+    );
+    final current = _position(
+      latitude: 0.0001,
+      timestamp: DateTime.utc(2026, 1, 1, 12, 0, 10),
+    );
+
+    expect(LocationService.speedKmh(current, previous), closeTo(4.0, 0.5));
+  });
+}
+
+Position _position({
+  required double latitude,
+  required DateTime timestamp,
+  double longitude = 0,
+  double speed = 0,
+}) {
+  return Position(
+    latitude: latitude,
+    longitude: longitude,
+    timestamp: timestamp,
+    accuracy: 5,
+    altitude: 0,
+    altitudeAccuracy: 0,
+    heading: 0,
+    headingAccuracy: 0,
+    speed: speed,
+    speedAccuracy: 0,
+  );
 }

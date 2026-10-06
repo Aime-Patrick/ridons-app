@@ -574,6 +574,10 @@ class _EstimateSheet extends StatelessWidget {
                 : 'market_fair_price'.tr(),
             style: TextStyle(color: context.ridonsMuted, fontSize: 11),
           ),
+          if (viewModel.hasRouteAlternatives) ...[
+            const SizedBox(height: 12),
+            _RouteChoices(viewModel: viewModel),
+          ],
           const SizedBox(height: 10),
           RidonsPriceAdjuster(
             amountRwf: viewModel.offeredPrice,
@@ -1046,6 +1050,28 @@ class _MatchedSheet extends StatelessWidget {
               ),
               const Expanded(
                 child: _Fact(label: 'payment_method', value: 'cash_or_momo'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _Fact(
+                  label: viewModel.liveRideStatus == 'in_progress'
+                      ? 'distance_to_destination'
+                      : 'distance_to_pickup',
+                  value: viewModel.etaDistanceLabel,
+                ),
+              ),
+              Expanded(
+                child: _Fact(
+                  label: viewModel.liveRideStatus == 'in_progress'
+                      ? 'eta_to_destination'
+                      : 'eta_to_pickup',
+                  value: viewModel.etaLabel,
+                  emphasized: true,
+                ),
               ),
             ],
           ),
@@ -1540,6 +1566,111 @@ class _RouteSummary extends StatelessWidget {
   }
 }
 
+class _RouteChoices extends StatelessWidget {
+  const _RouteChoices({required this.viewModel});
+
+  final HomeMapViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final routes = viewModel.routeOptions;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'choose_route'.tr(),
+          style: TextStyle(
+            color: context.ridonsInk,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 72,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: routes.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final route = routes[index];
+              final selected = index == viewModel.selectedRouteIndex;
+              final label = index == 0
+                  ? 'fastest_route'.tr()
+                  : 'alternative_route'.tr(namedArgs: {'number': '$index'});
+              return SizedBox(
+                width: 156,
+                child: Material(
+                  color: selected ? context.ridonsSoft : context.ridonsFill,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () => viewModel.selectRoute(index),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(11, 9, 9, 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selected
+                              ? RidonsColors.primary
+                              : context.ridonsLine,
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: selected
+                                        ? RidonsColors.primary
+                                        : context.ridonsInk,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  '${route.durationMin} min · ${route.distanceKm.toStringAsFixed(1)} km',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: context.ridonsMuted,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            selected
+                                ? Icons.check_circle
+                                : Icons.circle_outlined,
+                            size: 17,
+                            color: selected
+                                ? RidonsColors.primary
+                                : context.ridonsLine,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SummaryLine extends StatelessWidget {
   const _SummaryLine({required this.icon, required this.text});
 
@@ -1593,10 +1724,15 @@ class _SheetTitleRow extends StatelessWidget {
 }
 
 class _Fact extends StatelessWidget {
-  const _Fact({required this.label, required this.value});
+  const _Fact({
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+  });
 
   final String label;
   final String value;
+  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
@@ -1612,7 +1748,7 @@ class _Fact extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            color: context.ridonsInk,
+            color: emphasized ? RidonsColors.primary : context.ridonsInk,
             fontSize: 13,
             fontWeight: FontWeight.w700,
           ),

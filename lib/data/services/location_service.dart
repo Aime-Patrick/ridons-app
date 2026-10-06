@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -13,6 +14,38 @@ class LocationService {
   static const _latKey = 'ridons.last_lat';
   static const _lngKey = 'ridons.last_lng';
   static const _driverOnlineKey = 'ridons.driver_online_intent';
+
+  /// Returns the best available speed for a GPS fix.
+  ///
+  /// Some devices report 0 even while moving. In that case derive speed from
+  /// the previous fix, but reject stale fixes and GPS jitter.
+  static double speedKmh(Position current, Position? previous) {
+    final reported = current.speed;
+    if (reported.isFinite && reported > 0.5) {
+      return (reported * 3.6).clamp(0.0, 160.0).toDouble();
+    }
+    if (previous == null) return 0;
+    if (!current.accuracy.isFinite ||
+        !previous.accuracy.isFinite ||
+        current.accuracy > 100 ||
+        previous.accuracy > 100) {
+      return 0;
+    }
+
+    final seconds =
+        current.timestamp.difference(previous.timestamp).inMilliseconds / 1000;
+    if (seconds <= 0 || seconds > 30) return 0;
+
+    final distanceKm = _haversineKm(
+      previous.latitude,
+      previous.longitude,
+      current.latitude,
+      current.longitude,
+    );
+    final derived = distanceKm / seconds * 3600;
+    if (derived < 0.5) return 0;
+    return math.min(derived, 160.0);
+  }
 
   Future<bool> hasLocationPermission() async {
     try {
@@ -187,5 +220,24 @@ class LocationService {
       distanceFilter: distanceFilter,
       timeLimit: timeLimit,
     );
+  }
+
+  static double _haversineKm(
+    double lat1,
+    double lng1,
+    double lat2,
+    double lng2,
+  ) {
+    const earthRadiusKm = 6371.0;
+    final radians = math.pi / 180;
+    final dLat = (lat2 - lat1) * radians;
+    final dLng = (lng2 - lng1) * radians;
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * radians) *
+            math.cos(lat2 * radians) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    return 2 * earthRadiusKm * math.asin(math.sqrt(a));
   }
 }
