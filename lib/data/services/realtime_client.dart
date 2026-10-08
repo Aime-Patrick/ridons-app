@@ -18,9 +18,11 @@ class RealtimeClient {
 
   io.Socket? _socket;
   final _controller = StreamController<RealtimeMessage>.broadcast();
+  final _connectedController = StreamController<void>.broadcast();
   final _channels = <String>{};
 
   Stream<RealtimeMessage> get messages => _controller.stream;
+  Stream<void> get connected => _connectedController.stream;
   bool get isConnected => _socket?.connected == true;
 
   Future<void> connect() async {
@@ -46,6 +48,7 @@ class RealtimeClient {
       for (final channel in _channels) {
         socket.emit('subscribe', {'channel': channel});
       }
+      if (!_connectedController.isClosed) _connectedController.add(null);
     });
     socket.onDisconnect((_) {});
     socket.onConnectError((_) {});
@@ -104,5 +107,6 @@ class RealtimeClient {
   Future<void> dispose() async {
     await disconnect();
     await _controller.close();
+    await _connectedController.close();
   }
 }

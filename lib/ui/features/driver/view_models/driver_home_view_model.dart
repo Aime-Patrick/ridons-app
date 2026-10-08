@@ -97,6 +97,8 @@ class DriverHomeViewModel extends ChangeNotifier {
   int _routeRequestGeneration = 0;
   StreamSubscription<Position>? _gps;
   StreamSubscription<RealtimeMessage>? _ws;
+  StreamSubscription<void>? _realtimeConnected;
+  bool _assignmentSyncBusy = false;
 
   bool get onTrip => stage != DriverStage.home;
 
@@ -123,6 +125,9 @@ class DriverHomeViewModel extends ChangeNotifier {
       await _enterRide(active);
     }
     _ws = _realtime.messages.listen(_onRealtime);
+    _realtimeConnected = _realtime.connected.listen((_) {
+      if (!onTrip) unawaited(_restoreActiveRide());
+    });
     unawaited(_realtime.connect());
     unawaited(_realtime.subscribe('driver:${user.id}'));
     _startGpsTracking(background: onTrip);
@@ -460,6 +465,9 @@ class DriverHomeViewModel extends ChangeNotifier {
     _lastEtaRefreshAt = null;
     offers = const [];
     stage = next.isDriving ? DriverStage.driving : DriverStage.locked;
+    // Show the trip sheet immediately. Route, status, and ETA enrichment can
+    // finish asynchronously without making the driver wait or refresh.
+    notifyListeners();
     if (next.status == 'matched') {
       try {
         await _trips.updateStatus(next.rideId, 'en_route');
@@ -474,6 +482,50 @@ class DriverHomeViewModel extends ChangeNotifier {
     etaMinutes = quote?.minutes;
     routeDistanceKm = quote?.distanceKm;
     actualTrackPoints = [origin];
+  }
+
+  Future<void> _syncAssignedRide(String rideId) async {
+    if (_assignmentSyncBusy || rideId.isEmpty) return;
+    if (ride?.rideId == rideId) return;
+    _assignmentSyncBusy = true;
+    try {
+      // The realtime event and the ride row are written close together. A
+      // short bounded retry handles that write-order race without polling.
+      const delays = <Duration>[
+        Duration.zero,
+        Duration(milliseconds: 150),
+        Duration(milliseconds: 500),
+      ];
+      for (final delay in delays) {
+        if (delay > Duration.zero) await Future<void>.delayed(delay);
+        final active = await _trips.activeRide();
+        if (active?.rideId != rideId) continue;
+        try {
+          await _enterRide(active!);
+        } catch (_) {
+          // _enterRide assigns the ride and notifies before route/ETA calls.
+          // Keep the sheet visible even if enrichment is temporarily down.
+          notifyListeners();
+        }
+        return;
+      }
+    } finally {
+      _assignmentSyncBusy = false;
+    }
+  }
+
+  Future<void> _restoreActiveRide() async {
+    if (_assignmentSyncBusy || onTrip) return;
+    _assignmentSyncBusy = true;
+    try {
+      final active = await _trips.activeRide();
+      if (active == null || active.rideId.isEmpty || onTrip) return;
+      await _enterRide(active);
+    } catch (_) {
+      notifyListeners();
+    } finally {
+      _assignmentSyncBusy = false;
+    }
   }
 
   void _invalidateRouteRequests() {
@@ -596,6 +648,11 @@ class DriverHomeViewModel extends ChangeNotifier {
   }
 
   void _onRealtime(RealtimeMessage message) {
+    if (message.event == 'matched') {
+      final rideId = '${message.data['rideId'] ?? ''}'.trim();
+      if (rideId.isNotEmpty) unawaited(_syncAssignedRide(rideId));
+      return;
+    }
     if (message.event == 'incoming_request' && online && !onTrip) {
       unawaited(refreshInbox());
     }
@@ -807,6 +864,7 @@ class DriverHomeViewModel extends ChangeNotifier {
     _pingTimer?.cancel();
     _gps?.cancel();
     _ws?.cancel();
+    _realtimeConnected?.cancel();
     if (online) {
       unawaited(_geo.setOnline(online: false));
     }
