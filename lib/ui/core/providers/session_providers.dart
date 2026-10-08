@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/config/api_config.dart';
@@ -6,6 +8,7 @@ import '../../../data/services/api_client.dart';
 import '../../../data/services/geo_api.dart';
 import '../../../data/services/driver_documents_service.dart';
 import '../../../data/services/notification_api.dart';
+import '../../../data/services/push_notification_service.dart';
 import '../../../data/services/pricing_api.dart';
 import '../../../data/services/prefs_store.dart';
 import '../../../data/services/realtime_client.dart';
@@ -48,6 +51,16 @@ final supportApiProvider = Provider<SupportApi>((ref) {
 
 final notificationApiProvider = Provider<NotificationApi>((ref) {
   return NotificationApi(ref.watch(apiClientProvider));
+});
+
+final pushNotificationServiceProvider = Provider<PushNotificationService>((
+  ref,
+) {
+  final service = PushNotificationService(
+    apiClient: ref.watch(apiClientProvider),
+  );
+  ref.onDispose(() => unawaited(service.dispose()));
+  return service;
 });
 
 final driverDocumentsRepositoryProvider = Provider<DriverDocumentsRepository>((
@@ -128,6 +141,12 @@ class AuthSessionNotifier extends AsyncNotifier<AuthSession?> {
   }
 
   Future<void> clear() async {
+    final current = state.asData?.value;
+    if (current != null) {
+      await ref
+          .read(pushNotificationServiceProvider)
+          .unregisterForUser(current.user.id);
+    }
     await ref.read(authRepositoryProvider).logout();
     state = const AsyncData(null);
   }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "129021314689",
+    "project_id": "ridons",
+    "storage_bucket": "ridons.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:129021314689:android:8a35fb83d2b61bf6852f80",
+        "android_client_info": {
+          "package_name": "com.ridons.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfMnfLrBYQpqi8X4kOHEBxrKN-JpiyXoA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

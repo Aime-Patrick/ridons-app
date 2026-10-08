@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -52,6 +54,12 @@ class _RidonsAppState extends ConsumerState<RidonsApp>
   @override
   Widget build(BuildContext context) {
     ref.listen(authSessionProvider, (previous, next) {
+      final user = next.asData?.value?.user;
+      if (user != null) {
+        unawaited(
+          ref.read(pushNotificationServiceProvider).registerForUser(user.id),
+        );
+      }
       final savedLocale = next.asData?.value?.user.locale;
       if (savedLocale == null ||
           savedLocale == _lastSyncedLocale ||
