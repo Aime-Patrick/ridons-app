@@ -133,6 +133,20 @@ class AuthSessionNotifier extends AsyncNotifier<AuthSession?> {
         token: current.token,
         user: SessionUser.fromJson(userMap),
       );
+
+      // Approval changes are written to the database after the current JWT
+      // was issued. Re-issue the token when the driver's status changes so
+      // the gateway and downstream services receive the same fresh decision.
+      final verificationChanged =
+          current.user.verificationStatus != session.user.verificationStatus;
+      if (current.user.role.isDriver && verificationChanged) {
+        final refreshed = await ref.read(authRepositoryProvider).refreshSession();
+        if (refreshed != null) {
+          state = AsyncData(refreshed);
+          ref.read(appRoleProvider.notifier).state = refreshed.user.role;
+          return;
+        }
+      }
       state = AsyncData(session);
       ref.read(appRoleProvider.notifier).state = session.user.role;
     } catch (_) {

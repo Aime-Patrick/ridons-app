@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,12 +27,41 @@ class DriverDocumentsView extends ConsumerStatefulWidget {
 }
 
 class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
+  Timer? _statusTimer;
+  bool _statusRefreshBusy = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) ref.read(driverDocumentsViewModelProvider).load();
+      if (!mounted) return;
+      unawaited(ref.read(driverDocumentsViewModelProvider).load());
+      if (widget.onboarding) {
+        _statusTimer = Timer.periodic(
+          const Duration(seconds: 5),
+          (_) => unawaited(_refreshVerificationStatus()),
+        );
+      }
     });
+  }
+
+  Future<void> _refreshVerificationStatus() async {
+    if (!mounted || !widget.onboarding || _statusRefreshBusy) return;
+    _statusRefreshBusy = true;
+    try {
+      await ref.read(authSessionProvider.notifier).refreshProfile();
+      if (mounted) {
+        await ref.read(driverDocumentsViewModelProvider).load();
+      }
+    } finally {
+      _statusRefreshBusy = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _statusTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _pick(DriverDocumentType type) async {
@@ -200,12 +231,7 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
               OutlinedButton.icon(
                 onPressed: viewModel.loading
                     ? null
-                    : () async {
-                        await ref
-                            .read(authSessionProvider.notifier)
-                            .refreshProfile();
-                        await viewModel.load();
-                      },
+                    : _refreshVerificationStatus,
                 icon: const Icon(Icons.refresh_rounded),
                 label: Text('check_verification_status'.tr()),
               ),
