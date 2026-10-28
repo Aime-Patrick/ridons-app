@@ -1,17 +1,61 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../data/config/api_config.dart';
+import '../../core/providers/session_providers.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/widgets.dart';
 
 /// Entry screen for phone-only account creation.
-class SignUpView extends StatelessWidget {
+class SignUpView extends ConsumerStatefulWidget {
   const SignUpView({super.key});
+
+  @override
+  ConsumerState<SignUpView> createState() => _SignUpViewState();
+}
+
+class _SignUpViewState extends ConsumerState<SignUpView> {
+  bool _accepted = false;
+  late final TapGestureRecognizer _termsRecognizer;
+  late final TapGestureRecognizer _privacyRecognizer;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsRecognizer = TapGestureRecognizer()
+      ..onTap = () => _openLegal(RidonsEnv.termsUrl);
+    _privacyRecognizer = TapGestureRecognizer()
+      ..onTap = () => _openLegal(RidonsEnv.privacyUrl);
+  }
+
+  @override
+  void dispose() {
+    _termsRecognizer.dispose();
+    _privacyRecognizer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openLegal(String value) async {
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) RidonsNotice.info(context, 'could_not_open_link'.tr());
+    }
+  }
+
+  void _continue() {
+    if (!_accepted) return;
+    ref.read(authViewModelProvider).setSignupConsent(accepted: true);
+    context.go(AppRoutes.signInPhone);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +105,7 @@ class SignUpView extends StatelessWidget {
                 const SizedBox(height: 18),
                 RidonsButton(
                   label: 'continue_with_phone',
-                  onPressed: () => context.go(AppRoutes.signUpPhone),
+                  onPressed: _accepted ? _continue : null,
                 ),
                 const SizedBox(height: 8),
                 RidonsButton(
@@ -79,7 +123,12 @@ class SignUpView extends StatelessWidget {
                 const SizedBox(height: 22),
                 Center(
                   child: GestureDetector(
-                    onTap: () => context.go(AppRoutes.signInPhone),
+                    onTap: () {
+                      ref
+                          .read(authViewModelProvider)
+                          .setSignupConsent(accepted: true);
+                      context.go(AppRoutes.signInPhone);
+                    },
                     child: Text.rich(
                       TextSpan(
                         text: 'already_have_account'.tr(),
@@ -108,48 +157,42 @@ class SignUpView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                Text.rich(
-                  TextSpan(
-                    text: 'by_continuing'.tr(),
-                    style: GoogleFonts.inter(
-                      color: context.ridonsMuted,
-                      fontWeight: FontWeight.w400,
-                      fontSize: 14,
-                      height: 18 / 14,
-                      letterSpacing: 0.5,
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _accepted,
+                  onChanged: (value) {
+                    setState(() => _accepted = value ?? false);
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text.rich(
+                    TextSpan(
+                      text: 'consent_prefix'.tr(),
+                      style: GoogleFonts.inter(
+                        color: context.ridonsMuted,
+                        fontSize: 13,
+                        height: 18 / 13,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: 'terms_conditions'.tr(),
+                          recognizer: _termsRecognizer,
+                          style: const TextStyle(
+                            color: RidonsColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                        TextSpan(text: 'consent_joiner'.tr()),
+                        TextSpan(
+                          text: 'privacy_policy'.tr(),
+                          recognizer: _privacyRecognizer,
+                          style: const TextStyle(
+                            color: RidonsColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
                     ),
-                    children: [
-                      TextSpan(
-                        text: 'terms_conditions'.tr(),
-                        style: GoogleFonts.inter(
-                          color: RidonsColors.primary,
-                          fontWeight: FontWeight.w400,
-                          fontSize: 14,
-                          height: 18 / 14,
-                          letterSpacing: 0.5,
-                          decoration: TextDecoration.underline,
-                          decorationStyle: TextDecorationStyle.solid,
-                          decorationColor: RidonsColors.primary,
-                        ),
-                      ),
-                      TextSpan(text: 'acknowledge_our'.tr()),
-                      TextSpan(
-                        text: 'privacy_policy'.tr(),
-                        style: GoogleFonts.inter(
-                          color: RidonsColors.primary,
-                          fontWeight: FontWeight.w400,
-                          fontSize: 14,
-                          height: 18 / 14,
-                          letterSpacing: 0.5,
-                          decoration: TextDecoration.underline,
-                          decorationStyle: TextDecorationStyle.solid,
-                          decorationColor: RidonsColors.primary,
-                        ),
-                      ),
-                      const TextSpan(text: '.'),
-                    ],
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),

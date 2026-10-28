@@ -18,8 +18,6 @@ abstract final class AppRoutes {
   static const signInPhone = '/sign-in/phone';
   static const signInCode = '/sign-in/code';
   static const signUp = '/sign-up';
-  static const signUpPhone = '/sign-up/phone';
-  static const signUpCode = '/sign-up/code';
   static const signUpAccount = '/sign-up/account';
   static const driverVerification = '/driver/verification';
   static const widgetsLab = '/widgets';
@@ -52,7 +50,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           user?.role.isDriver == true && !user!.isVerified;
       final onAccount = loc == AppRoutes.signUpAccount;
       final onDriverVerification = loc == AppRoutes.driverVerification;
-      final onAuth = loc.startsWith('/sign-in') ||
+      final onAuth =
+          loc.startsWith('/sign-in') ||
           loc.startsWith('/sign-up') ||
           loc == AppRoutes.onboarding;
 
@@ -118,15 +117,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.signUp,
         builder: (context, state) => const SignUpView(),
-      ),
-      GoRoute(
-        path: AppRoutes.signUpPhone,
-        builder: (context, state) => const SignInView(isSignUp: true),
-      ),
-      GoRoute(
-        path: AppRoutes.signUpCode,
-        builder: (context, state) =>
-            const SignInView(showCode: true, isSignUp: true),
       ),
       GoRoute(
         path: AppRoutes.signUpAccount,

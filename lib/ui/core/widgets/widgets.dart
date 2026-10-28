@@ -11,6 +11,7 @@ export 'ridons_notice.dart';
 export 'ridons_bottom_nav.dart';
 export 'ridons_splash_background.dart';
 export 'ridons_logo.dart';
+export 'camera_wordmark.dart';
 export 'ridons_price_adjuster.dart';
 export 'ridons_driver_card.dart';
 export 'ridons_star_rating.dart';

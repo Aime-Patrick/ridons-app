@@ -7,12 +7,24 @@ import '../services/api_client.dart';
 import '../services/token_store.dart';
 
 abstract class AuthRepository {
-  Future<void> sendOtp(String phone);
+  Future<void> sendOtp({
+    required String phone,
+    String? intent,
+    AppRole? role,
+    bool termsAccepted = false,
+    bool privacyAccepted = false,
+    String? policyVersion,
+    String consentSource = 'mobile',
+  });
   Future<AuthSession> verifyOtp({
     required String phone,
     required String code,
     required AppRole role,
-    bool signUp = false,
+    String? intent,
+    bool termsAccepted = false,
+    bool privacyAccepted = false,
+    String? policyVersion,
+    String consentSource = 'mobile',
   });
   Future<AuthSession> updateProfile({
     String? firstName,
@@ -20,6 +32,7 @@ abstract class AuthRepository {
     String? locale,
     String? avatarKey,
   });
+  Future<AuthSession> switchMode(AppRole mode);
   Future<AuthSession> uploadAvatar(String filePath);
   Future<AuthSession?> restore();
   Future<AuthSession?> refreshSession();
@@ -37,15 +50,32 @@ class RemoteAuthRepository implements AuthRepository {
   final TokenStore _tokens;
 
   @override
-  Future<void> sendOtp(String phone) async {
+  Future<void> sendOtp({
+    required String phone,
+    String? intent,
+    AppRole? role,
+    bool termsAccepted = false,
+    bool privacyAccepted = false,
+    String? policyVersion,
+    String consentSource = 'mobile',
+  }) async {
     try {
       await _api.dio.post<Map<String, dynamic>>(
         '/auth/otp/send',
-        data: {'phone': phone},
+        data: {
+          'phone': phone,
+          if (intent != null) 'intent': intent,
+          if (role != null) 'role': role.name,
+          'termsAccepted': termsAccepted,
+          'privacyAccepted': privacyAccepted,
+          if (policyVersion != null) 'policyVersion': policyVersion,
+          'consentSource': consentSource,
+        },
       );
     } on DioException catch (e) {
       throw AuthException(
         apiErrorMessage(e, fallback: 'Could not send the code.'),
+        code: errorCodeOf(e),
       );
     }
   }
@@ -55,7 +85,11 @@ class RemoteAuthRepository implements AuthRepository {
     required String phone,
     required String code,
     required AppRole role,
-    bool signUp = false,
+    String? intent,
+    bool termsAccepted = false,
+    bool privacyAccepted = false,
+    String? policyVersion,
+    String consentSource = 'mobile',
   }) async {
     try {
       final response = await _api.dio.post<Map<String, dynamic>>(
@@ -64,7 +98,11 @@ class RemoteAuthRepository implements AuthRepository {
           'phone': phone,
           'code': code,
           'role': role.name,
-          'intent': signUp ? 'signup' : 'signin',
+          if (intent != null) 'intent': intent,
+          'termsAccepted': termsAccepted,
+          'privacyAccepted': privacyAccepted,
+          if (policyVersion != null) 'policyVersion': policyVersion,
+          'consentSource': consentSource,
         },
       );
       return await _sessionFrom(response.data ?? const {});
@@ -131,6 +169,29 @@ class RemoteAuthRepository implements AuthRepository {
     } on DioException catch (e) {
       throw AuthException(
         apiErrorMessage(e, fallback: 'Could not upload the photo.'),
+      );
+    }
+  }
+
+  @override
+  Future<AuthSession> switchMode(AppRole mode) async {
+    try {
+      final response = await _api.dio.patch<Map<String, dynamic>>(
+        '/auth/mode',
+        data: {'mode': mode.name},
+      );
+      final json = response.data ?? const {};
+      final token = '${json['token'] ?? ''}';
+      if (token.isEmpty) {
+        throw const AuthException('Could not switch account mode.');
+      }
+      await _tokens.saveAccess(token);
+      final userMap = (json['user'] as Map<String, dynamic>?) ?? const {};
+      return AuthSession(token: token, user: SessionUser.fromJson(userMap));
+    } on DioException catch (e) {
+      throw AuthException(
+        apiErrorMessage(e, fallback: 'Could not switch account mode.'),
+        code: errorCodeOf(e),
       );
     }
   }

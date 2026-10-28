@@ -258,7 +258,10 @@ String _documentTypeLabel(DriverDocumentType type) {
     DriverDocumentType.nationalId => 'national_id'.tr(),
     DriverDocumentType.drivingLicense => 'driving_license'.tr(),
     DriverDocumentType.vehicleRegistration => 'vehicle_registration'.tr(),
+    DriverDocumentType.motorcycleAuthorisation =>
+      'motorcycle_authorisation'.tr(),
     DriverDocumentType.insurance => 'insurance'.tr(),
+    DriverDocumentType.selfie => 'selfie'.tr(),
   };
 }
 
@@ -355,6 +358,13 @@ class _DocumentTile extends StatelessWidget {
       DriverDocumentStatus.rejected => RidonsColors.primary,
       _ => context.ridonsMuted,
     };
+    final detail = document == null
+        ? 'required_not_uploaded'.tr()
+        : _documentStatusLabel(status, document?.rejectReason);
+    final expiry = document?.expiresAt;
+    final expiryLabel = expiry == null
+        ? null
+        : '${'expires_on'.tr()}: ${expiry.toLocal().toIso8601String().split('T').first}';
     return Material(
       color: Colors.transparent,
       shape: RoundedRectangleBorder(
@@ -370,9 +380,7 @@ class _DocumentTile extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         subtitle: Text(
-          document == null
-              ? 'required_not_uploaded'.tr()
-              : _documentStatusLabel(status, document?.rejectReason),
+          expiryLabel == null ? detail : '$detail\n$expiryLabel',
           style: TextStyle(color: statusColor, fontSize: 12),
         ),
         trailing: uploading

@@ -41,6 +41,7 @@ class DriverDocumentsViewModel extends ChangeNotifier {
     required DriverDocumentType type,
     required String filePath,
     required String fileName,
+    DateTime? expiresAt,
   }) async {
     uploading = type;
     errorMessage = null;
@@ -50,6 +51,7 @@ class DriverDocumentsViewModel extends ChangeNotifier {
         type: type,
         filePath: filePath,
         fileName: fileName,
+        expiresAt: expiresAt,
       );
       await load();
       return true;

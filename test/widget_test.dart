@@ -28,6 +28,44 @@ class _MockAssetLoader extends AssetLoader {
       'tagline': 'Ride-Hailing made simple',
       'continue': 'Continue',
       'sign_in': 'Sign In',
+      'choose_language': 'Choose a language',
+      'kinyarwanda': 'Kinyarwanda',
+      'english': 'English',
+      'skip_onboarding': 'Skip',
+      'get_a_ride': 'Get a ride',
+      'get_a_ride_description': 'Offer your price, pick from the drivers',
+      'drive_and_earn': 'Drive & Earn',
+      'drive_and_earn_description': 'Get offers, pick from the passengers',
+      'enter_your_number': 'Enter your number',
+      'verification_code_sent':
+          'We\'ll send you a verification code on your phone number',
+      'verification_code_sent_short': 'A code was sent to your number',
+      'no_account': 'Don\'t have an account? ',
+      'create_one': 'Create One',
+      'or': 'Or',
+      'continue_with_google': 'Continue with Google',
+      'phone_hint': '788 888 888',
+      'enter_the_code': 'Enter the code',
+      'resend_in': 'Resend in ',
+      'resend_code': 'Resend code',
+      'try_different_method': 'Try a different method',
+      'get_a_ride_literal': 'Get a ride',
+      'offer_your_price_literal': 'Offer your price, pick from the drivers',
+      'fair_deals_tagline': 'Your app for fair deals',
+      'choose_ride_tagline':
+          'Choose a ride, name your price and connect instantly with drivers',
+      'already_have_account': 'Already have an account? ',
+      'consent_prefix': 'I agree to the ',
+      'terms_conditions': 'Terms & conditions',
+      'consent_joiner': ' and ',
+      'privacy_policy': 'Privacy Policy',
+      'continue_with_phone': 'Continue with phone',
+      'Continue': 'Continue',
+      'Continue with Google': 'Continue with Google',
+      'Sign In': 'Sign In',
+      'Get a ride': 'Get a ride',
+      'Offer your price, pick from the drivers':
+          'Offer your price, pick from the drivers',
     };
   }
 }
@@ -35,11 +73,19 @@ class _MockAssetLoader extends AssetLoader {
 class FakeAuthRepository implements AuthRepository {
   String? lastPhone;
   String? lastCode;
-  bool? lastSignUp;
+  String? lastIntent;
   AuthException? verifyError;
 
   @override
-  Future<void> sendOtp(String phone) async {
+  Future<void> sendOtp({
+    required String phone,
+    String? intent,
+    AppRole? role,
+    bool termsAccepted = false,
+    bool privacyAccepted = false,
+    String? policyVersion,
+    String consentSource = 'mobile',
+  }) async {
     lastPhone = phone;
   }
 
@@ -48,12 +94,16 @@ class FakeAuthRepository implements AuthRepository {
     required String phone,
     required String code,
     required AppRole role,
-    bool signUp = false,
+    String? intent,
+    bool termsAccepted = false,
+    bool privacyAccepted = false,
+    String? policyVersion,
+    String consentSource = 'mobile',
   }) async {
     lastCode = code;
-    lastSignUp = signUp;
+    lastIntent = intent;
     final error = verifyError;
-    if (error != null && signUp) {
+    if (error != null) {
       throw error;
     }
     return AuthSession(
@@ -79,6 +129,19 @@ class FakeAuthRepository implements AuthRepository {
         lastName: lastName ?? '',
         locale: locale ?? 'en',
         avatarKey: avatarKey ?? 'passenger',
+      ),
+    );
+  }
+
+  @override
+  Future<AuthSession> switchMode(AppRole mode) async {
+    return AuthSession(
+      token: 'test-token',
+      user: SessionUser(
+        id: 'pax_test',
+        phone: lastPhone ?? '+250788888888',
+        role: mode,
+        availableRoles: const [AppRole.passenger, AppRole.driver],
       ),
     );
   }

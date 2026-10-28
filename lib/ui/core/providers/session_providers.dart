@@ -116,6 +116,14 @@ class AuthSessionNotifier extends AsyncNotifier<AuthSession?> {
 
   Future<void> setSession(AuthSession session) async {
     state = AsyncData(session);
+    ref.read(appRoleProvider.notifier).state = session.user.role;
+  }
+
+  Future<AuthSession> switchMode(AppRole mode) async {
+    final session = await ref.read(authRepositoryProvider).switchMode(mode);
+    state = AsyncData(session);
+    ref.read(appRoleProvider.notifier).state = session.user.role;
+    return session;
   }
 
   /// Soft refresh of `/me` without clearing tokens on transient failures.

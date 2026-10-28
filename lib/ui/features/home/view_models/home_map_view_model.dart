@@ -13,6 +13,7 @@ import '../../../../data/services/realtime_client.dart';
 import '../../../../data/services/routing_service.dart';
 import '../../../../data/services/trip_api.dart';
 import '../../../../data/services/support_api.dart';
+import '../../../../domain/models/cancellation_reason.dart';
 import '../../../../domain/models/geo_place.dart';
 import '../../../../domain/models/fare_estimate.dart';
 import '../../../../domain/models/fare_policy.dart';
@@ -127,6 +128,8 @@ class HomeMapViewModel extends ChangeNotifier {
   String? ratingError;
   bool sharingTrip = false;
   String? shareError;
+  bool sosBusy = false;
+  String? sosError;
 
   Timer? _ticker;
   Timer? _matchTimer;
@@ -1342,6 +1345,27 @@ class HomeMapViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> triggerSos() async {
+    final rideId = liveRideId;
+    final api = _tripApi;
+    if (sosBusy || rideId == null || rideId.isEmpty || api == null) {
+      return false;
+    }
+    sosBusy = true;
+    sosError = null;
+    notifyListeners();
+    try {
+      await api.triggerSos(rideId, location: userPoint);
+      return true;
+    } catch (_) {
+      sosError = 'could_not_send_sos';
+      return false;
+    } finally {
+      sosBusy = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> submitRating() async {
     final rideId = liveRideId;
     final api = _tripApi;
@@ -1424,11 +1448,23 @@ class HomeMapViewModel extends ChangeNotifier {
     await _refreshRoute();
   }
 
-  void cancelRide() {
+  Future<List<CancellationReason>> cancellationReasons() async {
+    final api = _tripApi;
+    if (api == null) return defaultCancellationReasons('passenger');
+    return api.cancellationReasons(actor: 'passenger');
+  }
+
+  void cancelRide({String? reasonCode, String? reasonLabel, String? note}) {
     _ticker?.cancel();
     _matchTimer?.cancel();
     _stopEtaRefresh();
-    unawaited(_cancelLiveRequest());
+    unawaited(
+      _cancelLiveRequest(
+        reasonCode: reasonCode,
+        reasonLabel: reasonLabel,
+        note: note,
+      ),
+    );
     dropoff = null;
     pickCandidate = null;
     routePoints = const [];
@@ -1457,7 +1493,11 @@ class HomeMapViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _cancelLiveRequest() async {
+  Future<void> _cancelLiveRequest({
+    String? reasonCode,
+    String? reasonLabel,
+    String? note,
+  }) async {
     final id = liveRequestId;
     final api = _tripApi;
     liveRequestId = null;
@@ -1465,7 +1505,12 @@ class HomeMapViewModel extends ChangeNotifier {
     if (id == null || id.isEmpty || api == null) return;
     unawaited(_realtime.unsubscribe('request:$id'));
     try {
-      await api.cancelRequest(id);
+      await api.cancelRequest(
+        id,
+        reasonCode: reasonCode,
+        reasonLabel: reasonLabel,
+        note: note,
+      );
     } catch (_) {}
   }
 

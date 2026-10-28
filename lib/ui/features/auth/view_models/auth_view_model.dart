@@ -19,23 +19,37 @@ class AuthViewModel extends ChangeNotifier {
   bool verifying = false;
   bool savingProfile = false;
   bool phoneTaken = false;
+  bool userNotFound = false;
   String? errorMessage;
   int resendInSec = 0;
+  bool signupTermsAccepted = false;
+  bool signupPrivacyAccepted = false;
+  String signupPolicyVersion = RidonsEnv.policyVersion;
+
+  void setSignupConsent({required bool accepted}) {
+    signupTermsAccepted = accepted;
+    signupPrivacyAccepted = accepted;
+    notifyListeners();
+  }
+
   Timer? _resendTimer;
 
   String get displayPhone => pendingPhone.isEmpty ? '+250' : pendingPhone;
 
   void updateOtp(String code) {
     otpCode = code;
-    if (errorMessage != null || phoneTaken) {
+    if (errorMessage != null || phoneTaken || userNotFound) {
       errorMessage = null;
       phoneTaken = false;
+      userNotFound = false;
       notifyListeners();
     }
   }
 
-  Future<bool> sendCode(String localDigits) async {
+  Future<bool> sendCode(String localDigits, {AppRole? role}) async {
     errorMessage = null;
+    phoneTaken = false;
+    userNotFound = false;
     if (!isValidRwandaLocal(localDigits)) {
       errorMessage = 'valid_rwanda_phone';
       notifyListeners();
@@ -46,11 +60,19 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       pendingPhone = e164Phone(localDigits);
-      await _auth.sendOtp(pendingPhone);
+      await _auth.sendOtp(
+        phone: pendingPhone,
+        role: role,
+        termsAccepted: signupTermsAccepted,
+        privacyAccepted: signupPrivacyAccepted,
+        policyVersion: signupPolicyVersion,
+      );
       _startResendTimer();
       return true;
     } on AuthException catch (e) {
       errorMessage = e.message;
+      phoneTaken = e.isPhoneTaken;
+      userNotFound = e.isUserNotFound;
       return false;
     } catch (_) {
       errorMessage = 'could_not_send_code';
@@ -61,11 +83,7 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<AuthSession?> verifyCode({
-    required AppRole role,
-    String? code,
-    bool signUp = false,
-  }) async {
+  Future<AuthSession?> verifyCode({required AppRole role, String? code}) async {
     errorMessage = null;
     phoneTaken = false;
     final value = (code ?? otpCode).trim();
@@ -82,7 +100,9 @@ class AuthViewModel extends ChangeNotifier {
         phone: pendingPhone,
         code: value,
         role: role,
-        signUp: signUp,
+        termsAccepted: signupTermsAccepted,
+        privacyAccepted: signupPrivacyAccepted,
+        policyVersion: signupPolicyVersion,
       );
       return session;
     } on AuthException catch (e) {
@@ -183,9 +203,9 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> resend() async {
+  Future<void> resend({AppRole? role}) async {
     if (resendInSec > 0 || pendingPhone.isEmpty) return;
-    await sendCode(pendingPhone.replaceFirst('+250', ''));
+    await sendCode(pendingPhone.replaceFirst('+250', ''), role: role);
   }
 
   void _startResendTimer() {

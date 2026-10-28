@@ -16,6 +16,10 @@ String apiErrorMessage(
     'otp_not_found' => 'Request a new code first.',
     'otp_locked' => 'Too many attempts. Try again later.',
     'phone_taken' => phoneTakenMessage(payload?['role']?.toString()),
+    'user_not_found' =>
+        'No account found with this phone number. Create one instead.',
+    'legal_consent_required' =>
+        'Please accept the Terms & Conditions and Privacy Policy.',
     _ => null,
   };
   if (known != null) return known;

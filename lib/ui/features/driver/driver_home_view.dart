@@ -1,7 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../data/services/location_service.dart';
 import '../../../data/services/places_service.dart';
@@ -105,77 +104,24 @@ class _DriverIdleHome extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
-              Row(
-                children: [
-                  PassengerAvatar(user: user, radius: 28, token: session.token),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.displayName,
-                          style: TextStyle(
-                            color: context.ridonsInk,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          'driver_id_caption'.tr(
-                            namedArgs: {'id': user.driverIdLabel},
-                          ),
-                          style: TextStyle(
-                            color: context.ridonsMuted,
-                            fontSize: 13,
-                          ),
-                        ),
-                        if (stats.hasTierBadge)
-                          Row(
-                            children: [
-                              Icon(
-                                stats.tier == 'platinum'
-                                    ? Icons.workspace_premium_rounded
-                                    : Icons.star_rounded,
-                                color: RidonsColors.accent,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                stats.priorityDispatch
-                                    ? 'priority_dispatch'.tr(
-                                        namedArgs: {'tier': stats.tierLabel},
-                                      )
-                                    : stats.tierLabel,
-                                style: const TextStyle(
-                                  color: RidonsColors.accent,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                  RidonsNotificationBell(
-                    unreadCount: notificationCenter.unreadCount,
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const NotificationInboxView(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _EarningsCard(
+              _DriverSummaryCard(
+                user: user,
+                session: session,
                 stats: stats,
                 hidden: viewModel.hideEarnings,
-                online: viewModel.online,
-                onlineBusy: viewModel.onlineBusy,
+                unreadCount: notificationCenter.unreadCount,
                 onToggleHidden: viewModel.toggleEarningsHidden,
-                onToggleOnline: viewModel.toggleOnline,
+                onNotifications: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const NotificationInboxView(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _AvailabilityCard(
+                online: viewModel.online,
+                busy: viewModel.onlineBusy,
+                onChanged: viewModel.toggleOnline,
               ),
               if (viewModel.pendingRatingRideId != null) ...[
                 const SizedBox(height: 16),
@@ -215,7 +161,9 @@ class _DriverIdleHome extends ConsumerWidget {
                 const SizedBox(height: 10),
                 Text(
                   viewModel.errorMessage!.tr(
-                    namedArgs: {'amount': '${viewModel.counteredAmount ?? ''}'},
+                    namedArgs: {
+                      'amount': (viewModel.counteredAmount ?? '').toString(),
+                    },
                   ),
                   style: TextStyle(color: RidonsColors.primary),
                 ),
@@ -232,7 +180,7 @@ class _DriverIdleHome extends ConsumerWidget {
               const SizedBox(height: 12),
               if (!viewModel.online)
                 Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
+                  padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Text(
                     'go_online_offers'.tr(),
                     style: TextStyle(color: context.ridonsMuted),
@@ -262,17 +210,27 @@ class _DriverIdleHome extends ConsumerWidget {
                   ),
                 )
               else
-                for (final offer in viewModel.offers) ...[
-                  _OfferCard(
-                    offer: offer,
-                    fare: viewModel.fareFor(offer),
-                    busy: viewModel.busy,
-                    onAdjust: (delta) => viewModel.adjustFare(offer, delta),
-                    onSkip: () => viewModel.skip(offer),
-                    onAccept: () => viewModel.accept(offer),
+                SizedBox(
+                  height: 390,
+                  child: ListView.separated(
+                    primary: false,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: 4),
+                    itemCount: viewModel.offers.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final offer = viewModel.offers[index];
+                      return _OfferCard(
+                        offer: offer,
+                        fare: viewModel.fareFor(offer),
+                        busy: viewModel.busy,
+                        onAdjust: (delta) => viewModel.adjustFare(offer, delta),
+                        onSkip: () => viewModel.skip(offer),
+                        onAccept: () => viewModel.accept(offer),
+                      );
+                    },
                   ),
-                  const SizedBox(height: 12),
-                ],
+                ),
             ],
           ),
         ),
@@ -281,29 +239,31 @@ class _DriverIdleHome extends ConsumerWidget {
   }
 }
 
-class _EarningsCard extends StatelessWidget {
-  const _EarningsCard({
+class _DriverSummaryCard extends StatelessWidget {
+  const _DriverSummaryCard({
+    required this.user,
+    required this.session,
     required this.stats,
     required this.hidden,
-    required this.online,
-    required this.onlineBusy,
+    required this.unreadCount,
     required this.onToggleHidden,
-    required this.onToggleOnline,
+    required this.onNotifications,
   });
 
+  final SessionUser user;
+  final AuthSession session;
   final DriverStats stats;
   final bool hidden;
-  final bool online;
-  final bool onlineBusy;
+  final int unreadCount;
   final VoidCallback onToggleHidden;
-  final ValueChanged<bool> onToggleOnline;
+  final VoidCallback onNotifications;
 
   static final _money = NumberFormat('#,###');
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -315,117 +275,228 @@ class _EarningsCard extends StatelessWidget {
         child: CustomPaint(
           foregroundPainter: const _EarningsPatternPainter(),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
             child: Column(
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    PassengerAvatar(
+                      user: user,
+                      radius: 25,
+                      token: session.token,
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'rwf_earned'.tr(),
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  height: 1.1,
+                          Text(
+                            user.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'driver_id_caption'.tr(
+                              namedArgs: {'id': user.driverIdLabel},
+                            ),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (stats.hasTierBadge)
+                            Row(
+                              children: [
+                                Icon(
+                                  stats.tier == 'platinum'
+                                      ? Icons.workspace_premium_rounded
+                                      : Icons.star_rounded,
+                                  color: RidonsColors.accent,
+                                  size: 15,
                                 ),
-                              ),
-                              const SizedBox(width: 4),
-                              Semantics(
-                                button: true,
-                                label: hidden
-                                    ? 'show_earnings'.tr()
-                                    : 'hide_earnings'.tr(),
-                                child: GestureDetector(
-                                  onTap: onToggleHidden,
-                                  behavior: HitTestBehavior.opaque,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(2),
-                                    child: Icon(
-                                      hidden
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                      color: Colors.white,
-                                      size: 17,
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    stats.priorityDispatch
+                                        ? 'priority_dispatch'.tr(
+                                            namedArgs: {
+                                              'tier': stats.tierLabel,
+                                            },
+                                          )
+                                        : stats.tierLabel,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: RidonsColors.accent,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            hidden ? '********' : _money.format(stats.total),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              height: 1,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.4,
+                              ],
                             ),
-                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'online'.tr(),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            height: 1.1,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        _OnlineToggle(
-                          value: online,
-                          busy: onlineBusy,
-                          onChanged: onToggleOnline,
-                          width: 44,
-                          height: 23,
-                        ),
-                      ],
+                    IconTheme.merge(
+                      data: const IconThemeData(color: Colors.white),
+                      child: RidonsNotificationBell(
+                        unreadCount: unreadCount,
+                        onPressed: onNotifications,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 9),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Text(
+                      'rwf_earned'.tr(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Semantics(
+                      button: true,
+                      label: hidden
+                          ? 'show_earnings'.tr()
+                          : 'hide_earnings'.tr(),
+                      child: GestureDetector(
+                        onTap: onToggleHidden,
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(
+                            hidden
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: Colors.white,
+                            size: 17,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      hidden ? '********' : _money.format(stats.total),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        height: 1,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 Container(height: 1, color: Colors.white24),
-                const SizedBox(height: 9),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     _Stat(
                       'rating',
                       stats.avgRating == 0
-                          ? '—'
+                          ? ''
                           : stats.avgRating.toStringAsFixed(1),
-                      labelFontSize: 10,
-                      valueFontSize: 12,
-                      dividerHeight: 31,
+                      labelFontSize: 11,
+                      valueFontSize: 13,
+                      dividerHeight: 34,
                     ),
                     _Stat(
                       'trips',
-                      '${stats.trips}',
-                      labelFontSize: 10,
-                      valueFontSize: 12,
-                      dividerHeight: 31,
+                      stats.trips.toString(),
+                      labelFontSize: 11,
+                      valueFontSize: 13,
+                      dividerHeight: 34,
                     ),
                     _Stat(
                       'accept',
-                      '${stats.acceptanceRate}%',
-                      labelFontSize: 10,
-                      valueFontSize: 12,
-                      dividerHeight: 31,
+                      '%',
+                      labelFontSize: 11,
+                      valueFontSize: 13,
+                      dividerHeight: 34,
                     ),
                   ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AvailabilityCard extends StatelessWidget {
+  const _AvailabilityCard({
+    required this.online,
+    required this.busy,
+    required this.onChanged,
+  });
+
+  final bool online;
+  final bool busy;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = online ? RidonsColors.primary : const Color(0xFFE5E5E7);
+    final foreground = online ? Colors.white : RidonsColors.navy;
+    return Semantics(
+      button: true,
+      toggled: online,
+      label: busy
+          ? 'updating_online_status'.tr()
+          : (online ? 'you_are_now_online'.tr() : 'click_to_go_online'.tr()),
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(9),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: busy ? null : () => onChanged(!online),
+          child: SizedBox(
+            height: 132,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                busy
+                    ? SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(foreground),
+                        ),
+                      )
+                    : Icon(
+                        Icons.power_settings_new_rounded,
+                        size: 50,
+                        color: foreground,
+                      ),
+                const SizedBox(height: 10),
+                Text(
+                  busy
+                      ? 'updating_online_status'.tr()
+                      : (online
+                            ? 'you_are_now_online'.tr()
+                            : 'click_to_go_online'.tr()),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ],
             ),
@@ -506,73 +577,6 @@ class _StatDivider extends StatelessWidget {
       width: 1,
       height: height,
       child: CustomPaint(painter: _DottedLinePainter()),
-    );
-  }
-}
-
-class _OnlineToggle extends StatelessWidget {
-  const _OnlineToggle({
-    required this.value,
-    required this.busy,
-    required this.onChanged,
-    this.width = 66,
-    this.height = 36,
-  });
-
-  final bool value;
-  final bool busy;
-  final ValueChanged<bool> onChanged;
-  final double width;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      toggled: value,
-      label: busy
-          ? 'updating_online_status'.tr()
-          : (value ? 'online'.tr() : 'offline'.tr()),
-      child: GestureDetector(
-        onTap: busy ? null : () => onChanged(!value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          width: width,
-          height: height,
-          padding: EdgeInsets.all(height * 0.11),
-          decoration: BoxDecoration(
-            color: value ? RidonsColors.primary : Colors.white24,
-            borderRadius: BorderRadius.circular(99),
-          ),
-          child: busy
-              ? Center(
-                  child: SizedBox(
-                    width: height * 0.5,
-                    height: height * 0.5,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
-                )
-              : Align(
-                  alignment: value
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: SizedBox(
-                    width: height * 0.78,
-                    height: height * 0.78,
-                    child: const DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ),
-        ),
-      ),
     );
   }
 }
@@ -734,9 +738,7 @@ class _OfferCard extends StatelessWidget {
         final buttonFontSize = (width * 0.04).clamp(12.0, 15.0).toDouble();
         final isCounter = fare > offer.offeredPrice;
         final actionLabel = isCounter
-            ? 'counter_amount'.tr(
-                namedArgs: {'amount': '${_money.format(fare)}'},
-              )
+            ? 'counter_amount'.tr(namedArgs: {'amount': _money.format(fare)})
             : 'accept_offer'.tr();
 
         return Material(

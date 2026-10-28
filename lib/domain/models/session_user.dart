@@ -7,6 +7,7 @@ class SessionUser {
     required this.id,
     required this.phone,
     required this.role,
+    this.availableRoles = const [AppRole.passenger],
     this.name = '',
     this.firstName = '',
     this.lastName = '',
@@ -21,6 +22,7 @@ class SessionUser {
   final String id;
   final String phone;
   final AppRole role;
+  final List<AppRole> availableRoles;
   final String name;
   final String firstName;
   final String lastName;
@@ -33,6 +35,10 @@ class SessionUser {
 
   bool get isVerified =>
       !role.isDriver || verificationStatus == VerificationStatus.approved;
+
+  bool get canSwitchModes =>
+      availableRoles.contains(AppRole.passenger) &&
+      availableRoles.contains(AppRole.driver);
 
   bool get hasUploadedPhoto =>
       avatarKey == 'upload' && (avatarUrl ?? '').isNotEmpty;
@@ -76,6 +82,16 @@ class SessionUser {
 
   factory SessionUser.fromJson(Map<String, dynamic> json) {
     final roleRaw = '${json['role'] ?? 'passenger'}';
+    final activeRole = roleRaw == 'driver' ? AppRole.driver : AppRole.passenger;
+    final available = <AppRole>{activeRole};
+    final rawAvailable = json['availableRoles'];
+    if (rawAvailable is List) {
+      for (final raw in rawAvailable) {
+        final value = '$raw';
+        final parsed = AppRole.values.where((role) => role.name == value);
+        if (parsed.isNotEmpty) available.add(parsed.first);
+      }
+    }
     return SessionUser(
       id: '${json['id'] ?? ''}',
       phone: '${json['phone'] ?? ''}',
@@ -95,7 +111,8 @@ class SessionUser {
             : VerificationStatus.approved,
       ),
       rejectReason: json['rejectReason']?.toString(),
-      role: roleRaw == 'driver' ? AppRole.driver : AppRole.passenger,
+      role: activeRole,
+      availableRoles: available.toList(growable: false),
     );
   }
 }
@@ -115,6 +132,7 @@ class AuthException implements Exception {
   final String? code;
 
   bool get isPhoneTaken => code == 'phone_taken';
+  bool get isUserNotFound => code == 'user_not_found';
 
   @override
   String toString() => message;

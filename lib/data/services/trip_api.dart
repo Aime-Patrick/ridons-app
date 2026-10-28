@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../domain/models/cancellation_reason.dart';
 import '../../domain/models/geo_place.dart';
 import '../../domain/models/fare_policy.dart';
 import '../../domain/models/ride_bid.dart';
@@ -63,8 +64,46 @@ class TripApi {
     );
   }
 
-  Future<void> cancelRequest(String requestId) async {
-    await _api.dio.post<Map<String, dynamic>>('/rides/$requestId/cancel');
+  Future<List<CancellationReason>> cancellationReasons({
+    required String actor,
+  }) async {
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/cancellation-reasons',
+        queryParameters: {'actor': actor},
+      );
+      final raw = response.data?['data'];
+      if (raw is List) {
+        final items = raw
+            .whereType<Map>()
+            .map(
+              (item) =>
+                  CancellationReason.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .where((item) => item.code.isNotEmpty)
+            .toList();
+        if (items.isNotEmpty) return items;
+      }
+    } catch (_) {}
+    return defaultCancellationReasons(actor);
+  }
+
+  Future<void> cancelRequest(
+    String requestId, {
+    String? reasonCode,
+    String? reasonLabel,
+    String? note,
+  }) async {
+    await _api.dio.post<Map<String, dynamic>>(
+      '/rides/$requestId/cancel',
+      data: {
+        if (reasonCode?.trim().isNotEmpty == true)
+          'reasonCode': reasonCode!.trim(),
+        if (reasonLabel?.trim().isNotEmpty == true)
+          'reasonLabel': reasonLabel!.trim(),
+        if (note?.trim().isNotEmpty == true) 'note': note!.trim(),
+      },
+    );
   }
 
   Future<List<RideOffer>> inbox() async {
@@ -191,10 +230,21 @@ class TripApi {
     );
   }
 
-  Future<void> cancelRide(String rideId) async {
+  Future<void> cancelRide(
+    String rideId, {
+    String? reasonCode,
+    String? reasonLabel,
+    String? note,
+  }) async {
     await _api.dio.post<Map<String, dynamic>>(
       '/rides/$rideId/cancel',
-      data: {'reason': 'driver_cancelled'},
+      data: {
+        if (reasonCode?.trim().isNotEmpty == true)
+          'reasonCode': reasonCode!.trim(),
+        if (reasonLabel?.trim().isNotEmpty == true)
+          'reasonLabel': reasonLabel!.trim(),
+        if (note?.trim().isNotEmpty == true) 'note': note!.trim(),
+      },
     );
   }
 
@@ -221,7 +271,8 @@ class TripApi {
         driverName: '${ride['driverName'] ?? offer?.driverName ?? ''}',
         driverVehiclePlate:
             '${ride['vehiclePlate'] ?? offer?.driverVehiclePlate ?? ''}',
-        driverRating: (ride['driverRating'] as num?)?.toDouble() ??
+        driverRating:
+            (ride['driverRating'] as num?)?.toDouble() ??
             offer?.driverRating ??
             0,
         driverPhone: '${ride['driverPhone'] ?? ''}',
@@ -256,6 +307,21 @@ class TripApi {
     return url;
   }
 
+  Future<Map<String, dynamic>> triggerSos(
+    String rideId, {
+    LatLng? location,
+  }) async {
+    final response = await _api.dio.post<Map<String, dynamic>>(
+      '/safety/sos',
+      data: {
+        'rideId': rideId,
+        if (location != null)
+          'location': [location.latitude, location.longitude],
+      },
+    );
+    return response.data ?? const {};
+  }
+
   Future<void> rateRide(
     String rideId, {
     required int rating,
@@ -264,11 +330,7 @@ class TripApi {
   }) async {
     await _api.dio.post<Map<String, dynamic>>(
       '/rides/$rideId/rate',
-      data: {
-        'rating': rating,
-        'comment': comment.trim(),
-        'tags': tags,
-      },
+      data: {'rating': rating, 'comment': comment.trim(), 'tags': tags},
     );
   }
 
@@ -293,10 +355,12 @@ class TripApi {
         driverName: '${ride['driverName'] ?? offer?.driverName ?? ''}',
         driverVehiclePlate:
             '${ride['vehiclePlate'] ?? offer?.driverVehiclePlate ?? ''}',
-        driverRating: (ride['driverRating'] as num?)?.toDouble() ??
+        driverRating:
+            (ride['driverRating'] as num?)?.toDouble() ??
             offer?.driverRating ??
             0,
-        driverPhone: '${response.data?['driverPhone'] ?? ride['driverPhone'] ?? ''}',
+        driverPhone:
+            '${response.data?['driverPhone'] ?? ride['driverPhone'] ?? ''}',
         status: '${ride['status'] ?? ''}',
         fare: (ride['fare'] as num?)?.toInt() ?? offer?.offeredPrice ?? 0,
         from: LatLng(
@@ -310,8 +374,8 @@ class TripApi {
         paymentMethod: offer?.paymentMethod ?? 'cash',
         fromName: offer?.fromName ?? '',
         toName: offer?.toName ?? '',
-        driverAvatarUrl: ride['driverAvatarUrl']?.toString() ??
-            offer?.driverAvatarUrl,
+        driverAvatarUrl:
+            ride['driverAvatarUrl']?.toString() ?? offer?.driverAvatarUrl,
       );
     } on DioException {
       return null;
@@ -362,7 +426,9 @@ class TripApi {
       if (raw is! List) return const [];
       return raw
           .whereType<Map>()
-          .map((item) => ReceivedRating.fromJson(Map<String, dynamic>.from(item)))
+          .map(
+            (item) => ReceivedRating.fromJson(Map<String, dynamic>.from(item)),
+          )
           .toList(growable: false);
     } on DioException {
       // Ratings are supplementary. A ratings service/database failure must

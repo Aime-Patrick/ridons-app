@@ -216,7 +216,7 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const RidonsLogo(kind: RidonsLogoKind.wordmark, height: 32),
+        const CameraWordmark(width: 150, initialZoom: 1.8),
         const SizedBox(height: 4),
         FittedBox(
           fit: BoxFit.scaleDown,
@@ -266,8 +266,8 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           RidonsRoleCard(
-            title: tr('get_a_ride'),
-            description: tr('get_a_ride_description'),
+            title: 'get_a_ride',
+            description: 'get_a_ride_description',
             imageAsset: 'assets/image/passenger_avatar.png',
             isSelected: _selectedRole == AppRole.passenger,
             onTap: () => _onRoleSelected(AppRole.passenger),
@@ -275,8 +275,8 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
           ),
           SizedBox(width: 16 * scale),
           RidonsRoleCard(
-            title: tr('drive_and_earn'),
-            description: tr('drive_and_earn_description'),
+            title: 'drive_and_earn',
+            description: 'drive_and_earn_description',
             imageAsset: 'assets/image/driver_avatar.png',
             isSelected: _selectedRole == AppRole.driver,
             onTap: () => _onRoleSelected(AppRole.driver),
@@ -364,7 +364,7 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
           onTap: () => setState(() => _selectedLocale = const Locale('en')),
         ),
         const SizedBox(height: 22),
-        RidonsButton(label: tr('continue'), onPressed: _onLanguageContinue),
+        RidonsButton(label: 'continue', onPressed: _onLanguageContinue),
       ],
     );
   }

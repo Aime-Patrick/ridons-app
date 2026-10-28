@@ -18,9 +18,11 @@ class DriverDocumentsService {
     required String type,
     required String filePath,
     required String fileName,
+    DateTime? expiresAt,
   }) async {
     final form = FormData.fromMap({
       'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      if (expiresAt != null) 'expiresAt': expiresAt.toUtc().toIso8601String(),
     });
     final response = await _api.dio.post<Map<String, dynamic>>(
       '/me/driver-documents/$type',

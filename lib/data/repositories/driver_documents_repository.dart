@@ -46,12 +46,14 @@ class DriverDocumentsRepository {
     required DriverDocumentType type,
     required String filePath,
     required String fileName,
+    DateTime? expiresAt,
   }) async {
     try {
       final json = await _service.upload(
         type: type.apiValue,
-        filePath: filePath,
-        fileName: fileName,
+      filePath: filePath,
+      fileName: fileName,
+      expiresAt: expiresAt,
       );
       final document = json['document'];
       if (document is! Map) return null;

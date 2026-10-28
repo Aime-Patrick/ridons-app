@@ -12,6 +12,7 @@ import '../../../../data/services/places_service.dart';
 import '../../../../data/services/realtime_client.dart';
 import '../../../../data/services/routing_service.dart';
 import '../../../../data/services/trip_api.dart';
+import '../../../../domain/models/cancellation_reason.dart';
 import '../../../../domain/models/geo_place.dart';
 import '../../../../domain/models/fare_policy.dart';
 import '../../../../domain/models/ride_offer.dart';
@@ -72,6 +73,8 @@ class DriverHomeViewModel extends ChangeNotifier {
   String passengerRatingComment = '';
   bool passengerRatingBusy = false;
   String? passengerRatingError;
+  bool sosBusy = false;
+  String? sosError;
   List<LatLng> routePoints = const [];
   List<LatLng> actualTrackPoints = const [];
   int? etaMinutes;
@@ -437,10 +440,22 @@ class DriverHomeViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> cancelTrip() async {
+  Future<List<CancellationReason>> cancellationReasons() =>
+      _trips.cancellationReasons(actor: 'driver');
+
+  Future<void> cancelTrip({
+    String? reasonCode,
+    String? reasonLabel,
+    String? note,
+  }) async {
     final current = ride;
     if (current == null) return;
-    await _trips.cancelRide(current.rideId);
+    await _trips.cancelRide(
+      current.rideId,
+      reasonCode: reasonCode,
+      reasonLabel: reasonLabel,
+      note: note,
+    );
     ride = null;
     stage = DriverStage.home;
     routePoints = const [];
@@ -451,6 +466,24 @@ class DriverHomeViewModel extends ChangeNotifier {
     _invalidateRouteRequests();
     if (online) await refreshInbox();
     notifyListeners();
+  }
+
+  Future<bool> triggerSos() async {
+    final current = ride;
+    if (sosBusy || current == null || current.rideId.isEmpty) return false;
+    sosBusy = true;
+    sosError = null;
+    notifyListeners();
+    try {
+      await _trips.triggerSos(current.rideId, location: driverPoint);
+      return true;
+    } catch (_) {
+      sosError = 'could_not_send_sos';
+      return false;
+    } finally {
+      sosBusy = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _enterRide(ActiveRide next) async {

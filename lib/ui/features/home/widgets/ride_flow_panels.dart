@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../data/config/api_config.dart';
 import '../../../core/theme/ridons_colors.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/widgets/ridons_cancellation_sheet.dart';
 import '../../../../domain/models/ride_stage.dart';
 import '../../../../domain/models/ride_bid.dart';
 import '../view_models/home_map_view_model.dart';
@@ -86,7 +88,8 @@ class RouteHeaderChip extends StatelessWidget {
             child: Row(
               children: [
                 IconButton(
-                  onPressed: viewModel.cancelRide,
+                  onPressed: () =>
+                      _requestPassengerCancellation(context, viewModel),
                   icon: Icon(Icons.close, size: 20, color: context.ridonsInk),
                 ),
                 Expanded(
@@ -1115,10 +1118,43 @@ class _MatchedSheet extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
+              onPressed: () =>
+                  _requestPassengerCancellation(context, viewModel),
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: Text('cancel_ride'.tr()),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: RidonsColors.primary,
+                side: const BorderSide(color: RidonsColors.primary),
+                minimumSize: const Size.fromHeight(44),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
               onPressed: () => _openNeedHelpDialog(context, viewModel),
               icon: const Icon(Icons.help_outline, size: 16),
               label: Text('need_help'.tr()),
               style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: viewModel.sosBusy
+                  ? null
+                  : () => _confirmSos(context, viewModel),
+              icon: const Icon(Icons.warning_amber_rounded, size: 18),
+              label: Text(
+                viewModel.sosBusy ? 'sending_sos'.tr() : 'send_sos'.tr(),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: RidonsColors.primary,
+                side: const BorderSide(color: RidonsColors.primary),
                 minimumSize: const Size.fromHeight(44),
               ),
             ),
@@ -1946,22 +1982,70 @@ Future<void> _shareTrip(
     return;
   }
 
-  final text = Uri.encodeComponent(
-    'track_trip_message'.tr(namedArgs: {'link': link}),
-  );
-  final whatsapp = Uri.parse('whatsapp://send?text=$text');
-  final openedWhatsApp = await launchUrl(
-    whatsapp,
-    mode: LaunchMode.externalApplication,
-  );
-  if (openedWhatsApp || !context.mounted) return;
-
-  final browserFallback = Uri.parse('https://api.whatsapp.com/send?text=$text');
-  final openedFallback = await launchUrl(
-    browserFallback,
-    mode: LaunchMode.externalApplication,
-  );
-  if (!openedFallback && context.mounted) {
-    RidonsNotice.error(context, 'whatsapp_unavailable');
+  final message = 'track_trip_message'.tr(namedArgs: {'link': link});
+  try {
+    final result = await SharePlus.instance.share(
+      ShareParams(
+        text: message,
+        title: 'share_trip'.tr(),
+        subject: 'trip_guardian_subject'.tr(),
+      ),
+    );
+    if (result.status == ShareResultStatus.unavailable && context.mounted) {
+      RidonsNotice.error(context, 'share_unavailable');
+    }
+  } catch (_) {
+    if (context.mounted) {
+      RidonsNotice.error(context, 'share_unavailable');
+    }
   }
+}
+
+Future<void> _confirmSos(
+  BuildContext context,
+  HomeMapViewModel viewModel,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('send_sos'.tr()),
+      content: Text('sos_confirmation'.tr()),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: Text('cancel'.tr()),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: Text('send_sos'.tr()),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  final sent = await viewModel.triggerSos();
+  if (!context.mounted) return;
+  if (sent) {
+    RidonsNotice.success(context, 'sos_sent');
+  } else {
+    RidonsNotice.error(context, viewModel.sosError ?? 'could_not_send_sos');
+  }
+}
+
+Future<void> _requestPassengerCancellation(
+  BuildContext context,
+  HomeMapViewModel viewModel,
+) async {
+  final selection = await showCancellationReasonSheet(
+    context: context,
+    actor: 'passenger',
+    loadReasons: viewModel.cancellationReasons,
+  );
+  if (!context.mounted || selection == null) return;
+  viewModel.cancelRide(
+    reasonCode: selection.code,
+    reasonLabel: selection.label,
+    note: selection.note,
+  );
 }

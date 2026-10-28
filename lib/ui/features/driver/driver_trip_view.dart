@@ -8,6 +8,8 @@ import '../../../domain/models/ride_offer.dart';
 import '../../../data/services/compass_service.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/ridons_button.dart';
+import '../../core/widgets/ridons_cancellation_sheet.dart';
+import '../../core/widgets/ridons_notice.dart';
 import '../../core/widgets/ridons_animated_marker.dart';
 import '../../core/widgets/ridons_map_view.dart';
 import '../../core/widgets/map_marker_info_sheet.dart';
@@ -281,7 +283,7 @@ class _TripSheet extends StatelessWidget {
               RidonsButton(
                 label: 'trip_was_canceled',
                 variant: RidonsButtonVariant.secondary,
-                onPressed: viewModel.cancelTrip,
+                onPressed: () => _requestDriverCancellation(context, viewModel),
               ),
             ] else ...[
               const SizedBox(height: 12),
@@ -314,13 +316,52 @@ class _TripSheet extends StatelessWidget {
               RidonsButton(
                 label: 'trip_was_canceled',
                 variant: RidonsButtonVariant.secondary,
-                onPressed: viewModel.cancelTrip,
+                onPressed: () => _requestDriverCancellation(context, viewModel),
               ),
             ],
+            const SizedBox(height: 10),
+            RidonsButton(
+              label: viewModel.sosBusy ? 'sending_sos' : 'send_sos',
+              variant: RidonsButtonVariant.secondary,
+              isLoading: viewModel.sosBusy,
+              onPressed: () => _confirmSos(context, viewModel),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _confirmSos(
+    BuildContext context,
+    DriverHomeViewModel viewModel,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('send_sos'.tr()),
+        content: Text('sos_confirmation'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('send_sos'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final sent = await viewModel.triggerSos();
+    if (!context.mounted) return;
+    if (sent) {
+      RidonsNotice.success(context, 'sos_sent');
+    } else {
+      RidonsNotice.error(context, viewModel.sosError ?? 'could_not_send_sos');
+    }
   }
 
   static String _payLabel(String raw) {
@@ -521,4 +562,21 @@ class _PassengerCard extends StatelessWidget {
         : cleaned.substring(cleaned.length - 6);
     return 'PAX-${few.toUpperCase()}';
   }
+}
+
+Future<void> _requestDriverCancellation(
+  BuildContext context,
+  DriverHomeViewModel viewModel,
+) async {
+  final selection = await showCancellationReasonSheet(
+    context: context,
+    actor: 'driver',
+    loadReasons: viewModel.cancellationReasons,
+  );
+  if (!context.mounted || selection == null) return;
+  await viewModel.cancelTrip(
+    reasonCode: selection.code,
+    reasonLabel: selection.label,
+    note: selection.note,
+  );
 }

@@ -114,6 +114,18 @@ class AccountView extends ConsumerWidget {
                 label: 'profile',
                 onTap: () => _open(context, const ProfileSettingsView()),
               ),
+              if (user?.canSwitchModes == true) ...[
+                const SizedBox(height: 10),
+                _OutlineTile(
+                  icon: Icons.swap_horiz_rounded,
+                  label: 'account_mode',
+                  subtitle: user!.role.isDriver
+                      ? 'driver_mode_active'
+                      : 'passenger_mode_active',
+                  onTap: () =>
+                      _open(context, const AccountModeSettingsView()),
+                ),
+              ],
               const SizedBox(height: 10),
               _OutlineTile(
                 icon: Icons.notifications_none_rounded,

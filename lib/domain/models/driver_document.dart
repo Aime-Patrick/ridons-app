@@ -2,7 +2,9 @@ enum DriverDocumentType {
   nationalId,
   drivingLicense,
   vehicleRegistration,
+  motorcycleAuthorisation,
   insurance,
+  selfie,
 }
 
 extension DriverDocumentTypeX on DriverDocumentType {
@@ -10,14 +12,18 @@ extension DriverDocumentTypeX on DriverDocumentType {
         DriverDocumentType.nationalId => 'national_id',
         DriverDocumentType.drivingLicense => 'driving_license',
         DriverDocumentType.vehicleRegistration => 'vehicle_registration',
+        DriverDocumentType.motorcycleAuthorisation => 'motorcycle_authorisation',
         DriverDocumentType.insurance => 'insurance',
+        DriverDocumentType.selfie => 'selfie',
       };
 
   String get label => switch (this) {
         DriverDocumentType.nationalId => 'National ID',
         DriverDocumentType.drivingLicense => 'Driving license',
         DriverDocumentType.vehicleRegistration => 'Vehicle registration',
+        DriverDocumentType.motorcycleAuthorisation => 'Motorcycle authorisation',
         DriverDocumentType.insurance => 'Insurance',
+        DriverDocumentType.selfie => 'Selfie',
       };
 }
 
@@ -31,6 +37,7 @@ class DriverDocument {
     required this.originalName,
     this.rejectReason,
     this.uploadedAt,
+    this.expiresAt,
   });
 
   final String id;
@@ -39,6 +46,7 @@ class DriverDocument {
   final String originalName;
   final String? rejectReason;
   final DateTime? uploadedAt;
+  final DateTime? expiresAt;
 
   factory DriverDocument.fromJson(Map<String, dynamic> json) {
     final rawType = '${json['type'] ?? ''}';
@@ -58,6 +66,7 @@ class DriverDocument {
       originalName: '${json['originalName'] ?? ''}',
       rejectReason: json['rejectReason']?.toString(),
       uploadedAt: DateTime.tryParse('${json['uploadedAt'] ?? ''}'),
+      expiresAt: DateTime.tryParse('${json['expiresAt'] ?? ''}'),
     );
   }
 }

@@ -4,7 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../data/config/api_config.dart';
 import '../../../data/services/prefs_store.dart';
+import '../../../domain/models/app_role.dart';
+import '../../../domain/models/session_user.dart';
 import '../../core/providers/session_providers.dart';
 import '../../core/providers/theme_mode_provider.dart';
 import '../../core/theme/ridons_colors.dart';
@@ -44,6 +47,101 @@ class AccountSubpage extends StatelessWidget {
             ),
             Expanded(child: child),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class AccountModeSettingsView extends ConsumerWidget {
+  const AccountModeSettingsView({super.key});
+
+  Future<void> _switch(
+    BuildContext context,
+    WidgetRef ref,
+    AppRole mode,
+  ) async {
+    final current = ref.read(authSessionProvider).asData?.value?.user;
+    if (current == null || current.role == mode) return;
+    try {
+      await ref.read(authSessionProvider.notifier).switchMode(mode);
+      if (context.mounted) Navigator.pop(context);
+    } on AuthException catch (error) {
+      if (context.mounted) RidonsNotice.error(context, error.message);
+    } catch (_) {
+      if (context.mounted)
+        RidonsNotice.error(context, 'could_not_switch_mode'.tr());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authSessionProvider).asData?.value;
+    final user = session?.user;
+    final roles = user?.availableRoles ?? const <AppRole>[];
+    return AccountSubpage(
+      title: 'account_mode',
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          Text(
+            'account_mode_description'.tr(),
+            style: TextStyle(color: context.ridonsMuted, height: 1.4),
+          ),
+          const SizedBox(height: 18),
+          for (final mode in roles.where(
+            (value) => value == AppRole.passenger || value == AppRole.driver,
+          )) ...[
+            _ModeChoiceTile(
+              mode: mode,
+              selected: user?.role == mode,
+              onTap: () => _switch(context, ref, mode),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeChoiceTile extends StatelessWidget {
+  const _ModeChoiceTile({
+    required this.mode,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppRole mode;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDriver = mode == AppRole.driver;
+    return Material(
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: selected ? RidonsColors.primary : context.ridonsLine,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        onTap: selected ? null : onTap,
+        leading: Icon(
+          isDriver ? Icons.two_wheeler_outlined : Icons.person_outline,
+          color: context.ridonsInk,
+        ),
+        title: Text((isDriver ? 'driver_mode' : 'passenger_mode').tr()),
+        subtitle: Text(
+          (isDriver ? 'driver_mode_description' : 'passenger_mode_description')
+              .tr(),
+        ),
+        trailing: Icon(
+          selected ? Icons.check_circle : Icons.radio_button_unchecked,
+          color: selected ? RidonsColors.primary : context.ridonsLine,
         ),
       ),
     );
@@ -431,6 +529,40 @@ class PrivacySettingsView extends ConsumerWidget {
           Text(
             'privacy_description'.tr(),
             style: TextStyle(color: context.ridonsMuted, height: 1.4),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'legal_documents'.tr(),
+            style: TextStyle(
+              color: context.ridonsInk,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'legal_documents_description'.tr(),
+            style: TextStyle(color: context.ridonsMuted, height: 1.35),
+          ),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.description_outlined, color: context.ridonsInk),
+            title: Text('terms_conditions'.tr()),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: () => _launch(Uri.parse(RidonsEnv.termsUrl)),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.lock_outline, color: context.ridonsInk),
+            title: Text('privacy_policy'.tr()),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: () => _launch(Uri.parse(RidonsEnv.privacyUrl)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'policy_version'.tr(args: [RidonsEnv.policyVersion]),
+            style: TextStyle(color: context.ridonsMuted, fontSize: 12),
           ),
         ],
       ),

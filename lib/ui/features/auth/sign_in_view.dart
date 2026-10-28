@@ -14,12 +14,11 @@ import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/widgets.dart';
 import 'view_models/auth_view_model.dart';
 
-/// Sign-in flow matching the phone-number and verification-code references.
+/// Unified auth flow — one phone screen for both new and returning users.
 class SignInView extends ConsumerStatefulWidget {
-  const SignInView({super.key, this.showCode = false, this.isSignUp = false});
+  const SignInView({super.key, this.showCode = false});
 
   final bool showCode;
-  final bool isSignUp;
 
   @override
   ConsumerState<SignInView> createState() => _SignInViewState();
@@ -36,9 +35,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final phone = ref.read(authViewModelProvider).pendingPhone;
         if (phone.isEmpty && mounted) {
-          context.go(
-            widget.isSignUp ? AppRoutes.signUpPhone : AppRoutes.signInPhone,
-          );
+          context.go(AppRoutes.signInPhone);
         }
       });
     }
@@ -54,16 +51,18 @@ class _SignInViewState extends ConsumerState<SignInView> {
 
   Future<void> _continueToCode() async {
     final vm = ref.read(authViewModelProvider);
-    final sent = await vm.sendCode(_phoneController.text);
+    final sent = await vm.sendCode(
+      _phoneController.text,
+      role: _role,
+    );
     if (!mounted || !sent) return;
-    context.go(widget.isSignUp ? AppRoutes.signUpCode : AppRoutes.signInCode);
+    context.go(AppRoutes.signInCode);
   }
 
-  Future<void> _verify({bool? signUp}) async {
+  Future<void> _verify() async {
     final vm = ref.read(authViewModelProvider);
     final session = await vm.verifyCode(
       role: _role,
-      signUp: signUp ?? widget.isSignUp,
     );
     if (!mounted || session == null) return;
     await ref.read(authSessionProvider.notifier).setSession(session);
@@ -112,35 +111,31 @@ class _SignInViewState extends ConsumerState<SignInView> {
       child: Scaffold(
         backgroundColor: context.ridonsPage,
         resizeToAvoidBottomInset: false,
-        appBar: widget.showCode
-            ? AppBar(
-                backgroundColor: context.ridonsPage,
-                elevation: 0,
-                automaticallyImplyLeading: false,
-                systemOverlayStyle: context.ridonsOverlay,
-                leading: IconButton(
-                  onPressed: () => context.go(
-                    widget.isSignUp
-                        ? AppRoutes.signUpPhone
-                        : AppRoutes.signInPhone,
-                  ),
-                  padding: const EdgeInsets.all(8),
-                  icon: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: context.ridonsLine),
-                    ),
-                    child: Icon(
-                      Icons.chevron_left_rounded,
-                      size: 26,
-                      color: context.ridonsInk,
-                    ),
-                  ),
-                ),
-              )
-            : null,
+        appBar: AppBar(
+          backgroundColor: context.ridonsPage,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          systemOverlayStyle: context.ridonsOverlay,
+          leading: IconButton(
+            onPressed: () => context.go(
+              widget.showCode ? AppRoutes.signInPhone : AppRoutes.signUp,
+            ),
+            padding: const EdgeInsets.all(8),
+            icon: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: context.ridonsLine),
+              ),
+              child: Icon(
+                Icons.chevron_left_rounded,
+                size: 26,
+                color: context.ridonsInk,
+              ),
+            ),
+          ),
+        ),
         body: SafeArea(
           child: AnimatedPadding(
             duration: const Duration(milliseconds: 280),
@@ -187,7 +182,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 46),
+        const SizedBox(height: 24),
         _buildHeading('enter_your_number'.tr(), centered: true),
         const SizedBox(height: 8),
         Text(
@@ -217,57 +212,20 @@ class _SignInViewState extends ConsumerState<SignInView> {
         ],
         const SizedBox(height: 16),
         RidonsButton(
-          label: 'continue'.tr(),
+          label: 'continue',
           isLoading: vm.sending,
           onPressed: _continueToCode,
         ),
-        const SizedBox(height: 46),
-        Center(
-          child: GestureDetector(
-            onTap: () => context.go(
-              widget.isSignUp ? AppRoutes.signInPhone : AppRoutes.signUp,
-            ),
-            child: Text.rich(
-              widget.isSignUp
-                  ? TextSpan(
-                      text: 'already_have_account'.tr(),
-                      style: _bodyStyle(color: context.ridonsInk),
-                      children: [
-                        TextSpan(
-                          text: 'sign_in'.tr(),
-                          style: _bodyStyle(
-                            color: RidonsColors.primary,
-                            weight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    )
-                  : TextSpan(
-                      text: 'no_account'.tr(),
-                      style: _bodyStyle(color: context.ridonsInk),
-                      children: [
-                        TextSpan(
-                          text: 'create_one'.tr(),
-                          style: _bodyStyle(
-                            color: RidonsColors.primary,
-                            weight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 32),
         Center(
           child: Text(
             'or'.tr(),
             style: TextStyle(color: context.ridonsMuted, fontSize: 11),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         RidonsButton(
-          label: 'continue_with_google'.tr(),
+          label: 'continue_with_google',
           variant: RidonsButtonVariant.outline,
           leading: SvgPicture.asset(
             'assets/brand/google_g.svg',
@@ -313,11 +271,9 @@ class _SignInViewState extends ConsumerState<SignInView> {
         ],
         const SizedBox(height: 16),
         RidonsButton(
-          label: vm.phoneTaken
-              ? 'sign_in_instead'.tr()
-              : (widget.isSignUp ? 'continue'.tr() : 'sign_in'.tr()),
+          label: 'continue',
           isLoading: vm.verifying,
-          onPressed: () => _verify(signUp: vm.phoneTaken ? false : null),
+          onPressed: _verify,
         ),
         const SizedBox(height: 14),
         if (resendIn > 0)
@@ -342,7 +298,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
           )
         else
           TextButton(
-            onPressed: vm.resend,
+            onPressed: () => vm.resend(role: _role),
             style: TextButton.styleFrom(
               alignment: Alignment.centerLeft,
               padding: EdgeInsets.zero,
@@ -361,9 +317,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
           child: Divider(height: 1),
         ),
         TextButton(
-          onPressed: () => context.go(
-            widget.isSignUp ? AppRoutes.signUpPhone : AppRoutes.signInPhone,
-          ),
+          onPressed: () => context.go(AppRoutes.signInPhone),
           style: TextButton.styleFrom(
             alignment: Alignment.centerLeft,
             padding: EdgeInsets.zero,

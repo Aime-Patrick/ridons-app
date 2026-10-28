@@ -104,7 +104,7 @@ class _AccountDetailsViewState extends ConsumerState<AccountDetailsView> {
                 ],
                 const SizedBox(height: 22),
                 RidonsButton(
-                  label: 'finish'.tr(),
+                  label: 'finish',
                   isLoading: vm.savingProfile,
                   onPressed: _finish,
                 ),
