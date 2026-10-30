@@ -92,16 +92,23 @@ String defaultGatewayUrl() {
 
 String e164Phone(String localDigits, {String countryCode = '+250'}) {
   var digits = localDigits.replaceAll(RegExp(r'\D'), '');
+  final callingCode = countryCode.replaceAll('+', '');
+  if (digits.startsWith(callingCode)) {
+    digits = digits.substring(callingCode.length);
+  }
   if (digits.startsWith('0')) {
     digits = digits.substring(1);
-  }
-  if (digits.startsWith(countryCode.replaceAll('+', ''))) {
-    return '+$digits';
   }
   return '$countryCode$digits';
 }
 
 bool isValidRwandaLocal(String localDigits) {
-  final digits = localDigits.replaceAll(RegExp(r'\D'), '');
-  return digits.length >= 8 && digits.length <= 10;
+  var digits = localDigits.replaceAll(RegExp(r'\D'), '');
+  if (digits.startsWith('250')) {
+    digits = digits.substring(3);
+  }
+  if (digits.startsWith('0')) {
+    digits = digits.substring(1);
+  }
+  return RegExp(r'^7\d{8}$').hasMatch(digits);
 }

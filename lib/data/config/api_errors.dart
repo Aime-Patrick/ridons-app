@@ -11,6 +11,8 @@ String apiErrorMessage(
   final payload = errorPayload(data);
   final code = payload?['error']?.toString();
   final known = switch (code) {
+    'invalid_phone_number' => 'valid_rwanda_phone',
+    'otp_service_unavailable' => 'otp_service_unavailable',
     'otp_mismatch' => 'That code is incorrect.',
     'otp_expired' => 'That code expired. Request a new one.',
     'otp_not_found' => 'Request a new code first.',
