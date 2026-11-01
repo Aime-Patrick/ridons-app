@@ -13,6 +13,7 @@ import '../../core/widgets/ridons_notification_bell.dart';
 import '../../core/widgets/ridons_price_adjuster.dart';
 import '../../core/widgets/ridons_rating_prompt.dart';
 import '../account/passenger_avatar.dart';
+import '../account/driver_documents_view.dart';
 import '../notifications/notification_inbox_view.dart';
 import 'driver_trip_view.dart';
 import 'view_models/driver_home_view_model.dart';
@@ -118,11 +119,20 @@ class _DriverIdleHome extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              _AvailabilityCard(
-                online: viewModel.online,
-                busy: viewModel.onlineBusy,
-                onChanged: viewModel.toggleOnline,
-              ),
+              if (!user.isVerified)
+                _DriverVerificationPendingCard(
+                  onDocuments: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const DriverDocumentsView(),
+                    ),
+                  ),
+                )
+              else
+                _AvailabilityCard(
+                  online: viewModel.online,
+                  busy: viewModel.onlineBusy,
+                  onChanged: viewModel.toggleOnline,
+                ),
               if (viewModel.pendingRatingRideId != null) ...[
                 const SizedBox(height: 16),
                 RidonsRatingPrompt(
@@ -141,7 +151,7 @@ class _DriverIdleHome extends ConsumerWidget {
                   errorMessage: viewModel.passengerRatingError,
                 ),
               ],
-              if (viewModel.quests.isNotEmpty) ...[
+              ...[
                 const SizedBox(height: 18),
                 Text(
                   'quests'.tr(),
@@ -152,10 +162,16 @@ class _DriverIdleHome extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                for (final quest in viewModel.quests) ...[
-                  _QuestCard(quest: quest),
-                  const SizedBox(height: 10),
-                ],
+                if (viewModel.quests.isEmpty)
+                  Text(
+                    'quest_no_active'.tr(),
+                    style: TextStyle(color: context.ridonsMuted),
+                  )
+                else
+                  for (final quest in viewModel.quests) ...[
+                    _QuestCard(quest: quest),
+                    const SizedBox(height: 10),
+                  ],
               ],
               if (viewModel.errorMessage != null) ...[
                 const SizedBox(height: 10),
@@ -438,6 +454,57 @@ class _DriverSummaryCard extends StatelessWidget {
   }
 }
 
+class _DriverVerificationPendingCard extends StatelessWidget {
+  const _DriverVerificationPendingCard({required this.onDocuments});
+
+  final VoidCallback onDocuments;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: RidonsColors.primary.withValues(alpha: .08),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: RidonsColors.primary.withValues(alpha: .3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.lock_outline_rounded, color: RidonsColors.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'documents_need_approval'.tr(),
+                    style: TextStyle(
+                      color: context.ridonsInk,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'driver_verification_pending_description'.tr(),
+              style: TextStyle(color: context.ridonsMuted, height: 1.35),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onDocuments,
+              icon: const Icon(Icons.description_outlined),
+              label: Text('driver_documents'.tr()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AvailabilityCard extends StatelessWidget {
   const _AvailabilityCard({
     required this.online,
@@ -647,12 +714,8 @@ class _QuestCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  quest.completed
-                      ? Icons.check_circle_rounded
-                      : Icons.flag_rounded,
-                  color: quest.completed
-                      ? RidonsColors.success
-                      : RidonsColors.primary,
+                  quest.completed ? Icons.check_circle_rounded : Icons.flag_rounded,
+                  color: quest.completed ? RidonsColors.success : RidonsColors.primary,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -666,43 +729,78 @@ class _QuestCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '+${_money.format(quest.reward)} RWF',
+                  '${_money.format(quest.reward)} RWF',
                   style: TextStyle(
-                    color: quest.completed
-                        ? RidonsColors.success
-                        : RidonsColors.accent,
+                    color: quest.completed ? RidonsColors.success : RidonsColors.accent,
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
                   ),
                 ),
               ],
             ),
+            if (quest.description.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                quest.description,
+                style: TextStyle(color: context.ridonsMuted, fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(99),
-              child: LinearProgressIndicator(
-                value: quest.fraction,
-                minHeight: 6,
-                backgroundColor: context.ridonsFill,
-                color: quest.completed
-                    ? RidonsColors.success
-                    : RidonsColors.primary,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: quest.fraction),
+                duration: const Duration(milliseconds: 650),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, _) => LinearProgressIndicator(
+                  value: value,
+                  minHeight: 8,
+                  backgroundColor: context.ridonsFill,
+                  color: quest.completed ? RidonsColors.success : RidonsColors.primary,
+                ),
               ),
             ),
             const SizedBox(height: 6),
             Text(
-              quest.completed
-                  ? '${quest.current} / ${quest.total} · Completed'
-                  : '${quest.current} / ${quest.total}',
+              'quest_progress'.tr(namedArgs: {
+                'current': '${quest.current}',
+                'total': '${quest.total}',
+              }),
               style: TextStyle(color: context.ridonsMuted, fontSize: 12),
             ),
+            if (quest.rewardStatus != 'in_progress' ||
+                quest.status == 'scheduled' ||
+                quest.status == 'ended') ...[
+              const SizedBox(height: 4),
+              Text(
+                _rewardStatus(context),
+                style: TextStyle(
+                  color: quest.rewardStatus == 'earned' || quest.rewardStatus == 'paid'
+                      ? RidonsColors.success
+                      : context.ridonsMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
-}
 
+  String _rewardStatus(BuildContext context) {
+    if (quest.rewardStatus == 'paid') return 'quest_reward_paid'.tr();
+    if (quest.rewardStatus == 'earned') return 'quest_reward_pending_payout'.tr();
+    if (quest.rewardStatus == 'budget_exhausted') {
+      return 'quest_reward_unavailable'.tr();
+    }
+    if (quest.status == 'paused') return 'quest_paused'.tr();
+    if (quest.status == 'scheduled') return 'quest_scheduled'.tr();
+    if (quest.status == 'ended') return 'quest_ended'.tr();
+    return 'quest_completed'.tr();
+  }
+}
 class _OfferCard extends StatelessWidget {
   const _OfferCard({
     required this.offer,

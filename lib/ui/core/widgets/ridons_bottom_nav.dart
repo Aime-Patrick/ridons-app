@@ -12,14 +12,23 @@ class RidonsBottomNav extends StatelessWidget {
     required this.current,
     required this.onChanged,
     this.role = AppRole.passenger,
+    this.driverApproved = true,
   });
 
   final RidonsNavTab current;
   final ValueChanged<RidonsNavTab> onChanged;
   final AppRole role;
+  final bool driverApproved;
 
   List<RidonsNavTab> get tabs {
     if (role.isDriver) {
+      if (!driverApproved) {
+        return const [
+          RidonsNavTab.home,
+          RidonsNavTab.activities,
+          RidonsNavTab.account,
+        ];
+      }
       return const [
         RidonsNavTab.home,
         RidonsNavTab.earnings,

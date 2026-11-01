@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../domain/models/app_role.dart';
 import 'ridons_colors.dart';
@@ -46,12 +45,8 @@ abstract final class RidonsTheme {
     final lineColor = isDark ? RidonsColors.darkLine : RidonsColors.border;
     final fillColor = isDark ? RidonsColors.darkFill : RidonsColors.inputFill;
 
-    final textTheme = GoogleFonts.plusJakartaSansTextTheme(
-      ThemeData(brightness: brightness).textTheme,
-    ).apply(
-      bodyColor: textColor,
-      displayColor: textColor,
-    );
+    final textTheme = ThemeData(brightness: brightness).textTheme
+        .apply(bodyColor: textColor, displayColor: textColor);
 
     return ThemeData(
       useMaterial3: true,
@@ -70,8 +65,7 @@ abstract final class RidonsTheme {
         centerTitle: false,
         systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness:
-              isDark ? Brightness.light : Brightness.dark,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
           statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         ),
         titleTextStyle: textTheme.titleLarge?.copyWith(
@@ -142,8 +136,9 @@ abstract final class RidonsTheme {
         // Navigation selection uses the Ridons brand red in both themes and
         // for both roles. Role colors still control the rest of the theme.
         selectedItemColor: RidonsColors.primary,
-        unselectedItemColor:
-            isDark ? RidonsColors.darkMuted : RidonsColors.textSecondary,
+        unselectedItemColor: isDark
+            ? RidonsColors.darkMuted
+            : RidonsColors.textSecondary,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),

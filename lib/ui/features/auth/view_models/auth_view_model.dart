@@ -32,6 +32,11 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _clearSignupConsent() {
+    signupTermsAccepted = false;
+    signupPrivacyAccepted = false;
+  }
+
   Timer? _resendTimer;
 
   String get displayPhone => pendingPhone.isEmpty ? '+250' : pendingPhone;
@@ -104,6 +109,7 @@ class AuthViewModel extends ChangeNotifier {
         privacyAccepted: signupPrivacyAccepted,
         policyVersion: signupPolicyVersion,
       );
+      _clearSignupConsent();
       return session;
     } on AuthException catch (e) {
       errorMessage = e.message;

@@ -27,7 +27,10 @@ class DriverDocumentsView extends ConsumerStatefulWidget {
 }
 
 class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
+  static const _maxUploadBytes = 10 * 1024 * 1024;
+
   Timer? _statusTimer;
+  Timer? _uploadRetryTimer;
   bool _statusRefreshBusy = false;
 
   @override
@@ -35,7 +38,12 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(ref.read(driverDocumentsViewModelProvider).load());
+      unawaited(_loadDocuments());
+      unawaited(_retryPendingDocuments(showSuccess: true));
+      _uploadRetryTimer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => unawaited(_retryPendingDocuments()),
+      );
       if (widget.onboarding) {
         _statusTimer = Timer.periodic(
           const Duration(seconds: 5),
@@ -45,13 +53,41 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
     });
   }
 
-  Future<void> _refreshVerificationStatus() async {
+  Future<void> _loadDocuments({bool showError = false}) async {
+    final viewModel = ref.read(driverDocumentsViewModelProvider);
+    await viewModel.load();
+    if (!mounted || !showError) return;
+    final error = viewModel.errorMessage;
+    if (error != null) _showUploadMessage(error.tr(), success: false);
+  }
+
+  Future<void> _retryPendingDocuments({bool showSuccess = false}) async {
+    final ownerId = ref.read(authSessionProvider).asData?.value?.user.id;
+    if (ownerId == null || ownerId.isEmpty) return;
+    try {
+      final completed = await ref
+          .read(driverDocumentsViewModelProvider)
+          .retryPendingUploads(ownerId: ownerId);
+      if (completed && showSuccess && mounted) {
+        RidonsNotice.success(context, 'documents_uploaded_after_wait'.tr());
+      }
+    } catch (_) {
+      // A local queue or network failure must not escape the periodic retry.
+      if (showSuccess && mounted) {
+        RidonsNotice.error(context, 'could_not_upload_document'.tr());
+      }
+    }
+  }
+
+  Future<void> _refreshVerificationStatus({bool reloadDocuments = false}) async {
     if (!mounted || !widget.onboarding || _statusRefreshBusy) return;
     _statusRefreshBusy = true;
     try {
-      await ref.read(authSessionProvider.notifier).refreshProfile();
-      if (mounted) {
-        await ref.read(driverDocumentsViewModelProvider).load();
+      await ref
+          .read(authSessionProvider.notifier)
+          .refreshProfile(onlyIfChanged: !reloadDocuments);
+      if (reloadDocuments && mounted) {
+        await _loadDocuments(showError: true);
       }
     } finally {
       _statusRefreshBusy = false;
@@ -61,10 +97,16 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
   @override
   void dispose() {
     _statusTimer?.cancel();
+    _uploadRetryTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _pick(DriverDocumentType type) async {
+    final activeUpload = ref.read(driverDocumentsViewModelProvider).uploading;
+    if (activeUpload != null) {
+      _showUploadMessage('document_upload_in_progress'.tr(), success: false);
+      return;
+    }
     final choice = await showModalBottomSheet<_DocumentPickChoice>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -84,6 +126,11 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
+              Text(
+                _documentPurposeLabel(type),
+                style: TextStyle(color: context.ridonsMuted),
+              ),
+              const SizedBox(height: 4),
               Text(
                 'document_upload_description'.tr(),
                 style: TextStyle(color: context.ridonsMuted),
@@ -127,6 +174,8 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
         _showUploadMessage('could_not_access_pdf'.tr(), success: false);
         return;
       }
+      final size = await picked.length();
+      if (!_isUploadSizeValid(size ?? 0)) return;
       await _upload(type: type, filePath: path, fileName: picked.name);
       return;
     }
@@ -139,8 +188,22 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
       imageQuality: 88,
     );
     if (picked == null || !mounted) return;
+    final size = await picked.length();
+    if (!_isUploadSizeValid(size)) return;
 
     await _upload(type: type, filePath: picked.path, fileName: picked.name);
+  }
+
+  bool _isUploadSizeValid(int size) {
+    if (size <= 0) {
+      _showUploadMessage('empty_document'.tr(), success: false);
+      return false;
+    }
+    if (size > _maxUploadBytes) {
+      _showUploadMessage('document_too_large'.tr(), success: false);
+      return false;
+    }
+    return true;
   }
 
   Future<void> _upload({
@@ -151,7 +214,14 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
     if (!mounted) return;
 
     final viewModel = ref.read(driverDocumentsViewModelProvider);
+    final ownerId = ref.read(authSessionProvider).asData?.value?.user.id;
+    if (ownerId == null || ownerId.isEmpty) return;
+    if (viewModel.uploading != null) {
+      _showUploadMessage('document_upload_in_progress'.tr(), success: false);
+      return;
+    }
     final success = await viewModel.upload(
+      ownerId: ownerId,
       type: type,
       filePath: filePath,
       fileName: fileName,
@@ -188,7 +258,7 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
       showBack: !widget.onboarding,
       child: RefreshIndicator(
         color: RidonsColors.primary,
-        onRefresh: viewModel.load,
+        onRefresh: () => _loadDocuments(showError: true),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
@@ -204,9 +274,9 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
             ),
             const SizedBox(height: 16),
             if (viewModel.loading && viewModel.documents.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: _DocumentsLoadingState(),
               ),
             for (final type in DriverDocumentType.values)
               Padding(
@@ -214,16 +284,10 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
                 child: _DocumentTile(
                   type: type,
                   document: viewModel.documentFor(type),
+                  pendingUpload: viewModel.hasPendingUpload(type),
                   uploading: viewModel.uploading == type,
+                  uploadProgress: viewModel.uploadProgress,
                   onUpload: () => _pick(type),
-                ),
-              ),
-            if (viewModel.errorMessage != null && !viewModel.loading)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  viewModel.errorMessage!.tr(),
-                  style: const TextStyle(color: RidonsColors.primary),
                 ),
               ),
             if (widget.onboarding) ...[
@@ -231,11 +295,17 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
               OutlinedButton.icon(
                 onPressed: viewModel.loading
                     ? null
-                    : _refreshVerificationStatus,
+                    : () => _refreshVerificationStatus(reloadDocuments: true),
                 icon: const Icon(Icons.refresh_rounded),
                 label: Text('check_verification_status'.tr()),
               ),
               const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => context.go(AppRoutes.home),
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: Text('continue_to_app'.tr()),
+              ),
+              const SizedBox(height: 4),
               TextButton(
                 onPressed: () async {
                   await ref.read(authSessionProvider.notifier).clear();
@@ -265,11 +335,25 @@ String _documentTypeLabel(DriverDocumentType type) {
   };
 }
 
+String _documentPurposeLabel(DriverDocumentType type) {
+  return switch (type) {
+    DriverDocumentType.nationalId => 'national_id_help'.tr(),
+    DriverDocumentType.drivingLicense => 'driving_license_help'.tr(),
+    DriverDocumentType.vehicleRegistration => 'vehicle_registration_help'.tr(),
+    DriverDocumentType.motorcycleAuthorisation =>
+      'motorcycle_authorisation_help'.tr(),
+    DriverDocumentType.insurance => 'insurance_help'.tr(),
+    DriverDocumentType.selfie => 'selfie_help'.tr(),
+  };
+}
+
 String _documentStatusLabel(DriverDocumentStatus? status, String? reason) {
   final label = (status?.name ?? 'pending').tr();
   final cleanReason = reason?.trim() ?? '';
   return cleanReason.isEmpty ? label : '$label · ${cleanReason.tr()}';
 }
+
+enum _DocumentVisualState { missing, rejected, queued, uploaded, approved }
 
 class _VerificationBanner extends StatelessWidget {
   const _VerificationBanner({
@@ -285,24 +369,36 @@ class _VerificationBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final complete = viewModel.canApprove;
+    final uploaded = viewModel.allRequiredUploaded;
     final rejected = status == VerificationStatus.rejected;
     final title = rejected
         ? 'documents_need_changes'
         : complete
         ? 'documents_ready_review'
+        : uploaded
+        ? 'documents_uploaded_waiting'
         : 'upload_required_documents';
     final detail = rejected && (reason ?? '').trim().isNotEmpty
         ? reason!.trim()
         : 'documents_manual_review';
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final ready = complete && !rejected;
+    final accent = ready
+        ? RidonsColors.success
+        : (dark ? RidonsColors.primaryLight : RidonsColors.primary);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: complete && !rejected
+        color: ready
             ? RidonsColors.success.withValues(alpha: .1)
+            : dark
+            ? RidonsColors.primary.withValues(alpha: .18)
             : RidonsColors.primarySoft,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: complete && !rejected
+          color: ready
               ? RidonsColors.success.withValues(alpha: .35)
+              : dark
+              ? RidonsColors.primaryLight.withValues(alpha: .65)
               : RidonsColors.primaryLight,
         ),
       ),
@@ -312,12 +408,10 @@ class _VerificationBanner extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
-              complete && !rejected
+              ready
                   ? Icons.verified_outlined
                   : Icons.shield_outlined,
-              color: complete && !rejected
-                  ? RidonsColors.success
-                  : RidonsColors.primary,
+              color: accent,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -337,69 +431,185 @@ class _VerificationBanner extends StatelessWidget {
   }
 }
 
+class _DocumentsLoadingState extends StatelessWidget {
+  const _DocumentsLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: context.ridonsDark
+                ? RidonsColors.primaryLight
+                : RidonsColors.primary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'documents_loading'.tr(),
+          style: TextStyle(color: context.ridonsMuted),
+        ),
+      ],
+    );
+  }
+}
+
 class _DocumentTile extends StatelessWidget {
   const _DocumentTile({
     required this.type,
     required this.document,
+    required this.pendingUpload,
     required this.uploading,
+    required this.uploadProgress,
     required this.onUpload,
   });
 
   final DriverDocumentType type;
   final DriverDocument? document;
+  final bool pendingUpload;
   final bool uploading;
+  final double uploadProgress;
   final VoidCallback onUpload;
 
   @override
   Widget build(BuildContext context) {
     final status = document?.status;
-    final statusColor = switch (status) {
-      DriverDocumentStatus.approved => RidonsColors.success,
-      DriverDocumentStatus.rejected => RidonsColors.primary,
-      _ => context.ridonsMuted,
+    final visualState = pendingUpload
+        ? _DocumentVisualState.queued
+        : document == null
+        ? _DocumentVisualState.missing
+        : switch (status) {
+            DriverDocumentStatus.approved => _DocumentVisualState.approved,
+            DriverDocumentStatus.rejected => _DocumentVisualState.rejected,
+            _ => _DocumentVisualState.uploaded,
+          };
+    final isGreen = visualState == _DocumentVisualState.uploaded ||
+        visualState == _DocumentVisualState.approved;
+    final isRed = visualState == _DocumentVisualState.missing ||
+        visualState == _DocumentVisualState.rejected ||
+        visualState == _DocumentVisualState.queued;
+    final statusColor = isGreen
+        ? RidonsColors.success
+        : isRed
+        ? (context.ridonsDark
+              ? RidonsColors.primaryLight
+              : RidonsColors.primary)
+        : context.ridonsMuted;
+    final backgroundColor = isGreen
+        ? RidonsColors.success.withValues(
+            alpha: context.ridonsDark ? .14 : .07,
+          )
+        : isRed
+        ? (context.ridonsDark
+              ? RidonsColors.primary.withValues(alpha: .14)
+              : RidonsColors.primarySoft)
+        : Colors.transparent;
+    final icon = switch (visualState) {
+      _DocumentVisualState.missing => Icons.error_outline_rounded,
+      _DocumentVisualState.rejected => Icons.error_rounded,
+      _DocumentVisualState.queued => Icons.cloud_upload_outlined,
+      _DocumentVisualState.uploaded => Icons.check_circle_outline_rounded,
+      _DocumentVisualState.approved => Icons.verified_rounded,
     };
-    final detail = document == null
-        ? 'required_not_uploaded'.tr()
-        : _documentStatusLabel(status, document?.rejectReason);
+    final detail = switch (visualState) {
+      _DocumentVisualState.missing => 'required_not_uploaded'.tr(),
+      _DocumentVisualState.rejected =>
+        _documentStatusLabel(status, document?.rejectReason),
+      _DocumentVisualState.queued => uploading
+          ? 'document_uploading'.tr()
+          : 'document_upload_waiting'.tr(),
+      _DocumentVisualState.uploaded => 'document_uploaded'.tr(),
+      _DocumentVisualState.approved => _documentStatusLabel(status, null),
+    };
     final expiry = document?.expiresAt;
     final expiryLabel = expiry == null
         ? null
         : '${'expires_on'.tr()}: ${expiry.toLocal().toIso8601String().split('T').first}';
-    return Material(
-      color: Colors.transparent,
-      shape: RoundedRectangleBorder(
+    final motionDuration = MediaQuery.maybeOf(context)?.disableAnimations == true
+        ? Duration.zero
+        : const Duration(milliseconds: 240);
+    return AnimatedContainer(
+      duration: motionDuration,
+      curve: Curves.easeOut,
+      decoration: BoxDecoration(
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: context.ridonsLine),
+        border: Border.all(
+          color: isGreen || isRed
+              ? statusColor.withValues(alpha: .45)
+              : context.ridonsLine,
+        ),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: Icon(Icons.description_outlined, color: context.ridonsInk),
-        title: Text(
-          _documentTypeLabel(type),
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Text(
-          expiryLabel == null ? detail : '$detail\n$expiryLabel',
-          style: TextStyle(color: statusColor, fontSize: 12),
-        ),
-        trailing: uploading
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : IconButton(
-                tooltip: document == null
-                    ? 'upload'.tr()
-                    : 'replace_document'.tr(),
-                onPressed: onUpload,
-                icon: Icon(
-                  document == null
-                      ? Icons.file_upload_outlined
-                      : Icons.refresh_rounded,
+      child: Material(
+        color: Colors.transparent,
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 6,
+          ),
+          leading: AnimatedSwitcher(
+            duration: motionDuration,
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: Icon(
+              icon,
+              key: ValueKey(visualState),
+              color: statusColor,
+            ),
+          ),
+          title: Text(
+            _documentTypeLabel(type),
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: Text(
+            expiryLabel == null ? detail : '$detail\n$expiryLabel',
+            style: TextStyle(color: statusColor, fontSize: 12),
+          ),
+          trailing: uploading
+              ? SizedBox(
+                  width: 86,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      LinearProgressIndicator(
+                        value: uploadProgress > 0 ? uploadProgress : null,
+                        minHeight: 5,
+                        borderRadius: BorderRadius.circular(5),
+                        color: context.ridonsDark
+                            ? RidonsColors.primaryLight
+                            : RidonsColors.primary,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        uploadProgress > 0
+                            ? '${(uploadProgress * 100).round()}%'
+                            : 'document_uploading'.tr(),
+                        style: TextStyle(
+                          color: context.ridonsMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : IconButton(
+                  tooltip: document == null
+                      ? 'upload'.tr()
+                      : 'replace_document'.tr(),
+                  onPressed: onUpload,
+                  icon: Icon(
+                    document == null
+                        ? Icons.file_upload_outlined
+                        : Icons.refresh_rounded,
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }

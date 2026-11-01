@@ -19,6 +19,7 @@ class DriverDocumentsService {
     required String filePath,
     required String fileName,
     DateTime? expiresAt,
+    void Function(int sent, int total)? onSendProgress,
   }) async {
     final form = FormData.fromMap({
       'file': await MultipartFile.fromFile(filePath, filename: fileName),
@@ -27,6 +28,11 @@ class DriverDocumentsService {
     final response = await _api.dio.post<Map<String, dynamic>>(
       '/me/driver-documents/$type',
       data: form,
+      options: Options(
+        sendTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
+      ),
+      onSendProgress: onSendProgress,
     );
     return response.data ?? const {};
   }

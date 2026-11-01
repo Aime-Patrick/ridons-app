@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../data/config/api_config.dart';
 import '../../core/providers/session_providers.dart';
@@ -54,7 +53,7 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
   void _continue() {
     if (!_accepted) return;
     ref.read(authViewModelProvider).setSignupConsent(accepted: true);
-    context.go(AppRoutes.signInPhone);
+    context.push(AppRoutes.signInPhone);
   }
 
   @override
@@ -94,7 +93,7 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                 Text(
                   'choose_ride_tagline'.tr(),
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
                     color: context.ridonsMuted,
                     fontWeight: FontWeight.w400,
                     fontSize: 16,
@@ -124,15 +123,12 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                 Center(
                   child: GestureDetector(
                     onTap: () {
-                      ref
-                          .read(authViewModelProvider)
-                          .setSignupConsent(accepted: true);
-                      context.go(AppRoutes.signInPhone);
+                      context.push(AppRoutes.signInPhone);
                     },
                     child: Text.rich(
                       TextSpan(
                         text: 'already_have_account'.tr(),
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
                           color: context.ridonsInk,
                           fontWeight: FontWeight.w400,
                           fontSize: 16,
@@ -142,7 +138,7 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                         children: [
                           TextSpan(
                             text: 'sign_in'.tr(),
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
                               color: RidonsColors.primary,
                               fontWeight: FontWeight.w700,
                               fontSize: 16,
@@ -167,7 +163,7 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                   title: Text.rich(
                     TextSpan(
                       text: 'consent_prefix'.tr(),
-                      style: GoogleFonts.inter(
+                      style: TextStyle(
                         color: context.ridonsMuted,
                         fontSize: 13,
                         height: 18 / 13,

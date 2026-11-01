@@ -46,8 +46,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final loggedIn = session.asData?.value != null;
       final needsProfile = session.asData?.value?.needsProfile ?? false;
       final user = session.asData?.value?.user;
-      final needsDriverVerification =
-          user?.role.isDriver == true && !user!.isVerified;
       final onAccount = loc == AppRoutes.signUpAccount;
       final onDriverVerification = loc == AppRoutes.driverVerification;
       final onAuth =
@@ -55,22 +53,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           loc.startsWith('/sign-up') ||
           loc == AppRoutes.onboarding;
 
-      // Profile completion is the first authenticated onboarding step. Keep
-      // the driver verification guard behind it so an incomplete driver
-      // session cannot bounce between the account and verification routes.
+      // Profile completion is the first authenticated onboarding step. Driver
+      // verification is a capability gate, not a full-app navigation gate;
+      // unapproved drivers can still access Account and document status.
       if (loggedIn && needsProfile) {
         return onAccount ? null : AppRoutes.signUpAccount;
       }
-      if (loggedIn && needsDriverVerification && !onDriverVerification) {
-        return AppRoutes.driverVerification;
-      }
-      if (loggedIn && !needsDriverVerification && onDriverVerification) {
+      if (loggedIn && user?.isVerified == true && onDriverVerification) {
         return AppRoutes.home;
       }
       if (loggedIn && !needsProfile && onAuth) {
-        return needsDriverVerification
-            ? AppRoutes.driverVerification
-            : AppRoutes.home;
+        return AppRoutes.home;
       }
       if (!loggedIn && loc == AppRoutes.home) {
         return AppRoutes.onboarding;
@@ -87,20 +80,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.onboarding,
-        pageBuilder: (context, state) => CustomTransitionPage<void>(
-          key: state.pageKey,
-          child: const OnboardingView(),
-          transitionDuration: const Duration(milliseconds: 450),
-          transitionsBuilder: (context, animation, _, child) {
-            return FadeTransition(
-              opacity: CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-              ),
-              child: child,
-            );
-          },
-        ),
+        builder: (context, state) => const OnboardingView(),
       ),
       GoRoute(
         path: AppRoutes.widgetsLab,

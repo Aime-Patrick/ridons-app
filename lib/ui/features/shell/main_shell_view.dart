@@ -29,6 +29,7 @@ class _MainShellViewState extends ConsumerState<MainShellView> {
     final role = ref.watch(appRoleProvider) ??
         ref.watch(authSessionProvider).asData?.value?.user.role ??
         AppRole.passenger;
+    final user = ref.watch(authSessionProvider).asData?.value?.user;
     final isDriver = role.isDriver;
 
     return Scaffold(
@@ -72,6 +73,7 @@ class _MainShellViewState extends ConsumerState<MainShellView> {
       bottomNavigationBar: RidonsBottomNav(
         current: _tab,
         role: role,
+        driverApproved: !isDriver || user?.isVerified == true,
         onChanged: (t) => setState(() => _tab = t),
       ),
     );

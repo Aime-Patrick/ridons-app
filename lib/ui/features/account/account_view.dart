@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/session_user.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/providers/session_providers.dart';
 import '../../core/providers/theme_mode_provider.dart';
 import 'account_settings_views.dart';
+import 'driver_documents_view.dart';
 import 'passenger_avatar.dart';
 import 'profile_photo_sheet.dart';
 
@@ -114,6 +116,20 @@ class AccountView extends ConsumerWidget {
                 label: 'profile',
                 onTap: () => _open(context, const ProfileSettingsView()),
               ),
+              if (user?.role.isDriver == true) ...[
+                const SizedBox(height: 10),
+                _OutlineTile(
+                  icon: Icons.verified_user_outlined,
+                  label: 'driver_documents',
+                  subtitle: switch (user!.verificationStatus) {
+                    VerificationStatus.approved => 'approved',
+                    VerificationStatus.rejected => 'documents_need_changes',
+                    VerificationStatus.pending => 'documents_need_approval',
+                    VerificationStatus.suspended => 'verification_not_approved',
+                  },
+                  onTap: () => _open(context, const DriverDocumentsView()),
+                ),
+              ],
               if (user?.canSwitchModes == true) ...[
                 const SizedBox(height: 10),
                 _OutlineTile(
@@ -122,8 +138,7 @@ class AccountView extends ConsumerWidget {
                   subtitle: user!.role.isDriver
                       ? 'driver_mode_active'
                       : 'passenger_mode_active',
-                  onTap: () =>
-                      _open(context, const AccountModeSettingsView()),
+                  onTap: () => _open(context, const AccountModeSettingsView()),
                 ),
               ],
               const SizedBox(height: 10),
@@ -183,23 +198,20 @@ class AccountView extends ConsumerWidget {
                 onTap: () => _open(context, const ContactSupportView()),
               ),
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
                   onPressed: () async {
                     await ref.read(authSessionProvider.notifier).clear();
                     if (!context.mounted) return;
                     context.go(AppRoutes.onboarding);
                   },
-                  icon: const Icon(Icons.logout_rounded, size: 18),
-                  label: Text('sign_out'.tr()),
-                  style: TextButton.styleFrom(
-                    foregroundColor: RidonsColors.primary,
-                    textStyle: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: RidonsColors.primary,
+                    foregroundColor: Colors.white,
+                    alignment: Alignment.center,
                   ),
+                  child: Text('sign_out'.tr(), textAlign: TextAlign.center),
                 ),
               ),
             ],

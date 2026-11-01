@@ -26,8 +26,7 @@ class RidonsLanguageTile extends StatelessWidget {
       child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: outlined
@@ -57,8 +56,7 @@ class RidonsLanguageTile extends StatelessWidget {
                     ),
               ),
             ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+            Container(
               width: 22,
               height: 22,
               decoration: BoxDecoration(

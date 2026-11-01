@@ -127,7 +127,7 @@ class AuthSessionNotifier extends AsyncNotifier<AuthSession?> {
   }
 
   /// Soft refresh of `/me` without clearing tokens on transient failures.
-  Future<void> refreshProfile() async {
+  Future<void> refreshProfile({bool onlyIfChanged = false}) async {
     final current = state.asData?.value;
     if (current == null) return;
     try {
@@ -155,6 +155,7 @@ class AuthSessionNotifier extends AsyncNotifier<AuthSession?> {
           return;
         }
       }
+      if (onlyIfChanged) return;
       state = AsyncData(session);
       ref.read(appRoleProvider.notifier).state = session.user.role;
     } catch (_) {

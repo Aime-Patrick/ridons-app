@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/ridons_colors.dart';
 
@@ -335,7 +334,7 @@ class _OtpCell extends StatelessWidget {
       child: filled
           ? Text(
               digit,
-              style: GoogleFonts.inter(
+              style: TextStyle(
                 color: context.ridonsInk,
                 fontSize: 24,
                 fontWeight: FontWeight.w700,

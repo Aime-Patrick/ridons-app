@@ -89,9 +89,12 @@ class DriverHomeViewModel extends ChangeNotifier {
 
   Timer? _inboxPoll;
   Timer? _pingTimer;
+  Timer? _verificationStatusTimer;
   DateTime? _lastLocationPingAt;
   var _locationPingBusy = false;
   bool _inboxRefreshing = false;
+  bool _verificationRefreshBusy = false;
+  VerificationStatus? _lastVerificationStatus;
   bool _statusBusy = false;
   bool _routeRefreshing = false;
   DateTime? _lastRouteRefreshAt;
@@ -115,6 +118,12 @@ class DriverHomeViewModel extends ChangeNotifier {
       FarePolicy.normalize(localFares[offer.requestId] ?? offer.offeredPrice);
 
   Future<void> bootstrap() async {
+    _lastVerificationStatus = user.verificationStatus;
+    unawaited(_refreshVerificationStatus());
+    _verificationStatusTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => unawaited(_refreshVerificationStatus()),
+    );
     await _location.ensureLocationPermission();
     _fix =
         await _location.freshPosition() ?? await _location.lastKnownPosition();
@@ -139,6 +148,21 @@ class DriverHomeViewModel extends ChangeNotifier {
       await toggleOnline(true);
     }
     notifyListeners();
+  }
+
+  Future<void> _refreshVerificationStatus() async {
+    if (_verificationRefreshBusy || onTrip) return;
+    _verificationRefreshBusy = true;
+    try {
+      final refreshed = await _auth.refreshSession();
+      if (refreshed == null) return;
+      final status = refreshed.user.verificationStatus;
+      if (status == _lastVerificationStatus) return;
+      _lastVerificationStatus = status;
+      onSessionRefreshed(refreshed);
+    } finally {
+      _verificationRefreshBusy = false;
+    }
   }
 
   void _startGpsTracking({required bool background}) {
@@ -746,6 +770,7 @@ class DriverHomeViewModel extends ChangeNotifier {
         routeDistanceKm = null;
         _invalidateRouteRequests();
         notifyListeners();
+        unawaited(_refreshQuestProgress());
       }
     }
     if (message.event == 'location' &&
@@ -891,10 +916,21 @@ class DriverHomeViewModel extends ChangeNotifier {
     );
   }
 
+  Future<void> _refreshQuestProgress() async {
+    try {
+      stats = await _trips.stats();
+      quests = await _trips.quests();
+      notifyListeners();
+    } catch (_) {
+      // A later normal refresh retries; the completed trip remains completed.
+    }
+  }
+
   @override
   void dispose() {
     _inboxPoll?.cancel();
     _pingTimer?.cancel();
+    _verificationStatusTimer?.cancel();
     _gps?.cancel();
     _ws?.cancel();
     _realtimeConnected?.cancel();

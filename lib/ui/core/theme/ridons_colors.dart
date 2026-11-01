@@ -20,12 +20,12 @@ abstract final class RidonsColors {
   static const Color border = Color(0xFFE2E8F0);
   static const Color inputFill = Color(0xFFF1F5F9);
 
-  static const Color darkPage = Color(0xFF0B1220);
-  static const Color darkSurface = Color(0xFF111827);
+  static const Color darkPage = Color(0xFF121212);
+  static const Color darkSurface = Color(0xFF1E1E1E);
   static const Color darkInk = Color(0xFFF8FAFC);
   static const Color darkMuted = Color(0xFF94A3B8);
-  static const Color darkLine = Color(0xFF334155);
-  static const Color darkFill = Color(0xFF1E293B);
+  static const Color darkLine = Color(0xFF333333);
+  static const Color darkFill = Color(0xFF292929);
 
   static const LinearGradient splashGradient = LinearGradient(
     begin: Alignment.topCenter,

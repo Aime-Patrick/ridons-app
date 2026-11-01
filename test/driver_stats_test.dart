@@ -20,6 +20,31 @@ void main() {
     expect(stats.goalFraction, closeTo(18500 / 25000, 0.001));
   });
 
+  test('DriverStats reads earnings breakdown and chart buckets', () {
+    final stats = DriverStats.fromJson({
+      'period': 'week',
+      'total': 14500,
+      'tripEarnings': 12000,
+      'questBonus': 2500,
+      'trips': 3,
+      'series': [
+        {
+          'date': '2026-10-30',
+          'tripEarnings': 4000,
+          'questBonus': 500,
+          'total': 4500,
+          'trips': 1,
+        },
+      ],
+    });
+
+    expect(stats.total, 14500);
+    expect(stats.tripEarnings, 12000);
+    expect(stats.questBonus, 2500);
+    expect(stats.series.single.total, 4500);
+    expect(stats.series.single.date, '2026-10-30');
+  });
+
   test('DriverQuest parses progress', () {
     final quest = DriverQuest.fromJson({
       'id': 'q1',

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/config/api_config.dart';
@@ -148,15 +149,152 @@ class _ModeChoiceTile extends StatelessWidget {
   }
 }
 
-class ProfileSettingsView extends ConsumerStatefulWidget {
+class ProfileSettingsView extends ConsumerWidget {
   const ProfileSettingsView({super.key});
 
   @override
-  ConsumerState<ProfileSettingsView> createState() =>
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authSessionProvider).asData?.value;
+    final user = session?.user;
+    final driver = user?.role.isDriver == true;
+    final verificationLabel = switch (user?.verificationStatus) {
+      VerificationStatus.approved => 'approved',
+      VerificationStatus.rejected => 'documents_need_changes',
+      VerificationStatus.pending => 'documents_need_approval',
+      VerificationStatus.suspended => 'verification_not_approved',
+      null => null,
+    };
+
+    return Scaffold(
+      backgroundColor: context.ridonsPage,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.arrow_back_ios_new_rounded,
+                        color: context.ridonsInk, size: 20),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'my_profile'.tr(),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: context.ridonsInk,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const EditProfileSettingsView(),
+                      ),
+                    ),
+                    child: Text('edit'.tr()),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+                children: [
+                  Row(
+                    children: [
+                      PassengerAvatar(
+                        user: user,
+                        radius: 46,
+                        token: session?.token,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user?.displayName ?? 'passenger'.tr(),
+                              style: TextStyle(
+                                color: context.ridonsInk,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              (driver ? 'driver_mode' : 'passenger_mode').tr(),
+                              style: TextStyle(color: context.ridonsMuted),
+                            ),
+                            if (driver && verificationLabel != null) ...[
+                              const SizedBox(height: 8),
+                              _ProfileStatus(label: verificationLabel),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 26),
+                  Text(
+                    'profile_details'.tr(),
+                    style: TextStyle(
+                      color: context.ridonsInk,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _ProfileDetailRow(
+                    icon: Icons.phone_iphone_rounded,
+                    label: 'phone_number',
+                    value: user?.phone ?? '—',
+                  ),
+                  _ProfileDetailRow(
+                    icon: Icons.badge_outlined,
+                    label: driver ? 'driver_id' : 'passenger_id',
+                    value: user?.publicIdLabel ?? '—',
+                  ),
+                  _ProfileDetailRow(
+                    icon: Icons.person_outline_rounded,
+                    label: 'profile_account_type',
+                    value: (driver ? 'driver_mode' : 'passenger_mode').tr(),
+                  ),
+                  if (driver && (user?.vehiclePlate?.isNotEmpty ?? false))
+                    _ProfileDetailRow(
+                      icon: Icons.two_wheeler_outlined,
+                      label: 'profile_vehicle',
+                      value: user!.vehiclePlate!,
+                    ),
+                  _ProfileDetailRow(
+                    icon: Icons.language_rounded,
+                    label: 'language',
+                    value: (user?.locale == 'rw' ? 'kinyarwanda' : 'english').tr(),
+                    isLast: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class EditProfileSettingsView extends ConsumerStatefulWidget {
+  const EditProfileSettingsView({super.key});
+
+  @override
+  ConsumerState<EditProfileSettingsView> createState() =>
       _ProfileSettingsViewState();
 }
 
-class _ProfileSettingsViewState extends ConsumerState<ProfileSettingsView> {
+class _ProfileSettingsViewState extends ConsumerState<EditProfileSettingsView> {
   late final TextEditingController _firstName;
   late final TextEditingController _lastName;
 
@@ -201,7 +339,7 @@ class _ProfileSettingsViewState extends ConsumerState<ProfileSettingsView> {
     final session = ref.watch(authSessionProvider).asData?.value;
     final phone = session?.user.phone ?? '';
     return AccountSubpage(
-      title: 'profile',
+      title: 'edit_profile',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
@@ -247,12 +385,14 @@ class _ProfileSettingsViewState extends ConsumerState<ProfileSettingsView> {
             controller: _firstName,
             label: 'first_name',
             textInputAction: TextInputAction.next,
+            large: true,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 26),
           RidonsTextField(
             controller: _lastName,
             label: 'last_name',
             textInputAction: TextInputAction.done,
+            large: true,
           ),
           const SizedBox(height: 12),
           RidonsTextField(label: 'phone', hint: phone, enabled: false),
@@ -270,6 +410,85 @@ class _ProfileSettingsViewState extends ConsumerState<ProfileSettingsView> {
             onPressed: _save,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ProfileDetailRow extends StatelessWidget {
+  const _ProfileDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.isLast = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : Border(bottom: BorderSide(color: context.ridonsLine)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: context.ridonsMuted),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.tr(),
+                  style: TextStyle(color: context.ridonsMuted, fontSize: 12),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: context.ridonsInk,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileStatus extends StatelessWidget {
+  const _ProfileStatus({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final approved = label == 'approved';
+    final color = approved ? const Color(0xFF138A55) : RidonsColors.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label.tr(),
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -570,8 +789,15 @@ class PrivacySettingsView extends ConsumerWidget {
   }
 }
 
-class AboutRidonsView extends StatelessWidget {
+class AboutRidonsView extends StatefulWidget {
   const AboutRidonsView({super.key});
+
+  @override
+  State<AboutRidonsView> createState() => _AboutRidonsViewState();
+}
+
+class _AboutRidonsViewState extends State<AboutRidonsView> {
+  late final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
 
   @override
   Widget build(BuildContext context) {
@@ -589,7 +815,17 @@ class AboutRidonsView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text('version'.tr()),
+          FutureBuilder<PackageInfo>(
+            future: _packageInfo,
+            builder: (context, snapshot) {
+              final info = snapshot.data;
+              if (snapshot.hasError) return Text('version_unavailable'.tr());
+              if (info == null) return const SizedBox.shrink();
+              return Text(
+                'version'.tr(args: [info.version, info.buildNumber]),
+              );
+            },
+          ),
           const SizedBox(height: 16),
           Text(
             'about_description'.tr(),

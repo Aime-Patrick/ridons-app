@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../domain/models/app_role.dart';
 import '../../core/providers/app_role_provider.dart';
@@ -51,30 +50,19 @@ class _SignInViewState extends ConsumerState<SignInView> {
 
   Future<void> _continueToCode() async {
     final vm = ref.read(authViewModelProvider);
-    final sent = await vm.sendCode(
-      _phoneController.text,
-      role: _role,
-    );
+    final sent = await vm.sendCode(_phoneController.text, role: _role);
     if (!mounted || !sent) return;
-    context.go(AppRoutes.signInCode);
+    context.push(AppRoutes.signInCode);
   }
 
   Future<void> _verify() async {
     final vm = ref.read(authViewModelProvider);
-    final session = await vm.verifyCode(
-      role: _role,
-    );
+    final session = await vm.verifyCode(role: _role);
     if (!mounted || session == null) return;
     await ref.read(authSessionProvider.notifier).setSession(session);
     ref.read(appRoleProvider.notifier).state = session.user.role;
     if (!mounted) return;
-    context.go(
-      session.needsProfile
-          ? AppRoutes.signUpAccount
-          : (session.user.role.isDriver && !session.user.isVerified
-                ? AppRoutes.driverVerification
-                : AppRoutes.home),
-    );
+    context.go(session.needsProfile ? AppRoutes.signUpAccount : AppRoutes.home);
   }
 
   void _googleSoon() {
@@ -85,7 +73,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
     required Color color,
     FontWeight weight = FontWeight.w400,
   }) {
-    return GoogleFonts.inter(
+    return TextStyle(
       color: color,
       fontSize: 16,
       fontWeight: weight,
@@ -188,7 +176,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
         Text(
           'verification_code_sent'.tr(),
           textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
+          style: TextStyle(
             color: context.ridonsMuted,
             fontWeight: FontWeight.w400,
             fontSize: 14,
@@ -247,7 +235,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
         const SizedBox(height: 24),
         Text(
           '${'verification_code_sent_short'.tr()}\n${vm.displayPhone}',
-          style: GoogleFonts.inter(
+          style: TextStyle(
             color: context.ridonsInk,
             fontWeight: FontWeight.w400,
             fontSize: 16,
@@ -336,7 +324,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
     return Text(
       text,
       textAlign: centered ? TextAlign.center : TextAlign.left,
-      style: GoogleFonts.inter(
+      style: TextStyle(
         color: context.ridonsInk,
         fontSize: 24,
         fontWeight: FontWeight.w700,

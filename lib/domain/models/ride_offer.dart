@@ -66,8 +66,9 @@ class RideOffer {
   }
 
   String get passengerIdLabel {
-    final tail =
-        passengerId.contains('_') ? passengerId.split('_').last : passengerId;
+    final tail = passengerId.contains('_')
+        ? passengerId.split('_').last
+        : passengerId;
     final cleaned = tail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
     if (cleaned.isEmpty) return '—';
     final few = cleaned.length <= 6
@@ -87,17 +88,20 @@ class RideOffer {
       from: LatLng(fromLat, fromLng),
       to: LatLng(toLat, toLng),
       offeredPrice: (json['offeredPrice'] as num?)?.toInt() ?? 0,
-      expiresAt: DateTime.tryParse('${json['expiresAt'] ?? ''}')?.toLocal() ??
+      expiresAt:
+          DateTime.tryParse('${json['expiresAt'] ?? ''}')?.toLocal() ??
           DateTime.now(),
       paymentMethod: '${json['paymentMethod'] ?? 'cash'}',
       driverName: '${json['driverName'] ?? ''}',
       driverVehiclePlate: '${json['vehiclePlate'] ?? ''}',
       driverRating: (json['driverRating'] as num?)?.toDouble() ?? 0,
       driverAvatarUrl: json['driverAvatarUrl']?.toString(),
-      negotiationRound: (json['negotiationRound'] as num?)?.toInt() ??
+      negotiationRound:
+          (json['negotiationRound'] as num?)?.toInt() ??
           (json['round'] as num?)?.toInt() ??
           0,
-      maxNegotiationRounds: (json['maxNegotiationRounds'] as num?)?.toInt() ??
+      maxNegotiationRounds:
+          (json['maxNegotiationRounds'] as num?)?.toInt() ??
           (json['maxRounds'] as num?)?.toInt() ??
           3,
     );
@@ -171,6 +175,9 @@ class DriverStats {
   const DriverStats({
     this.total = 0,
     this.trips = 0,
+    this.tripEarnings = 0,
+    this.questBonus = 0,
+    this.series = const [],
     this.avgRating = 0,
     this.acceptanceRate = 100,
     this.completionRate = 100,
@@ -183,6 +190,9 @@ class DriverStats {
 
   final int total;
   final int trips;
+  final int tripEarnings;
+  final int questBonus;
+  final List<EarningsBucket> series;
   final double avgRating;
   final int acceptanceRate;
   final int completionRate;
@@ -218,16 +228,30 @@ class DriverStats {
 
   factory DriverStats.fromJson(Map<String, dynamic> json) {
     return DriverStats(
-      total: (json['total'] as num?)?.toInt() ??
+      total:
+          (json['total'] as num?)?.toInt() ??
           (json['weeklyEarnings'] as num?)?.toInt() ??
           0,
-      trips: (json['trips'] as num?)?.toInt() ??
+      trips:
+          (json['trips'] as num?)?.toInt() ??
           (json['weeklyTrips'] as num?)?.toInt() ??
           0,
+      tripEarnings: (json['tripEarnings'] as num?)?.toInt() ?? 0,
+      questBonus: (json['questBonus'] as num?)?.toInt() ?? 0,
+      series:
+          (json['series'] as List?)
+              ?.whereType<Map>()
+              .map(
+                (item) =>
+                    EarningsBucket.fromJson(Map<String, dynamic>.from(item)),
+              )
+              .toList(growable: false) ??
+          const [],
       avgRating: (json['avgRating'] as num?)?.toDouble() ?? 0,
       acceptanceRate: (json['acceptanceRate'] as num?)?.toInt() ?? 100,
       completionRate: (json['completionRate'] as num?)?.toInt() ?? 100,
-      todayEarnings: (json['todayEarnings'] as num?)?.toInt() ??
+      todayEarnings:
+          (json['todayEarnings'] as num?)?.toInt() ??
           (json['goalProgress'] as num?)?.toInt() ??
           0,
       goalDaily: (json['goalDaily'] as num?)?.toInt() ?? 25000,
@@ -238,24 +262,56 @@ class DriverStats {
   }
 }
 
+class EarningsBucket {
+  const EarningsBucket({
+    required this.date,
+    required this.tripEarnings,
+    required this.questBonus,
+    required this.total,
+    required this.trips,
+  });
+
+  final String date;
+  final int tripEarnings;
+  final int questBonus;
+  final int total;
+  final int trips;
+
+  factory EarningsBucket.fromJson(Map<String, dynamic> json) {
+    return EarningsBucket(
+      date: '${json['date'] ?? ''}',
+      tripEarnings: (json['tripEarnings'] as num?)?.toInt() ?? 0,
+      questBonus: (json['questBonus'] as num?)?.toInt() ?? 0,
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      trips: (json['trips'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class DriverQuest {
   const DriverQuest({
     required this.id,
     required this.title,
+    this.description = '',
     required this.current,
     required this.total,
     required this.reward,
     required this.expires,
     this.completed = false,
+    this.status = 'active',
+    this.rewardStatus = 'in_progress',
   });
 
   final String id;
   final String title;
+  final String description;
   final int current;
   final int total;
   final int reward;
   final DateTime expires;
   final bool completed;
+  final String status;
+  final String rewardStatus;
 
   double get fraction {
     if (total <= 0) return 0;
@@ -269,12 +325,20 @@ class DriverQuest {
     return DriverQuest(
       id: '${json['id'] ?? ''}',
       title: '${json['title'] ?? ''}',
+      description: '${json['description'] ?? ''}',
       current: (json['current'] as num?)?.toInt() ?? 0,
       total: (json['total'] as num?)?.toInt() ?? 1,
-      reward: (json['reward'] as num?)?.toInt() ?? 0,
-      expires: DateTime.tryParse('${json['expires'] ?? ''}')?.toLocal() ??
+      reward:
+          (json['reward'] as num?)?.toInt() ??
+          (json['rewardRwf'] as num?)?.toInt() ??
+          0,
+      expires:
+          DateTime.tryParse('${json['expires'] ?? ''}')?.toLocal() ??
+          DateTime.tryParse('${json['endsAt'] ?? ''}')?.toLocal() ??
           DateTime.now(),
       completed: json['completed'] == true,
+      status: '${json['status'] ?? 'active'}',
+      rewardStatus: '${json['rewardStatus'] ?? 'in_progress'}',
     );
   }
 }
@@ -309,7 +373,8 @@ class TripHistoryItem {
       ),
       fare: (json['fare'] as num?)?.toInt() ?? 0,
       status: '${json['status'] ?? ''}',
-      when: DateTime.tryParse('${json['completedAt'] ?? ''}')?.toLocal() ??
+      when:
+          DateTime.tryParse('${json['completedAt'] ?? ''}')?.toLocal() ??
           DateTime.now(),
     );
   }

@@ -4,7 +4,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../domain/models/app_role.dart';
 import '../../core/providers/app_role_provider.dart';
@@ -53,83 +52,76 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
   void _onRoleSelected(AppRole role) {
     setState(() => _selectedRole = role);
     unawaited(_persist(role));
-    context.go(AppRoutes.signUp);
+    context.push(AppRoutes.signUp);
   }
 
   void _onSkip() {
     unawaited(_persist(AppRole.passenger));
-    context.go(AppRoutes.signUp);
+    context.push(AppRoutes.signUp);
   }
 
   void _onSignIn() {
     unawaited(_persist(_selectedRole ?? AppRole.passenger));
-    context.go(AppRoutes.signInPhone);
+    context.push(AppRoutes.signInPhone);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        clipBehavior: Clip.hardEdge,
-        children: [
-          Positioned(
-            top: 3,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: ClipRect(
-              child: Transform.scale(
-                scale: 1.45,
-                alignment: Alignment.bottomCenter,
-                child: Image.asset(
-                  'assets/image/landing_image.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) =>
-                      Container(color: RidonsColors.primaryDarker),
+    return PopScope<void>(
+      canPop: _currentStep == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _currentStep == 0) return;
+        setState(() {
+          _currentStep = 0;
+          _selectedRole = null;
+        });
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          fit: StackFit.expand,
+          clipBehavior: Clip.hardEdge,
+          children: [
+            Positioned(
+              top: 3,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: ClipRect(
+                child: Transform.scale(
+                  scale: 1.45,
+                  alignment: Alignment.bottomCenter,
+                  child: Image.asset(
+                    'assets/image/landing_image.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        Container(color: RidonsColors.primaryDarker),
+                  ),
                 ),
               ),
             ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: const [0.0, 0.35, 0.65, 1.0],
-                colors: [
-                  Colors.black.withValues(alpha: 0.15),
-                  Colors.black.withValues(alpha: 0.35),
-                  Colors.black.withValues(alpha: 0.70),
-                  Colors.black.withValues(alpha: 0.95),
-                ],
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.0, 0.35, 0.65, 1.0],
+                  colors: [
+                    Colors.black.withValues(alpha: 0.15),
+                    Colors.black.withValues(alpha: 0.35),
+                    Colors.black.withValues(alpha: 0.70),
+                    Colors.black.withValues(alpha: 0.95),
+                  ],
+                ),
               ),
             ),
-          ),
-          SafeArea(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 320),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.0, 0.025),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                );
-              },
+            SafeArea(
               child: _currentStep == 0
                   ? _buildLanguageLayout(context)
                   : _buildRoleLayout(context),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -216,7 +208,7 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const CameraWordmark(width: 150, initialZoom: 1.8),
+        const RidonsLogo(kind: RidonsLogoKind.wordmark, height: 40),
         const SizedBox(height: 4),
         FittedBox(
           fit: BoxFit.scaleDown,
@@ -224,7 +216,7 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
             tr('tagline'),
             textAlign: TextAlign.center,
             softWrap: false,
-            style: GoogleFonts.inter(
+            style: TextStyle(
               color: Colors.white.withValues(alpha: 0.94),
               fontSize: 20,
               fontWeight: FontWeight.w500,

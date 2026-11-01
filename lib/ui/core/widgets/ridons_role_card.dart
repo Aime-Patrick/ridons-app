@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/ridons_colors.dart';
 
@@ -29,8 +28,7 @@ class RidonsRoleCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+        child: Container(
           padding: EdgeInsets.symmetric(
             horizontal: 16 * scale,
             vertical: 16 * scale,
@@ -90,7 +88,7 @@ class RidonsRoleCard extends StatelessWidget {
                       Text(
                         title.tr(),
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
                           fontSize: 20 * scale,
                           fontWeight: FontWeight.w600,
                           height: 0.88,
@@ -103,7 +101,7 @@ class RidonsRoleCard extends StatelessWidget {
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.clip,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
                           fontSize: 16 * scale,
                           fontWeight: FontWeight.w400,
                           height: 1,

@@ -38,11 +38,7 @@ class _AccountDetailsViewState extends ConsumerState<AccountDetailsView> {
     if (!mounted || session == null) return;
     await ref.read(authSessionProvider.notifier).setSession(session);
     if (!mounted) return;
-    context.go(
-      session.user.role.isDriver && !session.user.isVerified
-          ? AppRoutes.driverVerification
-          : AppRoutes.home,
-    );
+    context.go(AppRoutes.home);
   }
 
   @override
@@ -80,17 +76,19 @@ class _AccountDetailsViewState extends ConsumerState<AccountDetailsView> {
                 const SizedBox(height: 12),
                 RidonsTextField(
                   controller: _firstName,
-                  label: 'first_name'.tr(),
+                  label: 'first_name',
                   textInputAction: TextInputAction.next,
                   autofocus: true,
                   enabled: !vm.savingProfile,
+                  large: true,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 26),
                 RidonsTextField(
                   controller: _lastName,
-                  label: 'last_name'.tr(),
+                  label: 'last_name',
                   textInputAction: TextInputAction.done,
                   enabled: !vm.savingProfile,
+                  large: true,
                 ),
                 if (vm.errorMessage != null) ...[
                   const SizedBox(height: 12),
