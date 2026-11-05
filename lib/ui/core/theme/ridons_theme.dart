@@ -140,7 +140,7 @@ abstract final class RidonsTheme {
             ? RidonsColors.darkMuted
             : RidonsColors.textSecondary,
         type: BottomNavigationBarType.fixed,
-        elevation: 8,
+        elevation: 0,
       ),
       dividerColor: isDark ? const Color(0xFF1F2937) : RidonsColors.border,
       dialogTheme: DialogThemeData(

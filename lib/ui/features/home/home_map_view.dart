@@ -57,11 +57,13 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
       geoApi: ref.read(geoApiProvider),
       realtime: ref.read(realtimeClientProvider),
       coverageApi: ref.read(coverageApiProvider),
+      prefsStore: ref.read(prefsStoreProvider),
       tripApi: ref.read(tripApiProvider),
       pricingApi: ref.read(pricingApiProvider),
       supportApi: ref.read(supportApiProvider),
       passengerName:
           ref.read(authSessionProvider).asData?.value?.user.displayName ?? '',
+      passengerId: ref.read(authSessionProvider).asData?.value?.user.id ?? '',
     )..addListener(_onViewModel);
     _sheetController.addListener(_onSheetMoved);
     _viewModel.bootstrap();
@@ -186,7 +188,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
     final hasDropoff = _viewModel.dropoff != null;
     if (stage == RideStage.search ||
         _viewModel.locationPromptNeeded ||
-        _viewModel.coverageBlocksBooking ||
+        _viewModel.coverageNeedsUserAction ||
         !_viewModel.bootstrapped) {
       return;
     }
@@ -253,7 +255,9 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
             _viewModel.stage == RideStage.preview ||
             _viewModel.stage == RideStage.estimate;
         final coverageBlocked =
-            planningTrip && !askingLocation && _viewModel.coverageBlocksBooking;
+            planningTrip &&
+            !askingLocation &&
+            _viewModel.coverageNeedsUserAction;
         final showRideSheet =
             _viewModel.bootstrapped &&
             !askingLocation &&
@@ -265,106 +269,196 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
             showRideSheet &&
             _viewModel.dropoffLabel.isNotEmpty;
         final sheetFraction = showRideSheet ? _sheetFraction : 0.0;
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(
-              child: _PassengerMap(
-                controller: _mapController,
-                viewModel: _viewModel,
-                sheetFraction: sheetFraction,
-                followLocation:
-                    _followLocation && _shouldFollowPassengerLocation,
-                onRecenter: askingLocation || searching ? null : _recenterOnYou,
-                onMapInteraction: _pauseLocationFollow,
-                deviceHeadingStream: _compassService.headingStream,
-                user: ref.watch(authSessionProvider).asData?.value?.user,
-                token: ref.watch(authSessionProvider).asData?.value?.token,
-                onMapTap: askingLocation ? null : _collapseSheet,
-                onMapReady: () {
-                  _mapReady = true;
-                  _centerOnGpsIfNeeded();
-                },
+        return PopScope<Object?>(
+          canPop: !_viewModel.interceptsSystemBack,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            _viewModel.handleSystemBack();
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: _PassengerMap(
+                  controller: _mapController,
+                  viewModel: _viewModel,
+                  sheetFraction: sheetFraction,
+                  followLocation:
+                      _followLocation && _shouldFollowPassengerLocation,
+                  onRecenter:
+                      askingLocation || searching ? null : _recenterOnYou,
+                  onMapInteraction: _pauseLocationFollow,
+                  deviceHeadingStream: _compassService.headingStream,
+                  user: ref.watch(authSessionProvider).asData?.value?.user,
+                  token: ref.watch(authSessionProvider).asData?.value?.token,
+                  onMapTap: askingLocation ? null : _collapseSheet,
+                  onMapReady: () {
+                    _mapReady = true;
+                    _centerOnGpsIfNeeded();
+                  },
+                ),
               ),
-            ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: RouteHeaderChip(
-                viewModel: _viewModel,
-                visible: showDestinationChip,
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: RouteHeaderChip(
+                  viewModel: _viewModel,
+                  visible: showDestinationChip,
+                ),
               ),
-            ),
-            Positioned(
-              top:
-                  MediaQuery.paddingOf(context).top +
-                  (showDestinationChip ? 64 : 8),
-              right: 12,
-              child: Material(
-                color: context.ridonsSheet,
-                elevation: 4,
-                shape: const CircleBorder(),
-                child: RidonsNotificationBell(
-                  unreadCount: ref
-                      .watch(notificationCenterProvider)
-                      .unreadCount,
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const NotificationInboxView(),
+              Positioned(
+                top:
+                    MediaQuery.paddingOf(context).top +
+                    (showDestinationChip ? 64 : 8),
+                right: 12,
+                child: Material(
+                  color: context.ridonsSheet,
+                  elevation: 4,
+                  shape: const CircleBorder(),
+                  child: RidonsNotificationBell(
+                    unreadCount: ref
+                        .watch(notificationCenterProvider)
+                        .unreadCount,
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const NotificationInboxView(),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            if (showRideSheet)
-              Positioned.fill(
-                child: RidonsTripSheetHost(
-                  controller: _sheetController,
-                  initialChildSize: 0.34,
-                  minChildSize: _sheetMinSize,
-                  maxChildSize: _sheetMaxSize,
-                  snapSizes: _sheetSnapSizes,
-                  // Keep initial size stable so didUpdateWidget does not
-                  // replace extent mid-build.
-                  child: RideFlowPanel(viewModel: _viewModel, decorate: false),
+              if (showRideSheet)
+                Positioned.fill(
+                  child: RidonsTripSheetHost(
+                    controller: _sheetController,
+                    initialChildSize: 0.34,
+                    minChildSize: _sheetMinSize,
+                    maxChildSize: _sheetMaxSize,
+                    snapSizes: _sheetSnapSizes,
+                    // Keep initial size stable so didUpdateWidget does not
+                    // replace extent mid-build.
+                    child: RideFlowPanel(
+                      viewModel: _viewModel,
+                      decorate: false,
+                    ),
+                  ),
                 ),
+              if (searching || success)
+                Positioned.fill(child: RideFlowPanel(viewModel: _viewModel)),
+              if (!askingLocation &&
+                  (_viewModel.locationFixUnavailable ||
+                      _viewModel.locationHintLoading))
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 58,
+                  left: 12,
+                  right: 76,
+                  child: _LocationFixHint(
+                    message: _viewModel.locationHintLoading
+                        ? 'getting_current_location'.tr()
+                        : _viewModel.locationPermissionMissing
+                        ? 'location_permission_needed'.tr()
+                        : 'location_fix_unavailable'.tr(),
+                    loading: _viewModel.locationHintLoading,
+                    onTap: _viewModel.retryLocation,
+                  ),
+                ),
+              _AnimatedLocationSheet(
+                visible: askingLocation,
+                locating: _viewModel.locating,
+                onAllow: _viewModel.allowLocation,
+                onSkip: _viewModel.skipPermissions,
               ),
-            if (searching || success)
-              Positioned.fill(child: RideFlowPanel(viewModel: _viewModel)),
-            _AnimatedLocationSheet(
-              visible: askingLocation,
-              locating: _viewModel.locating,
-              onAllow: _viewModel.allowLocation,
-              onSkip: _viewModel.skipPermissions,
-            ),
-            if (coverageBlocked)
-              CoverageStatusSheet(
-                messageKey: _viewModel.coverageStatusKey,
-                isChecking: _viewModel.checkingCoverage,
-                isError: _viewModel.coverageError != null,
-                actionLabelKey: _viewModel.checkingCoverage
-                    ? 'coverage_checking'
-                    : _viewModel.coverageError != null
-                    ? 'retry'
-                    : _viewModel.coverageNeedsPickupChange
-                    ? 'coverage_change_pickup'
-                    : 'coverage_change_destination',
-                onAction: () {
-                  if (_viewModel.coverageError != null) {
-                    _viewModel.retryCoverage();
-                    return;
-                  }
-                  _viewModel.openSearch(
-                    _viewModel.coverageNeedsPickupChange
-                        ? LocationField.pickup
-                        : LocationField.dropoff,
-                  );
-                },
-              ),
-          ],
+              if (coverageBlocked)
+                CoverageStatusSheet(
+                  messageKey: _viewModel.coverageStatusKey,
+                  isChecking: _viewModel.checkingCoverage,
+                  isError: _viewModel.coverageError != null,
+                  actionLabelKey: _viewModel.checkingCoverage
+                      ? 'coverage_checking'
+                      : _viewModel.coverageError != null
+                      ? 'retry'
+                      : _viewModel.coverageNeedsPickupChange
+                      ? 'coverage_change_pickup'
+                      : 'coverage_change_destination',
+                  onAction: () {
+                    if (_viewModel.coverageError != null) {
+                      _viewModel.retryCoverage();
+                      return;
+                    }
+                    _viewModel.openSearch(
+                      _viewModel.coverageNeedsPickupChange
+                          ? LocationField.pickup
+                          : LocationField.dropoff,
+                    );
+                  },
+                ),
+            ],
+          ),
         );
       },
+    );
+  }
+}
+
+class _LocationFixHint extends StatelessWidget {
+  const _LocationFixHint({
+    required this.message,
+    required this.loading,
+    required this.onTap,
+  });
+
+  final String message;
+  final bool loading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: context.ridonsSheet,
+      elevation: 4,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: loading ? null : onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Icon(
+                Icons.my_location_rounded,
+                size: 18,
+                color: colors.primary,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.ridonsInk,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              if (loading)
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colors.primary,
+                  ),
+                )
+              else
+                Icon(Icons.refresh_rounded, size: 18, color: context.ridonsMuted),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

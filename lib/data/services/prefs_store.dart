@@ -11,6 +11,17 @@ class PrefsStore {
   static const _notifSafety = 'ridons.notif.safety';
   static const _emergency = 'ridons.emergency.contacts';
   static const _themeMode = 'ridons.themeMode';
+  static const _locationPromptDismissed = 'ridons.location.promptDismissed';
+
+  Future<bool> locationPromptDismissed() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_locationPromptDismissed) ?? false;
+  }
+
+  Future<void> setLocationPromptDismissed(bool dismissed) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_locationPromptDismissed, dismissed);
+  }
 
   Future<bool> isOnboarded() async {
     final prefs = await SharedPreferences.getInstance();

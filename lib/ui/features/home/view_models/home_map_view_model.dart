@@ -11,6 +11,8 @@ import '../../../../data/services/geo_api.dart';
 import '../../../../data/services/location_service.dart';
 import '../../../../data/services/places_service.dart';
 import '../../../../data/services/pricing_api.dart';
+import '../../../../data/services/prefs_store.dart';
+import '../../../../data/services/recent_places_store.dart';
 import '../../../../data/services/realtime_client.dart';
 import '../../../../data/services/routing_service.dart';
 import '../../../../data/services/trip_api.dart';
@@ -63,13 +65,17 @@ class HomeMapViewModel extends ChangeNotifier {
     required GeoApi this._geoApi,
     required RealtimeClient this._realtime,
     required CoverageApi this._coverageApi,
+    required PrefsStore this._prefsStore,
     TripApi? tripApi,
     PricingApi? pricingApi,
     SupportApi? supportApi,
+    RecentPlacesStore? recentPlacesStore,
     this.passengerName = '',
+    this.passengerId = '',
   }) : _tripApi = tripApi,
        _pricingApi = pricingApi,
-       _supportApi = supportApi;
+       _supportApi = supportApi,
+       _recentPlacesStore = recentPlacesStore ?? RecentPlacesStore();
 
   final LocationService _locationService;
   final PlacesService _placesService;
@@ -77,10 +83,13 @@ class HomeMapViewModel extends ChangeNotifier {
   final GeoApi _geoApi;
   final RealtimeClient _realtime;
   final CoverageApi _coverageApi;
+  final PrefsStore _prefsStore;
   final TripApi? _tripApi;
   final PricingApi? _pricingApi;
   final SupportApi? _supportApi;
+  final RecentPlacesStore _recentPlacesStore;
   final String passengerName;
+  final String passengerId;
 
   MatchedDriver? matchedDriver;
   String driverPhone = '';
@@ -90,12 +99,16 @@ class HomeMapViewModel extends ChangeNotifier {
 
   RideStage stage = RideStage.route;
   bool locationPromptNeeded = false;
+  bool locationFixUnavailable = false;
+  bool locationPermissionMissing = false;
+  bool locationHintLoading = false;
   bool bootstrapped = false;
   LocationField activeField = LocationField.dropoff;
   GeoPlace? pickup;
   GeoPlace? dropoff;
   GeoPlace? pickCandidate;
   List<GeoPlace> suggestions = const [];
+  List<GeoPlace> recentDestinations = const [];
   bool searchingPlaces = false;
   List<LatLng> routePoints = const [];
   List<List<LatLng>> routeAlternatives = const [];
@@ -139,6 +152,7 @@ class HomeMapViewModel extends ChangeNotifier {
   String? coverageError;
   bool checkingCoverage = false;
   int _coverageRequestGeneration = 0;
+  bool _coverageRequestedForBooking = false;
 
   Timer? _ticker;
   Timer? _matchTimer;
@@ -164,6 +178,7 @@ class HomeMapViewModel extends ChangeNotifier {
   int _pickupNameGeneration = 0;
 
   bool _openedPickerFromSearch = false;
+  RideStage? _stageBeforeSearch;
   int _routeGen = 0;
 
   String get tripDistanceLabel => '${tripKm.toStringAsFixed(1)} Km';
@@ -272,10 +287,31 @@ class HomeMapViewModel extends ChangeNotifier {
 
   bool get hasGpsFix => _lastFix != null;
 
-  bool get coverageBlocksBooking =>
-      checkingCoverage ||
-      coverageError != null ||
-      coverageDecision?.allowed == false;
+  bool get interceptsSystemBack => switch (stage) {
+    RideStage.search ||
+    RideStage.pickOnMap ||
+    RideStage.estimate ||
+    RideStage.preview ||
+    RideStage.success => true,
+    RideStage.route ||
+    RideStage.offering ||
+    RideStage.matched ||
+    RideStage.payment => false,
+  };
+
+  bool get showingRecentDestinations =>
+      activeField == LocationField.dropoff && searchQuery.trim().isEmpty;
+
+  bool get coverageNeedsUserAction =>
+      coverageDecision?.allowed == false ||
+      (coverageError != null && _coverageRequestedForBooking);
+
+  bool get canConfirmOffer =>
+      !loadingFareEstimate &&
+      !checkingCoverage &&
+      coverageError == null &&
+      coverageDecision?.allowed != false &&
+      offeredPrice > 0;
 
   bool get coverageNeedsPickupChange =>
       coverageDecision?.pickupNeedsChange ?? true;
@@ -311,34 +347,66 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   Future<void> bootstrap() async {
-    locating = true;
-    checkingCoverage = true;
     stage = RideStage.route;
-    notifyListeners();
-
-    final granted = await _locationService.hasLocationPermission();
+    _coverageRequestedForBooking = false;
+    var granted = false;
+    try {
+      granted = await _locationService.hasLocationPermission();
+    } catch (_) {
+      // Treat a permission-service failure like unavailable permission and let
+      // the passenger continue to the map instead of leaving startup pending.
+    }
     bootstrapped = true;
     if (granted) {
-      await _afterLocationGranted();
+      locationPromptNeeded = false;
+      locationFixUnavailable = false;
+      locationPermissionMissing = false;
+      locating = false;
+      checkingCoverage = false;
+      notifyListeners();
+      unawaited(_afterLocationGranted());
       return;
     }
 
+    var dismissed = false;
+    try {
+      dismissed = await _prefsStore.locationPromptDismissed();
+    } catch (_) {}
     locating = false;
     checkingCoverage = false;
-    locationPromptNeeded = true;
+    locationPromptNeeded = !dismissed;
+    locationFixUnavailable = dismissed;
+    locationPermissionMissing = true;
     notifyListeners();
+    if (dismissed) unawaited(_startLive());
   }
 
   Future<void> allowLocation() async {
     locating = true;
     notifyListeners();
-    final granted = await _locationService.ensureLocationPermission();
+    var granted = false;
+    try {
+      granted = await _locationService.ensureLocationPermission();
+    } catch (_) {}
     locating = false;
     if (!granted) {
+      locationPromptNeeded = false;
+      locationFixUnavailable = true;
+      locationPermissionMissing = true;
+      checkingCoverage = false;
+      try {
+        await _prefsStore.setLocationPromptDismissed(true);
+      } catch (_) {}
       notifyListeners();
+      unawaited(_startLive());
       return;
     }
+    try {
+      await _prefsStore.setLocationPromptDismissed(true);
+    } catch (_) {}
     locationPromptNeeded = false;
+    locationFixUnavailable = false;
+    locationPermissionMissing = false;
     checkingCoverage = true;
     notifyListeners();
     await _afterLocationGranted();
@@ -348,8 +416,57 @@ class HomeMapViewModel extends ChangeNotifier {
     locationPromptNeeded = false;
     locating = false;
     checkingCoverage = false;
+    locationFixUnavailable = true;
+    locationPermissionMissing = true;
+    unawaited(_persistLocationPromptDismissed());
     notifyListeners();
     unawaited(_startLive());
+  }
+
+  Future<void> retryLocation() async {
+    var permissionGranted = false;
+    try {
+      permissionGranted = await _locationService.hasLocationPermission();
+    } catch (_) {}
+    if (!permissionGranted) {
+      locationFixUnavailable = false;
+      locationPermissionMissing = true;
+      locationPromptNeeded = true;
+      notifyListeners();
+      return;
+    }
+
+    locating = true;
+    locationHintLoading = true;
+    locationFixUnavailable = false;
+    locationPermissionMissing = false;
+    notifyListeners();
+    Position? position;
+    try {
+      position =
+          await _locationService.freshPosition() ??
+          await _locationService.lastKnownPosition();
+    } catch (_) {
+      // Keep the map usable; the hint below offers an explicit retry.
+    }
+    locating = false;
+    locationHintLoading = false;
+    if (position == null) {
+      locationFixUnavailable = true;
+      notifyListeners();
+      return;
+    }
+    locationFixUnavailable = false;
+    _applyGps(position);
+    notifyListeners();
+    unawaited(_checkCurrentCoverage(position));
+    unawaited(_renamePickup(position.latitude, position.longitude));
+  }
+
+  Future<void> _persistLocationPromptDismissed() async {
+    try {
+      await _prefsStore.setLocationPromptDismissed(true);
+    } catch (_) {}
   }
 
   void openMapPickerFor(LocationField field) {
@@ -359,20 +476,31 @@ class HomeMapViewModel extends ChangeNotifier {
 
   Future<void> _afterLocationGranted() async {
     locating = true;
+    locationHintLoading = false;
     checkingCoverage = true;
     notifyListeners();
 
     // Prefer a fresh GPS fix (emulator Extended Controls / real device).
     // Fall back to OS last-known, then last cached fix — never a hardcoded city.
-    final fresh = await _locationService.freshPosition();
-    final last = fresh ?? await _locationService.lastKnownPosition();
+    Position? fresh;
+    Position? last;
+    try {
+      fresh = await _locationService.freshPosition();
+      last = fresh ?? await _locationService.lastKnownPosition();
+    } catch (_) {
+      // GPS/system-location errors must not leave the home screen in loading.
+    }
     if (last != null) {
+      locationFixUnavailable = false;
+      locationPermissionMissing = false;
       _applyGps(last);
       locating = false;
       notifyListeners();
       unawaited(_checkCurrentCoverage(last));
     } else {
       checkingCoverage = false;
+      locating = false;
+      locationFixUnavailable = true;
       notifyListeners();
     }
     unawaited(_startLive());
@@ -383,7 +511,7 @@ class HomeMapViewModel extends ChangeNotifier {
       if (_pickupFollowsGps) {
         unawaited(_renamePickup(fresh.latitude, fresh.longitude));
       }
-    } else {
+    } else if (last != null) {
       unawaited(_refineFixAndName(last));
     }
   }
@@ -403,6 +531,7 @@ class HomeMapViewModel extends ChangeNotifier {
   void _applyGps(Position position) {
     _lastFix = position;
     _pickupFollowsGps = true;
+    locationFixUnavailable = false;
     pickup = GeoPlace(
       name: pickup?.name ?? 'my_location',
       subtitle: pickup?.subtitle ?? '',
@@ -486,8 +615,9 @@ class HomeMapViewModel extends ChangeNotifier {
 
   Future<void> _checkCoverageThenLoadFare(GeoPlace from, GeoPlace to) async {
     // Start both requests together so coverage latency doesn't get added on
-    // top of pricing latency. The estimate stays behind the coverage blocker
-    // until the route has been approved.
+    // top of pricing latency. Confirmation remains disabled until both checks
+    // finish, without covering the home map with a startup-style modal.
+    _coverageRequestedForBooking = true;
     final coverageRequest = _evaluateCoverage(from, to);
     final fareRequest = _loadFareEstimate(from, to);
     final allowed = await coverageRequest;
@@ -1113,29 +1243,111 @@ class HomeMapViewModel extends ChangeNotifier {
   bool resolvingPin = false;
 
   void openSearch(LocationField field) {
+    if (stage != RideStage.search) _stageBeforeSearch = stage;
+    _searchGen++;
+    _searchDebounce?.cancel();
     activeField = field;
     searchQuery = '';
     suggestions = const [];
     searchingPlaces = true;
     stage = RideStage.search;
     notifyListeners();
-    unawaited(_runPlaceSearch(''));
+    if (field == LocationField.dropoff) {
+      unawaited(_loadRecentDestinations());
+    } else {
+      unawaited(_runPlaceSearch(''));
+    }
   }
 
   void closeSearch() {
     _searchGen++;
     searchingPlaces = false;
-    stage = dropoff == null ? RideStage.route : RideStage.preview;
+    stage = _stageBeforeSearch ??
+        (dropoff == null ? RideStage.route : RideStage.preview);
+    _stageBeforeSearch = null;
     notifyListeners();
+  }
+
+  /// Handles logical back navigation inside the ride flow without popping
+  /// the home route itself.
+  bool handleSystemBack() {
+    switch (stage) {
+      case RideStage.search:
+        closeSearch();
+        return true;
+      case RideStage.pickOnMap:
+        closeMapPicker();
+        return true;
+      case RideStage.estimate:
+        stage = RideStage.preview;
+        notifyListeners();
+        return true;
+      case RideStage.preview:
+        stage = RideStage.route;
+        notifyListeners();
+        return true;
+      case RideStage.success:
+        resetToHome();
+        return true;
+      case RideStage.route:
+      case RideStage.offering:
+      case RideStage.matched:
+      case RideStage.payment:
+        return false;
+    }
   }
 
   void updateSearch(String query) {
     searchQuery = query;
-    notifyListeners();
     _searchDebounce?.cancel();
+    if (showingRecentDestinations) {
+      _searchGen++;
+      suggestions = recentDestinations;
+      searchingPlaces = false;
+      notifyListeners();
+      if (recentDestinations.isEmpty) {
+        unawaited(_loadRecentDestinations());
+      }
+      return;
+    }
+    _searchGen++;
+    suggestions = const [];
+    searchingPlaces = true;
+    notifyListeners();
     _searchDebounce = Timer(const Duration(milliseconds: 400), () {
       unawaited(_runPlaceSearch(query));
     });
+  }
+
+  Future<void> _loadRecentDestinations() async {
+    final gen = ++_searchGen;
+    List<GeoPlace> places;
+    try {
+      places = await _recentPlacesStore.read(passengerId);
+    } catch (_) {
+      places = const [];
+    }
+    if (gen != _searchGen ||
+        stage != RideStage.search ||
+        activeField != LocationField.dropoff ||
+        searchQuery.trim().isNotEmpty) {
+      return;
+    }
+    recentDestinations = places;
+    suggestions = places;
+    searchingPlaces = false;
+    notifyListeners();
+  }
+
+  Future<void> clearRecentDestinations() async {
+    try {
+      await _recentPlacesStore.clear(passengerId);
+    } catch (_) {
+      // Keep search usable if secure local storage is temporarily unavailable.
+    }
+    recentDestinations = const [];
+    if (showingRecentDestinations) suggestions = const [];
+    notifyListeners();
   }
 
   Future<void> _runPlaceSearch(String query) async {
@@ -1157,6 +1369,8 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   Future<void> choosePlace(GeoPlace place) async {
+    _stageBeforeSearch = null;
+    _coverageRequestedForBooking = false;
     final choosingPickup = activeField == LocationField.pickup;
     if (choosingPickup) {
       _pickupFollowsGps = false;
@@ -1165,6 +1379,7 @@ class HomeMapViewModel extends ChangeNotifier {
     } else {
       dropoff = place;
       stage = RideStage.preview;
+      unawaited(_rememberRecentDestination(place));
     }
     pickCandidate = null;
     notifyListeners();
@@ -1173,6 +1388,14 @@ class HomeMapViewModel extends ChangeNotifier {
       unawaited(_evaluatePickupCoverage(place));
     }
     await routeRefresh;
+  }
+
+  Future<void> _rememberRecentDestination(GeoPlace place) async {
+    try {
+      await _recentPlacesStore.remember(passengerId, place);
+    } catch (_) {
+      // A local history write must never block booking or route selection.
+    }
   }
 
   void openMapPicker() {
@@ -1306,6 +1529,10 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   Future<void> confirmOffer() async {
+    if (checkingCoverage || coverageError != null ||
+        coverageDecision?.allowed == false) {
+      return;
+    }
     if (loadingFareEstimate || offeredPrice <= 0) {
       fareEstimateError = 'wait_for_current_fare';
       notifyListeners();

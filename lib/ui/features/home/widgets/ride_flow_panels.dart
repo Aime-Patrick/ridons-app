@@ -437,40 +437,101 @@ class _SearchSheetState extends State<_SearchSheet> {
             Expanded(
               child: viewModel.searchingPlaces && viewModel.suggestions.isEmpty
                   ? const Center(child: CircularProgressIndicator())
-                  : viewModel.suggestions.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Text(
-                          viewModel.searchQuery.trim().isEmpty
-                              ? 'looking_up_places'.tr()
-                              : 'no_places_match'.tr(),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Theme.of(context).textTheme.bodyMedium?.color
-                                ?.withValues(alpha: 0.7),
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                      children: [
+                        if (viewModel.showingRecentDestinations)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.history_rounded,
+                                  size: 19,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'recent_destinations'.tr(),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                if (viewModel.recentDestinations.isNotEmpty)
+                                  TextButton(
+                                    onPressed:
+                                        viewModel.clearRecentDestinations,
+                                    child: Text('clear'.tr()),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-                      itemCount: viewModel.suggestions.length,
-                      separatorBuilder: (_, _) => Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: context.ridonsLine,
-                      ),
-                      itemBuilder: (context, index) {
-                        final place = viewModel.suggestions[index];
-                        return RidonsLocationTile(
-                          title: place.name,
-                          subtitle: place.subtitle.isEmpty
-                              ? null
-                              : place.subtitle,
-                          onTap: () => viewModel.choosePlace(place),
-                        );
-                      },
+                        if (viewModel.suggestions.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 38, 20, 28),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  viewModel.showingRecentDestinations
+                                      ? Icons.history_rounded
+                                      : Icons.search_off_rounded,
+                                  size: 38,
+                                  color: context.ridonsMuted,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  viewModel.showingRecentDestinations
+                                      ? 'recent_destinations_empty'.tr()
+                                      : 'no_places_match'.tr(),
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(color: context.ridonsMuted),
+                                ),
+                                if (viewModel.showingRecentDestinations) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'recent_destinations_hint'.tr(),
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(color: context.ridonsMuted),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          )
+                        else
+                          for (var index = 0;
+                              index < viewModel.suggestions.length;
+                              index++) ...[
+                            if (index > 0)
+                              Divider(
+                                height: 1,
+                                thickness: 1,
+                                color: context.ridonsLine,
+                              ),
+                            RidonsLocationTile(
+                              title: viewModel.suggestions[index].name,
+                              subtitle: viewModel.suggestions[index]
+                                      .subtitle
+                                      .isEmpty
+                                  ? null
+                                  : viewModel.suggestions[index].subtitle,
+                              leadingIcon: viewModel.showingRecentDestinations
+                                  ? Icons.history_rounded
+                                  : Icons.location_on_outlined,
+                              onTap: () => viewModel.choosePlace(
+                                viewModel.suggestions[index],
+                              ),
+                            ),
+                          ],
+                      ],
                     ),
             ),
           ],
@@ -589,9 +650,14 @@ class _EstimateSheet extends StatelessWidget {
             onDecrement: () => viewModel.adjustPrice(-100),
             onIncrement: () => viewModel.adjustPrice(100),
           ),
-          if (viewModel.loadingFareEstimate) ...[
+          if (viewModel.loadingFareEstimate || viewModel.checkingCoverage) ...[
             const SizedBox(height: 8),
-            Text('loading_current_fare'.tr(), textAlign: TextAlign.center),
+            Text(
+              viewModel.checkingCoverage
+                  ? 'coverage_checking'.tr()
+                  : 'loading_current_fare'.tr(),
+              textAlign: TextAlign.center,
+            ),
           ],
           if (viewModel.fareEstimateError != null) ...[
             const SizedBox(height: 8),
@@ -608,10 +674,9 @@ class _EstimateSheet extends StatelessWidget {
           const SizedBox(height: 10),
           RidonsButton(
             label: 'confirm',
-            onPressed:
-                viewModel.loadingFareEstimate || viewModel.offeredPrice <= 0
-                ? null
-                : viewModel.confirmOffer,
+            onPressed: viewModel.canConfirmOffer
+                ? viewModel.confirmOffer
+                : null,
           ),
           const SizedBox(height: 8),
           _RouteSummary(viewModel: viewModel),

@@ -8,11 +8,13 @@ class RidonsLocationTile extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.onTap,
+    this.leadingIcon = Icons.location_on_outlined,
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onTap;
+  final IconData leadingIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +37,7 @@ class RidonsLocationTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  Icons.location_on_outlined,
+                  leadingIcon,
                   color: colors.onSurfaceVariant,
                 ),
               ),
