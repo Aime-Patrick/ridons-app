@@ -22,6 +22,7 @@ import '../../core/widgets/ridons_map_view.dart';
 import '../../core/widgets/ridons_trip_sheet.dart';
 import 'view_models/home_map_view_model.dart';
 import 'widgets/ride_flow_panels.dart';
+import 'widgets/coverage_status_sheet.dart';
 
 /// Passenger home: OpenStreetMap, route request, offer, match, manual payment.
 class HomeMapView extends ConsumerStatefulWidget {
@@ -55,6 +56,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
       routingService: RoutingService(),
       geoApi: ref.read(geoApiProvider),
       realtime: ref.read(realtimeClientProvider),
+      coverageApi: ref.read(coverageApiProvider),
       tripApi: ref.read(tripApiProvider),
       pricingApi: ref.read(pricingApiProvider),
       supportApi: ref.read(supportApiProvider),
@@ -184,6 +186,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
     final hasDropoff = _viewModel.dropoff != null;
     if (stage == RideStage.search ||
         _viewModel.locationPromptNeeded ||
+        _viewModel.coverageBlocksBooking ||
         !_viewModel.bootstrapped) {
       return;
     }
@@ -245,9 +248,16 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
         final searching = _viewModel.stage == RideStage.search;
         final success = _viewModel.stage == RideStage.success;
         final askingLocation = _viewModel.locationPromptNeeded;
+        final planningTrip =
+            _viewModel.stage == RideStage.route ||
+            _viewModel.stage == RideStage.preview ||
+            _viewModel.stage == RideStage.estimate;
+        final coverageBlocked =
+            planningTrip && !askingLocation && _viewModel.coverageBlocksBooking;
         final showRideSheet =
             _viewModel.bootstrapped &&
             !askingLocation &&
+            !coverageBlocked &&
             !searching &&
             !success;
         final showDestinationChip =
@@ -328,6 +338,30 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
               onAllow: _viewModel.allowLocation,
               onSkip: _viewModel.skipPermissions,
             ),
+            if (coverageBlocked)
+              CoverageStatusSheet(
+                messageKey: _viewModel.coverageStatusKey,
+                isChecking: _viewModel.checkingCoverage,
+                isError: _viewModel.coverageError != null,
+                actionLabelKey: _viewModel.checkingCoverage
+                    ? 'coverage_checking'
+                    : _viewModel.coverageError != null
+                    ? 'retry'
+                    : _viewModel.coverageNeedsPickupChange
+                    ? 'coverage_change_pickup'
+                    : 'coverage_change_destination',
+                onAction: () {
+                  if (_viewModel.coverageError != null) {
+                    _viewModel.retryCoverage();
+                    return;
+                  }
+                  _viewModel.openSearch(
+                    _viewModel.coverageNeedsPickupChange
+                        ? LocationField.pickup
+                        : LocationField.dropoff,
+                  );
+                },
+              ),
           ],
         );
       },

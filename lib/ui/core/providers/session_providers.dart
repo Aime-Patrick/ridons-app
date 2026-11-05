@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/config/api_config.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/api_client.dart';
+import '../../../data/services/coverage_api.dart';
 import '../../../data/services/geo_api.dart';
 import '../../../data/services/driver_documents_service.dart';
 import '../../../data/services/notification_api.dart';
@@ -35,6 +36,10 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 
 final geoApiProvider = Provider<GeoApi>((ref) {
   return GeoApi(ref.watch(apiClientProvider));
+});
+
+final coverageApiProvider = Provider<CoverageApi>((ref) {
+  return CoverageApi(ref.watch(apiClientProvider));
 });
 
 final tripApiProvider = Provider<TripApi>((ref) {
@@ -148,7 +153,9 @@ class AuthSessionNotifier extends AsyncNotifier<AuthSession?> {
       final verificationChanged =
           current.user.verificationStatus != session.user.verificationStatus;
       if (current.user.role.isDriver && verificationChanged) {
-        final refreshed = await ref.read(authRepositoryProvider).refreshSession();
+        final refreshed = await ref
+            .read(authRepositoryProvider)
+            .refreshSession();
         if (refreshed != null) {
           state = AsyncData(refreshed);
           ref.read(appRoleProvider.notifier).state = refreshed.user.role;

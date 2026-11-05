@@ -11,7 +11,6 @@ import '../../core/providers/theme_mode_provider.dart';
 import 'account_settings_views.dart';
 import 'driver_documents_view.dart';
 import 'passenger_avatar.dart';
-import 'profile_photo_sheet.dart';
 
 /// Passenger account hub and working settings.
 class AccountView extends ConsumerWidget {
@@ -77,36 +76,10 @@ class AccountView extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      PassengerAvatar(
-                        user: user,
-                        radius: 32,
-                        token: session?.token,
-                      ),
-                      Positioned(
-                        right: -2,
-                        bottom: -2,
-                        child: Material(
-                          color: context.ridonsSheet,
-                          shape: const CircleBorder(),
-                          elevation: 2,
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: () => showProfilePhotoSheet(context, ref),
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: Icon(
-                                Icons.photo_camera_outlined,
-                                size: 16,
-                                color: context.ridonsInk,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  PassengerAvatar(
+                    user: user,
+                    radius: 32,
+                    token: session?.token,
                   ),
                 ],
               ),
