@@ -141,12 +141,18 @@ class TripApi {
       },
     );
     final data = response.data ?? const {};
+    // Backend now returns {ok: true, accepted: true} when passenger still
+    // needs to choose. A rideId is only present when the ride is already
+    // created (legacy path / passenger already chose this driver).
     return ActiveRide(
       rideId: '${data['rideId'] ?? ''}',
       requestId: requestId,
       passengerId: '${data['passengerId'] ?? ''}',
       status: '${data['status'] ?? 'matched'}',
       fare: (data['fare'] as num?)?.toInt() ?? 0,
+      pendingPassengerChoice:
+          data['accepted'] == true &&
+          (data['rideId'] == null || '${data['rideId']}'.isEmpty),
       from: const LatLng(0, 0),
       to: const LatLng(0, 0),
     );

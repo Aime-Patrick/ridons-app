@@ -9,14 +9,14 @@ abstract final class RidonsTheme {
     AppRole role, {
     Brightness brightness = Brightness.light,
   }) {
-    final seed = role.isPassenger ? RidonsColors.primary : RidonsColors.navy;
+    final seed = RidonsColors.primary;
     final isDark = brightness == Brightness.dark;
     final scheme = isDark
         ? ColorScheme.dark(
             primary: seed,
             onPrimary: Colors.white,
             secondary: RidonsColors.accent,
-            onSecondary: RidonsColors.navy,
+            onSecondary: Colors.white,
             surface: RidonsColors.darkSurface,
             onSurface: RidonsColors.darkInk,
             onSurfaceVariant: RidonsColors.darkMuted,
@@ -30,7 +30,7 @@ abstract final class RidonsTheme {
             primary: seed,
             onPrimary: Colors.white,
             secondary: RidonsColors.accent,
-            onSecondary: RidonsColors.navy,
+            onSecondary: Colors.white,
             surface: RidonsColors.surface,
             onSurface: RidonsColors.textPrimary,
             onSurfaceVariant: RidonsColors.textSecondary,
@@ -161,9 +161,9 @@ abstract final class RidonsTheme {
         selectedColor: seed,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: isDark ? RidonsColors.darkFill : RidonsColors.navy,
+        backgroundColor: isDark ? RidonsColors.darkFill : RidonsColors.primary,
         contentTextStyle: TextStyle(
-          color: isDark ? RidonsColors.darkInk : Colors.white,
+          color: Colors.white,
         ),
       ),
     );

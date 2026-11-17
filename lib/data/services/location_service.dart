@@ -122,7 +122,7 @@ class LocationService {
   Stream<Position> positionStream({bool background = false}) {
     return Geolocator.getPositionStream(
       locationSettings: _settings(
-        distanceFilter: background ? 5 : 1,
+        distanceFilter: background ? 5 : 4,
         background: background,
       ),
     ).map((position) {
@@ -189,7 +189,7 @@ class LocationService {
       return AndroidSettings(
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: distanceFilter,
-        intervalDuration: Duration(seconds: background ? 4 : 1),
+        intervalDuration: Duration(seconds: background ? 4 : 2),
         forceLocationManager: false,
         timeLimit: timeLimit,
         foregroundNotificationConfig: background

@@ -97,6 +97,19 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
     }
   }
 
+  void _fitRoute() {
+    final points = _viewModel.routePoints;
+    if (points.length < 2) return;
+    try {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints(points),
+          padding: const EdgeInsets.fromLTRB(48, 120, 48, 280),
+        ),
+      );
+    } catch (_) {}
+  }
+
   void _centerOnGpsIfNeeded() {
     if (!_mapReady || _didCenterOnGps) return;
     if (_viewModel.routePoints.length >= 2) return;
@@ -173,8 +186,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
   bool get _shouldFollowPassengerLocation {
     // Keep route planning as an overview, but follow the passenger during an
     // active matched ride so the live map stays centered on their movement.
-    return _viewModel.stage == RideStage.matched ||
-        _viewModel.routePoints.length < 2;
+    return _viewModel.stage == RideStage.matched;
   }
 
   List<double> get _sheetSnapSizes {
@@ -298,6 +310,17 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
                   },
                 ),
               ),
+              // Fixed crosshair shown while the user is picking a location
+              // by dragging the map. The pin sits at the screen center and
+              // the map moves under it — no tapping required.
+              if (_viewModel.stage == RideStage.pickOnMap)
+                const Positioned.fill(
+                  child: IgnorePointer(
+                    child: Center(
+                      child: _MapCrosshair(),
+                    ),
+                  ),
+                ),
               Positioned(
                 top: 0,
                 left: 0,
@@ -341,11 +364,17 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
                     child: RideFlowPanel(
                       viewModel: _viewModel,
                       decorate: false,
+                      onFitRoute: _fitRoute,
                     ),
                   ),
                 ),
               if (searching || success)
-                Positioned.fill(child: RideFlowPanel(viewModel: _viewModel)),
+                Positioned.fill(
+                  child: RideFlowPanel(
+                    viewModel: _viewModel,
+                    onFitRoute: _fitRoute,
+                  ),
+                ),
               if (!askingLocation &&
                   (_viewModel.locationFixUnavailable ||
                       _viewModel.locationHintLoading))
@@ -592,6 +621,7 @@ class _PassengerMap extends StatelessWidget {
     final etaMid = RoutingService.midpointAlong(viewModel.routePoints);
     final showDriverTrack =
         viewModel.stage == RideStage.matched &&
+        !viewModel.isInProgress &&
         viewModel.driverTrackPoints.length >= 2;
 
     return RidonsMapView(
@@ -604,10 +634,17 @@ class _PassengerMap extends StatelessWidget {
       onRecenter: onRecenter,
       deviceHeadingStream: deviceHeadingStream,
       onMapReady: onMapReady,
-      onMapInteraction: onMapInteraction,
+      onMapInteraction: () {
+        onMapInteraction?.call();
+        if (viewModel.stage == RideStage.pickOnMap) {
+          viewModel.pickOnMap(controller.camera.center);
+        }
+      },
       onTap: (point) {
         if (viewModel.stage == RideStage.pickOnMap) {
-          viewModel.pickOnMap(point);
+          // Crosshair mode: use the map center, not the tap point.
+          // The user drags the map; tapping confirms the center position.
+          viewModel.pickOnMap(controller.camera.center);
           return;
         }
         onMapTap?.call();
@@ -626,7 +663,8 @@ class _PassengerMap extends StatelessWidget {
               ),
             ],
           ),
-        if (viewModel.routePoints.length >= 2)
+        if (viewModel.routePoints.length >= 2 &&
+            viewModel.stage != RideStage.pickOnMap)
           PolylineLayer(
             polylines: [
               for (final alt in viewModel.routeAlternatives)
@@ -697,10 +735,11 @@ class _PassengerMap extends StatelessWidget {
                 pickup,
                 Theme.of(context).brightness == Brightness.dark
                     ? Colors.white
-                    : RidonsColors.navy,
+                    : RidonsColors.primary,
               ),
             if (dropoff != null) _pinMarker(dropoff, RidonsColors.primary),
-            if (candidate != null) _pinMarker(candidate, RidonsColors.primary),
+            if (candidate != null && viewModel.stage != RideStage.pickOnMap)
+              _pinMarker(candidate, RidonsColors.primary),
             if (etaMid != null)
               Marker(
                 point: etaMid,
@@ -801,7 +840,7 @@ class _DriverMapMarker extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: assigned ? RidonsColors.primary : RidonsColors.navy,
+        color: assigned ? RidonsColors.primary : RidonsColors.primary,
         shape: BoxShape.circle,
         border: Border.all(
           color: assigned ? RidonsColors.accent : Colors.white,
@@ -824,4 +863,32 @@ double _mapControlBottom(BuildContext context, double sheetFraction) {
   final topSafe = media.padding.top + 80;
   final raw = height * sheetFraction + 12;
   return raw.clamp(16.0, (height - topSafe - 56).clamp(16.0, height));
+}
+
+/// Fixed crosshair pinned to the screen center during "pick from map" mode.
+/// The map moves under it; the crosshair always marks the selected point.
+class _MapCrosshair extends StatelessWidget {
+  const _MapCrosshair();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : RidonsColors.primary;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.location_on, color: color, size: 40),
+        // Shadow dot so the pin tip is easy to read against any tile color.
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.35),
+            shape: BoxShape.circle,
+          ),
+        ),
+      ],
+    );
+  }
 }

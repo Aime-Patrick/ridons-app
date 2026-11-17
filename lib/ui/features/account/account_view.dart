@@ -10,7 +10,6 @@ import '../../core/providers/session_providers.dart';
 import '../../core/providers/theme_mode_provider.dart';
 import 'account_settings_views.dart';
 import 'driver_documents_view.dart';
-import 'passenger_avatar.dart';
 
 /// Passenger account hub and working settings.
 class AccountView extends ConsumerWidget {
@@ -24,10 +23,6 @@ class AccountView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(authSessionProvider).asData?.value;
     final user = session?.user;
-    final name =
-        user?.displayName ??
-        (user?.role.isDriver == true ? 'driver'.tr() : 'passenger'.tr());
-    final idLabel = user == null ? '—' : user.roleIdCaption;
 
     return ColoredBox(
       color: context.ridonsPage,
@@ -51,39 +46,6 @@ class AccountView extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: TextStyle(
-                            color: context.ridonsInk,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          idLabel,
-                          style: TextStyle(
-                            color: context.ridonsMuted,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PassengerAvatar(
-                    user: user,
-                    radius: 32,
-                    token: session?.token,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
               _OutlineTile(
                 icon: Icons.person_outline_rounded,
                 label: 'profile',

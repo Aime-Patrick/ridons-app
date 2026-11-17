@@ -10,6 +10,7 @@ import '../../../domain/models/session_user.dart';
 import '../../core/providers/session_providers.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/ridons_notification_bell.dart';
+import '../../core/widgets/ridons_notice.dart';
 import '../../core/widgets/ridons_price_adjuster.dart';
 import '../../core/widgets/ridons_rating_prompt.dart';
 import '../account/passenger_avatar.dart';
@@ -53,8 +54,43 @@ class DriverHomeViewState extends ConsumerState<DriverHomeView> {
     _vm!.bootstrap();
   }
 
+  String? _lastShownError;
+
   void _onVm() {
     widget.onTripChanged?.call(_vm?.onTrip ?? false);
+    // Show error messages as toasts and clear them so they don't persist.
+    final error = _vm?.errorMessage;
+    if (error != null && error != _lastShownError) {
+      _lastShownError = error;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        RidonsNotice.error(
+          context,
+          error.tr(
+            namedArgs: {'amount': (_vm?.counteredAmount ?? '').toString()},
+          ),
+        );
+        _vm?.clearErrorMessage();
+      });
+    } else if (error == null) {
+      _lastShownError = null;
+    }
+    // Notify driver when passenger cancels the ride.
+    if (_vm?.passengerCancelled == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        RidonsNotice.info(context, 'passenger_cancelled_ride');
+        _vm?.clearPassengerCancelled();
+      });
+    }
+    // Notify driver when passenger chose another driver.
+    if (_vm?.offerTakenByOther == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        RidonsNotice.info(context, 'offer_taken_by_other');
+        _vm?.clearOfferTakenByOther();
+      });
+    }
     if (mounted) setState(() {});
   }
 
@@ -172,17 +208,6 @@ class _DriverIdleHome extends ConsumerWidget {
                     _QuestCard(quest: quest),
                     const SizedBox(height: 10),
                   ],
-              ],
-              if (viewModel.errorMessage != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  viewModel.errorMessage!.tr(
-                    namedArgs: {
-                      'amount': (viewModel.counteredAmount ?? '').toString(),
-                    },
-                  ),
-                  style: TextStyle(color: RidonsColors.primary),
-                ),
               ],
               const SizedBox(height: 22),
               Text(
@@ -422,9 +447,9 @@ class _DriverSummaryCard extends StatelessWidget {
                   children: [
                     _Stat(
                       'rating',
-                      stats.avgRating == 0
-                          ? ''
-                          : stats.avgRating.toStringAsFixed(1),
+                      stats.avgRating > 0
+                          ? stats.avgRating.toStringAsFixed(1)
+                          : '—',
                       labelFontSize: 11,
                       valueFontSize: 13,
                       dividerHeight: 34,
@@ -438,7 +463,7 @@ class _DriverSummaryCard extends StatelessWidget {
                     ),
                     _Stat(
                       'accept',
-                      '%',
+                      '${stats.acceptanceRate}%',
                       labelFontSize: 11,
                       valueFontSize: 13,
                       dividerHeight: 34,
@@ -474,7 +499,10 @@ class _DriverVerificationPendingCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.lock_outline_rounded, color: RidonsColors.primary),
+                const Icon(
+                  Icons.lock_outline_rounded,
+                  color: RidonsColors.primary,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -524,7 +552,7 @@ class _AvailabilityCard extends StatelessWidget {
       button: true,
       toggled: online,
       label: busy
-          ? 'updating_online_status'.tr()
+          ? (online ? 'you_are_now_online'.tr() : 'click_to_go_online'.tr())
           : (online ? 'you_are_now_online'.tr() : 'click_to_go_online'.tr()),
       child: Material(
         color: background,
@@ -553,11 +581,9 @@ class _AvailabilityCard extends StatelessWidget {
                       ),
                 const SizedBox(height: 10),
                 Text(
-                  busy
-                      ? 'updating_online_status'.tr()
-                      : (online
-                            ? 'you_are_now_online'.tr()
-                            : 'click_to_go_online'.tr()),
+                  online
+                      ? 'you_are_now_online'.tr()
+                      : 'click_to_go_online'.tr(),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: foreground,
@@ -714,8 +740,12 @@ class _QuestCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  quest.completed ? Icons.check_circle_rounded : Icons.flag_rounded,
-                  color: quest.completed ? RidonsColors.success : RidonsColors.primary,
+                  quest.completed
+                      ? Icons.check_circle_rounded
+                      : Icons.flag_rounded,
+                  color: quest.completed
+                      ? RidonsColors.success
+                      : RidonsColors.primary,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -731,7 +761,9 @@ class _QuestCard extends StatelessWidget {
                 Text(
                   '${_money.format(quest.reward)} RWF',
                   style: TextStyle(
-                    color: quest.completed ? RidonsColors.success : RidonsColors.accent,
+                    color: quest.completed
+                        ? RidonsColors.success
+                        : RidonsColors.accent,
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
                   ),
@@ -756,16 +788,20 @@ class _QuestCard extends StatelessWidget {
                   value: value,
                   minHeight: 8,
                   backgroundColor: context.ridonsFill,
-                  color: quest.completed ? RidonsColors.success : RidonsColors.primary,
+                  color: quest.completed
+                      ? RidonsColors.success
+                      : RidonsColors.primary,
                 ),
               ),
             ),
             const SizedBox(height: 6),
             Text(
-              'quest_progress'.tr(namedArgs: {
-                'current': '${quest.current}',
-                'total': '${quest.total}',
-              }),
+              'quest_progress'.tr(
+                namedArgs: {
+                  'current': '${quest.current}',
+                  'total': '${quest.total}',
+                },
+              ),
               style: TextStyle(color: context.ridonsMuted, fontSize: 12),
             ),
             if (quest.rewardStatus != 'in_progress' ||
@@ -775,7 +811,9 @@ class _QuestCard extends StatelessWidget {
               Text(
                 _rewardStatus(context),
                 style: TextStyle(
-                  color: quest.rewardStatus == 'earned' || quest.rewardStatus == 'paid'
+                  color:
+                      quest.rewardStatus == 'earned' ||
+                          quest.rewardStatus == 'paid'
                       ? RidonsColors.success
                       : context.ridonsMuted,
                   fontSize: 12,
@@ -791,7 +829,8 @@ class _QuestCard extends StatelessWidget {
 
   String _rewardStatus(BuildContext context) {
     if (quest.rewardStatus == 'paid') return 'quest_reward_paid'.tr();
-    if (quest.rewardStatus == 'earned') return 'quest_reward_pending_payout'.tr();
+    if (quest.rewardStatus == 'earned')
+      return 'quest_reward_pending_payout'.tr();
     if (quest.rewardStatus == 'budget_exhausted') {
       return 'quest_reward_unavailable'.tr();
     }
@@ -801,6 +840,7 @@ class _QuestCard extends StatelessWidget {
     return 'quest_completed'.tr();
   }
 }
+
 class _OfferCard extends StatelessWidget {
   const _OfferCard({
     required this.offer,

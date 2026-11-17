@@ -4,12 +4,16 @@ import 'package:ridons/data/config/api_errors.dart';
 void main() {
   test('phone taken copy names the existing role', () {
     expect(
-      phoneTakenMessage('passenger'),
-      'This number already has a passenger account. Sign in instead.',
+      phoneTakenKey('passenger'),
+      'phone_taken_passenger',
     );
     expect(
-      phoneTakenMessage('driver'),
-      'This number already has a driver account. Sign in instead.',
+      phoneTakenKey('driver'),
+      'phone_taken_driver',
+    );
+    expect(
+      phoneTakenKey(null),
+      'phone_taken',
     );
   });
 

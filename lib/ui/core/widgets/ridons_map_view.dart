@@ -8,6 +8,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'ridons_tile_layer.dart';
+import '../theme/ridons_colors.dart';
 
 /// Shared map surface used by passenger and driver flows.
 ///
@@ -132,7 +133,7 @@ class _RidonsMapViewState extends State<RidonsMapView> {
               onPressed: _recenter,
               icon: Icon(
                 Icons.my_location_rounded,
-                color: Theme.of(context).colorScheme.primary,
+                color: RidonsColors.primary,
               ),
             ),
           ),

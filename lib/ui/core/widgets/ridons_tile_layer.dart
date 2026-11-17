@@ -8,8 +8,19 @@ import 'package:flutter_map/flutter_map.dart';
 ///
 /// On high-DPI phones, retina mode requests extra zoom so streets stay sharp
 /// instead of stretching 256px tiles.
+///
+/// Tile caching is enabled automatically by flutter_map on Android/iOS.
+/// Tiles loaded once are stored on disk and reused on the next app open,
+/// so the map appears instantly without a network round-trip.
 abstract final class RidonsMapTiles {
   static const _userAgent = 'app.ridons.mobile';
+
+  // Cache provider shared across all tile layers — 500 MB limit,
+  // tiles kept for 30 days regardless of server Cache-Control headers.
+  static final _cacheProvider = BuiltInMapCachingProvider.getOrCreateInstance(
+    maxCacheSize: 500 * 1024 * 1024, // 500 MB
+    overrideFreshAge: const Duration(days: 30),
+  );
 
   // These providers do not require a Google, Mapbox, or Carto API key.
   static const _light = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -43,6 +54,7 @@ abstract final class RidonsMapTiles {
       tileDisplay: const TileDisplay.fadeIn(
         duration: Duration(milliseconds: 120),
       ),
+      tileProvider: NetworkTileProvider(cachingProvider: _cacheProvider),
     );
   }
 

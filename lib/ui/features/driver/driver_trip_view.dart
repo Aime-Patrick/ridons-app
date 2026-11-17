@@ -17,18 +17,31 @@ import '../../core/widgets/ridons_route_endpoints.dart';
 import '../../core/widgets/ridons_trip_sheet.dart';
 import 'view_models/driver_home_view_model.dart';
 
-class DriverTripView extends StatelessWidget {
+class DriverTripView extends StatefulWidget {
   const DriverTripView({super.key, required this.viewModel});
 
   final DriverHomeViewModel viewModel;
 
   @override
+  State<DriverTripView> createState() => _DriverTripViewState();
+}
+
+class _DriverTripViewState extends State<DriverTripView> {
+  double _sheetFraction = 0.28;
+
+  @override
   Widget build(BuildContext context) {
-    final ride = viewModel.ride;
+    final ride = widget.viewModel.ride;
     if (ride == null) return const SizedBox.shrink();
+    final mapControlsBottom =
+        MediaQuery.sizeOf(context).height * _sheetFraction + 12;
     return Stack(
       children: [
-        _TripMap(viewModel: viewModel, ride: ride),
+        _TripMap(
+          viewModel: widget.viewModel,
+          ride: ride,
+          bottomControlsOffset: mapControlsBottom,
+        ),
         SafeArea(
           child: Align(
             alignment: Alignment.topCenter,
@@ -47,9 +60,9 @@ class DriverTripView extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        viewModel.etaChip.tr(
+                        widget.viewModel.etaChip.tr(
                           namedArgs: {
-                            'minutes': '${viewModel.etaMinutes ?? ''}',
+                            'minutes': '${widget.viewModel.etaMinutes ?? ''}',
                           },
                         ),
                         style: const TextStyle(
@@ -57,9 +70,9 @@ class DriverTripView extends StatelessWidget {
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      if (viewModel.routeDistanceKm != null)
+                      if (widget.viewModel.routeDistanceKm != null)
                         Text(
-                          '${viewModel.routeDistanceKm!.toStringAsFixed(1)} km',
+                          '${widget.viewModel.routeDistanceKm!.toStringAsFixed(1)} km',
                           style: const TextStyle(
                             color: RidonsColors.primary,
                             fontSize: 11,
@@ -74,7 +87,15 @@ class DriverTripView extends StatelessWidget {
           ),
         ),
         Positioned.fill(
-          child: _TripSheet(viewModel: viewModel, ride: ride),
+          child: _TripSheet(
+            viewModel: widget.viewModel,
+            ride: ride,
+            onSheetFraction: (f) {
+              if ((f - _sheetFraction).abs() > 0.005) {
+                setState(() => _sheetFraction = f);
+              }
+            },
+          ),
         ),
       ],
     );
@@ -82,10 +103,15 @@ class DriverTripView extends StatelessWidget {
 }
 
 class _TripMap extends StatefulWidget {
-  const _TripMap({required this.viewModel, required this.ride});
+  const _TripMap({
+    required this.viewModel,
+    required this.ride,
+    required this.bottomControlsOffset,
+  });
 
   final DriverHomeViewModel viewModel;
   final ActiveRide ride;
+  final double bottomControlsOffset;
 
   @override
   State<_TripMap> createState() => _TripMapState();
@@ -130,6 +156,7 @@ class _TripMapState extends State<_TripMap> {
       onRecenter: _recenterOnDriver,
       onMapInteraction: _pauseLocationFollow,
       deviceHeadingStream: compassService.headingStream,
+      bottomControlsOffset: widget.bottomControlsOffset,
       layers: [
         PolylineLayer(
           polylines: [
@@ -162,11 +189,42 @@ class _TripMapState extends State<_TripMap> {
             point: you,
           ),
         ),
-        RidonsAnimatedMarker(
-          point: dest,
-          child: _passengerMarkerChild(viewModel: viewModel, ride: ride),
-        ),
+        if (viewModel.stage == DriverStage.driving)
+          RidonsAnimatedMarker(
+            point: dest,
+            child: _destinationMarkerChild(ride: ride),
+          )
+        else
+          RidonsAnimatedMarker(
+            point: dest,
+            child: _passengerMarkerChild(viewModel: viewModel, ride: ride),
+          ),
       ],
+    );
+  }
+
+  Widget _destinationMarkerChild({required ActiveRide ride}) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => showMapMarkerInfoSheet(
+        context,
+        title: 'dropoff_location',
+        subtitle:
+            ride.toName.isNotEmpty ? ride.toName : 'dropoff_location'.tr(),
+        details: {
+          'destination': ride.toName.isNotEmpty
+              ? ride.toName
+              : '${ride.to.latitude.toStringAsFixed(5)}, ${ride.to.longitude.toStringAsFixed(5)}',
+          'ride': ride.rideId,
+        },
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.location_on,
+          color: RidonsColors.primary,
+          size: 36,
+        ),
+      ),
     );
   }
 
@@ -193,7 +251,7 @@ class _TripMapState extends State<_TripMap> {
           width: 20,
           height: 20,
           child: CircleAvatar(
-            backgroundColor: RidonsColors.navy,
+            backgroundColor: RidonsColors.primary,
             child: Icon(Icons.two_wheeler, color: Colors.white, size: 12),
           ),
         ),
@@ -241,18 +299,52 @@ class _TripMapState extends State<_TripMap> {
   }
 }
 
-class _TripSheet extends StatelessWidget {
-  const _TripSheet({required this.viewModel, required this.ride});
+class _TripSheet extends StatefulWidget {
+  const _TripSheet({
+    required this.viewModel,
+    required this.ride,
+    required this.onSheetFraction,
+  });
 
   final DriverHomeViewModel viewModel;
   final ActiveRide ride;
+  final ValueChanged<double> onSheetFraction;
+
+  @override
+  State<_TripSheet> createState() => _TripSheetState();
+}
+
+class _TripSheetState extends State<_TripSheet> {
+  final _controller = DraggableScrollableController();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onSheet);
+  }
+
+  void _onSheet() {
+    if (_controller.isAttached) {
+      widget.onSheetFraction(_controller.size);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onSheet);
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = widget.viewModel;
+    final ride = widget.ride;
     final driving = viewModel.stage == DriverStage.driving;
     final arrived = viewModel.stage == DriverStage.arrived;
     return RidonsTripSheetHost(
-      initialChildSize: 0.44,
+      controller: _controller,
+      initialChildSize: 0.28,
       minChildSize: 0.1,
       maxChildSize: 0.82,
       snapSizes: RidonsTripSheetHost.defaultSnapSizes,
@@ -306,12 +398,12 @@ class _TripSheet extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              if (arrived)
-                RidonsButton(
-                  label: 'start_ride',
-                  isLoading: viewModel.busy,
-                  onPressed: viewModel.startTrip,
-                ),
+              RidonsButton(
+                label: arrived ? 'start_ride' : 'i_have_arrived',
+                isLoading: viewModel.busy,
+                onPressed: viewModel.startTrip,
+              ),
+
               const SizedBox(height: 10),
               RidonsButton(
                 label: 'trip_was_canceled',
@@ -322,7 +414,7 @@ class _TripSheet extends StatelessWidget {
             const SizedBox(height: 10),
             RidonsButton(
               label: viewModel.sosBusy ? 'sending_sos' : 'send_sos',
-              variant: RidonsButtonVariant.secondary,
+              variant: RidonsButtonVariant.danger,
               isLoading: viewModel.sosBusy,
               onPressed: () => _confirmSos(context, viewModel),
             ),
@@ -365,14 +457,7 @@ class _TripSheet extends StatelessWidget {
   }
 
   static String _payLabel(String raw) {
-    final value = raw.trim().toLowerCase().replaceAll('_', ' ');
-    if (value.isEmpty) return 'not_specified'.tr();
-    if (value.contains('momo') || value.contains('mobile money')) {
-      if (value.contains('cash')) return 'cash_or_momo'.tr();
-      return 'mobile_money'.tr();
-    }
-    if (value.contains('cash')) return 'cash'.tr();
-    return raw.trim();
+    return 'cash'.tr();
   }
 }
 

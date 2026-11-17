@@ -135,6 +135,10 @@ class _CancellationReasonSheetState extends State<_CancellationReasonSheet> {
               ],
               const SizedBox(height: 14),
               FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: RidonsColors.primary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: canSubmit
                     ? () => Navigator.pop(
                         context,

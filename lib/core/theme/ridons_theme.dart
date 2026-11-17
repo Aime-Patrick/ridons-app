@@ -11,8 +11,8 @@ abstract final class RidonsTheme {
       );
 
   static ThemeData driver() => _build(
-        seed: RidonsColors.navy,
-        primary: RidonsColors.navy,
+        seed: RidonsColors.primary,
+        primary: RidonsColors.primary,
       );
 
   static ThemeData forRole(RidonsAppRole role) =>

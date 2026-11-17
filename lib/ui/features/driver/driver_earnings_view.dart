@@ -10,7 +10,9 @@ import '../../core/providers/session_providers.dart';
 import '../../core/theme/ridons_colors.dart';
 
 class DriverEarningsView extends ConsumerStatefulWidget {
-  const DriverEarningsView({super.key});
+  const DriverEarningsView({super.key, this.isActive = false});
+
+  final bool isActive;
 
   @override
   ConsumerState<DriverEarningsView> createState() => _DriverEarningsViewState();
@@ -33,6 +35,14 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant DriverEarningsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _load();
+    }
   }
 
   Future<void> _load({bool pull = false}) async {
@@ -174,7 +184,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: context.ridonsSheet,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: context.ridonsLine),
       ),
@@ -217,7 +227,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       decoration: BoxDecoration(
-        color: context.ridonsSheet,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: context.ridonsLine),
       ),
@@ -282,7 +292,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       decoration: BoxDecoration(
-        color: context.ridonsSheet,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: context.ridonsLine),
       ),
@@ -533,7 +543,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
       constraints: const BoxConstraints(minHeight: 106),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: context.ridonsSheet,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(17),
         border: Border.all(color: context.ridonsLine),
       ),
@@ -574,7 +584,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: context.ridonsSheet,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.ridonsLine),
       ),
@@ -605,7 +615,7 @@ class _DriverEarningsViewState extends ConsumerState<DriverEarningsView> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
-        color: context.ridonsSheet,
+        color: Colors.transparent,
         border: Border.all(color: context.ridonsLine),
       ),
       child: Row(

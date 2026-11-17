@@ -41,9 +41,10 @@ class _MainShellViewState extends ConsumerState<MainShellView> {
             const DriverHomeView()
           else
             HomeMapView(key: _homeKey),
-          if (isDriver) const DriverEarningsView(),
+          if (isDriver) DriverEarningsView(isActive: _tab == RidonsNavTab.earnings),
           ActivitiesView(
             isDriver: isDriver,
+            isActive: _tab == RidonsNavTab.activities,
             onRebook: isDriver
                 ? null
                 : (trip) {

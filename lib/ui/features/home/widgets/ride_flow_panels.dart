@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -19,7 +20,10 @@ class RideFlowPanel extends StatelessWidget {
     super.key,
     required this.viewModel,
     this.decorate = true,
+    this.onFitRoute,
   });
+
+  final VoidCallback? onFitRoute;
 
   final HomeMapViewModel viewModel;
   final bool decorate;
@@ -39,14 +43,17 @@ class RideFlowPanel extends StatelessWidget {
       RideStage.estimate => _EstimateSheet(
         viewModel: viewModel,
         decorate: decorate,
+        onFitRoute: onFitRoute,
       ),
       RideStage.offering => _OfferingSheet(
         viewModel: viewModel,
         decorate: decorate,
+        onFitRoute: onFitRoute,
       ),
       RideStage.matched => _MatchedSheet(
         viewModel: viewModel,
         decorate: decorate,
+        onFitRoute: onFitRoute,
       ),
       RideStage.payment => _PaymentSheet(
         viewModel: viewModel,
@@ -487,9 +494,7 @@ class _SearchSheetState extends State<_SearchSheet> {
                                       ? 'recent_destinations_empty'.tr()
                                       : 'no_places_match'.tr(),
                                   textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
+                                  style: Theme.of(context).textTheme.bodyMedium
                                       ?.copyWith(color: context.ridonsMuted),
                                 ),
                                 if (viewModel.showingRecentDestinations) ...[
@@ -497,9 +502,7 @@ class _SearchSheetState extends State<_SearchSheet> {
                                   Text(
                                     'recent_destinations_hint'.tr(),
                                     textAlign: TextAlign.center,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
+                                    style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(color: context.ridonsMuted),
                                   ),
                                 ],
@@ -507,9 +510,11 @@ class _SearchSheetState extends State<_SearchSheet> {
                             ),
                           )
                         else
-                          for (var index = 0;
-                              index < viewModel.suggestions.length;
-                              index++) ...[
+                          for (
+                            var index = 0;
+                            index < viewModel.suggestions.length;
+                            index++
+                          ) ...[
                             if (index > 0)
                               Divider(
                                 height: 1,
@@ -518,9 +523,8 @@ class _SearchSheetState extends State<_SearchSheet> {
                               ),
                             RidonsLocationTile(
                               title: viewModel.suggestions[index].name,
-                              subtitle: viewModel.suggestions[index]
-                                      .subtitle
-                                      .isEmpty
+                              subtitle:
+                                  viewModel.suggestions[index].subtitle.isEmpty
                                   ? null
                                   : viewModel.suggestions[index].subtitle,
                               leadingIcon: viewModel.showingRecentDestinations
@@ -603,8 +607,13 @@ class _MapPickSheet extends StatelessWidget {
 }
 
 class _EstimateSheet extends StatelessWidget {
-  const _EstimateSheet({required this.viewModel, this.decorate = true});
+  const _EstimateSheet({
+    required this.viewModel,
+    this.decorate = true,
+    this.onFitRoute,
+  });
 
+  final VoidCallback? onFitRoute;
   final HomeMapViewModel viewModel;
   final bool decorate;
 
@@ -679,7 +688,11 @@ class _EstimateSheet extends StatelessWidget {
                 : null,
           ),
           const SizedBox(height: 8),
-          _RouteSummary(viewModel: viewModel),
+          InkWell(
+            onTap: onFitRoute,
+            borderRadius: BorderRadius.circular(10),
+            child: _RouteSummary(viewModel: viewModel),
+          ),
         ],
       ),
     );
@@ -687,13 +700,19 @@ class _EstimateSheet extends StatelessWidget {
 }
 
 class _OfferingSheet extends StatelessWidget {
-  const _OfferingSheet({required this.viewModel, this.decorate = true});
+  const _OfferingSheet({
+    required this.viewModel,
+    this.decorate = true,
+    this.onFitRoute,
+  });
 
+  final VoidCallback? onFitRoute;
   final HomeMapViewModel viewModel;
   final bool decorate;
 
   @override
   Widget build(BuildContext context) {
+    final hasOffers = viewModel.counterOffers.isNotEmpty;
     return RidonsBottomSheet(
       showHandle: false,
       decorate: decorate,
@@ -702,49 +721,80 @@ class _OfferingSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'offering_your_fare'.tr(),
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
-                child: Text(
-                  viewModel.driversNotified == 0
-                      ? 'no_drivers_received_offer'.tr()
-                      : 'drivers_notified'.tr(
-                          namedArgs: {
-                            'count': '${viewModel.driversNotified}',
-                            'driverWord': viewModel.driversNotified == 1
-                                ? 'driver'.tr()
-                                : 'drivers'.tr(),
-                            'eta': viewModel.etaLabel,
-                          },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasOffers
+                          ? 'offers_for_you'.tr()
+                          : 'offering_your_fare'.tr(),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (hasOffers)
+                      Text(
+                        'tap_motari_you_want'.tr(),
+                        style: TextStyle(
+                          color: context.ridonsMuted,
+                          fontSize: 12,
                         ),
-                  style: TextStyle(color: context.ridonsMuted, fontSize: 11),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                viewModel.timerLabel,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    viewModel.timerLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    'you_offered'.tr(
+                      namedArgs: {'price': '${viewModel.offeredPrice}'},
+                    ),
+                    style: TextStyle(color: context.ridonsMuted, fontSize: 11),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          RidonsPriceAdjuster(
-            amountRwf: viewModel.offeredPrice,
-            enabled: false,
-            onDecrement: () {},
-            onIncrement: () {},
-          ),
-          if (viewModel.counterOffers.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          _CountdownBar(viewModel: viewModel),
+          if (!hasOffers) ...[
+            const SizedBox(height: 8),
+            Text(
+              viewModel.driversNotified == 0
+                  ? 'no_drivers_received_offer'.tr()
+                  : 'drivers_notified'.tr(
+                      namedArgs: {
+                        'count': '${viewModel.driversNotified}',
+                        'driverWord': viewModel.driversNotified == 1
+                            ? 'driver'.tr()
+                            : 'drivers'.tr(),
+                        'eta': viewModel.etaLabel,
+                      },
+                    ),
+              style: TextStyle(color: context.ridonsMuted, fontSize: 12),
+            ),
             const SizedBox(height: 12),
-            _CounterOffersPanel(viewModel: viewModel),
+            RidonsPriceAdjuster(
+              amountRwf: viewModel.offeredPrice,
+              enabled: false,
+              onDecrement: () {},
+              onIncrement: () {},
+            ),
+          ] else ...[
+            // Marketplace — list of drivers who accepted
+            _AnimatedBidList(viewModel: viewModel),
           ],
           if (viewModel.bidError != null) ...[
             const SizedBox(height: 8),
@@ -754,12 +804,302 @@ class _OfferingSheet extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
-          RidonsButton(label: 'confirm', onPressed: null),
-          const SizedBox(height: 12),
-          _RouteSummary(viewModel: viewModel),
+          // Change my price — always available
+          OutlinedButton(
+            onPressed: () => viewModel.retryFareEstimate(),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              side: BorderSide(color: context.ridonsLine),
+              foregroundColor: context.ridonsInk,
+            ),
+            child: Text('change_my_price'.tr()),
+          ),
+          if (!hasOffers) ...[
+            const SizedBox(height: 8),
+            InkWell(
+            onTap: onFitRoute,
+            borderRadius: BorderRadius.circular(10),
+            child: _RouteSummary(viewModel: viewModel),
+          ),
+          ],
         ],
       ),
     );
+  }
+}
+
+/// Animates each driver card sliding in from the bottom as they accept.
+class _AnimatedBidList extends StatefulWidget {
+  const _AnimatedBidList({required this.viewModel});
+  final HomeMapViewModel viewModel;
+
+  @override
+  State<_AnimatedBidList> createState() => _AnimatedBidListState();
+}
+
+class _AnimatedBidListState extends State<_AnimatedBidList> {
+  final List<String> _seenIds = [];
+
+  @override
+  Widget build(BuildContext context) {
+    final bids = widget.viewModel.counterOffers;
+    // Track new arrivals for animation.
+    final newIds = bids
+        .map((b) => b.bidId)
+        .where((id) => !_seenIds.contains(id))
+        .toList();
+    _seenIds
+      ..removeWhere((id) => !bids.any((b) => b.bidId == id))
+      ..addAll(newIds);
+
+    return ListView.separated(
+      shrinkWrap: true,
+      padding: EdgeInsets.zero,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: bids.length,
+      separatorBuilder: (_, __) =>
+          Divider(height: 1, color: context.ridonsLine),
+      itemBuilder: (context, index) {
+        final bid = bids[index];
+        final isNew = newIds.contains(bid.bidId);
+        return _BidTile(
+          key: ValueKey(bid.bidId),
+          bid: bid,
+          offeredPrice: widget.viewModel.offeredPrice,
+          busy: widget.viewModel.bidBusy,
+          animateIn: isNew,
+          onTap: () => widget.viewModel.acceptCounterOffer(bid),
+        );
+      },
+    );
+  }
+}
+
+/// Animated red progress bar that shrinks from full width to zero
+/// in sync with the offer countdown timer.
+class _CountdownBar extends StatefulWidget {
+  const _CountdownBar({required this.viewModel});
+  final HomeMapViewModel viewModel;
+
+  @override
+  State<_CountdownBar> createState() => _CountdownBarState();
+}
+
+class _CountdownBarState extends State<_CountdownBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this);
+    _syncProgress();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CountdownBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncProgress();
+  }
+
+  void _syncProgress() {
+    final total = widget.viewModel.offerTtlTotal.inMilliseconds;
+    final remaining = widget.viewModel.offerTimer.inMilliseconds;
+    if (total <= 0) {
+      _ctrl.value = 0;
+      return;
+    }
+    final progress = (remaining / total).clamp(0.0, 1.0);
+    _ctrl.value = progress;
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _syncProgress();
+    return SizedBox(
+      height: 3,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (_, __) => FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          widthFactor: _ctrl.value,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: RidonsColors.primary,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BidTile extends StatefulWidget {
+  const _BidTile({
+    super.key,
+    required this.bid,
+    required this.offeredPrice,
+    required this.busy,
+    required this.animateIn,
+    required this.onTap,
+  });
+
+  final RideBid bid;
+  final int offeredPrice;
+  final bool busy;
+  final bool animateIn;
+  final VoidCallback onTap;
+
+  @override
+  State<_BidTile> createState() => _BidTileState();
+}
+
+class _BidTileState extends State<_BidTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<Offset> _slide;
+  late final Animation<double> _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.4),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    if (widget.animateIn) {
+      _ctrl.forward();
+    } else {
+      _ctrl.value = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bid = widget.bid;
+    final name = bid.driverName.isNotEmpty ? bid.driverName : bid.driverLabel;
+    final initials = _initials(name);
+    final avatarColor = _colorFor(bid.driverId);
+    final isCounter = bid.isCounter;
+    final priceStr = NumberFormat('#,###').format(bid.price);
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: InkWell(
+          onTap: widget.busy ? null : widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                // Avatar
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: avatarColor,
+                  backgroundImage: bid.driverAvatarUrl != null
+                      ? NetworkImage(bid.driverAvatarUrl!)
+                      : null,
+                  child: bid.driverAvatarUrl == null
+                      ? Text(
+                          initials,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                // Name + meta
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        '★ ${bid.driverRating > 0 ? bid.driverRating.toStringAsFixed(1) : '—'} · ${bid.proximityLabel}',
+                        style: TextStyle(
+                          color: context.ridonsMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Price + status
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      priceStr,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      isCounter ? 'counter'.tr() : 'accepted'.tr(),
+                      style: TextStyle(
+                        color: isCounter
+                            ? RidonsColors.accent
+                            : RidonsColors.success,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  Color _colorFor(String id) {
+    final colors = [
+      const Color(0xFF2F6FDE),
+      const Color(0xFFC9822B),
+      const Color(0xFF7C5CBF),
+      const Color(0xFF16A34A),
+      const Color(0xFFB45309),
+      const Color(0xFF0E7490),
+    ];
+    final hash = id.codeUnits.fold(0, (a, b) => a + b);
+    return colors[hash % colors.length];
   }
 }
 
@@ -788,7 +1128,7 @@ class _CounterOffersPanel extends StatelessWidget {
                   width: 34,
                   height: 34,
                   decoration: const BoxDecoration(
-                    color: RidonsColors.navy,
+                    color: RidonsColors.primary,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -1057,7 +1397,9 @@ class _CounterPrice extends StatelessWidget {
 }
 
 class _MatchedSheet extends StatelessWidget {
-  const _MatchedSheet({required this.viewModel, this.decorate = true});
+  const _MatchedSheet({required this.viewModel, this.decorate = true, this.onFitRoute});
+
+  final VoidCallback? onFitRoute;
 
   final HomeMapViewModel viewModel;
   final bool decorate;
@@ -1065,12 +1407,31 @@ class _MatchedSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final driver = viewModel.matchedDriver;
+    final isArrived = viewModel.liveRideStatus == 'arrived';
+    final isInProgress = viewModel.liveRideStatus == 'in_progress';
+    // Show destination name as title during trip, translated key otherwise.
+    final destLabel = viewModel.tripDestinationLabel;
+    final sheetTitle = isInProgress && destLabel.isNotEmpty
+        ? destLabel
+        : viewModel.rideStatusLabel.tr();
     return RidonsTripSheet(
-      title: viewModel.rideStatusLabel,
+      title: sheetTitle,
+      translateTitle: false,
       decorate: decorate,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Share trip icon — top right of header
+          IconButton(
+            icon: const Icon(Icons.share_outlined, size: 20),
+            tooltip: 'share_trip',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: viewModel.sharingTrip
+                ? null
+                : () => _shareTrip(context, viewModel),
+          ),
+          const SizedBox(width: 4),
           Text(
             viewModel.etaLabel,
             style: const TextStyle(
@@ -1080,12 +1441,12 @@ class _MatchedSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Icon(
-            viewModel.liveRideStatus == 'matched'
-                ? Icons.lock_outline
-                : Icons.route_rounded,
-            size: 18,
-            color: context.ridonsInk,
+          IconButton(
+            icon: const Icon(Icons.route_rounded, size: 20),
+            tooltip: 'route'.tr(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: onFitRoute,
           ),
         ],
       ),
@@ -1116,8 +1477,8 @@ class _MatchedSheet extends StatelessWidget {
                   value: '${viewModel.payableFare} Rwf',
                 ),
               ),
-              const Expanded(
-                child: _Fact(label: 'payment_method', value: 'cash_or_momo'),
+              Expanded(
+                child: _Fact(label: 'payment_method', value: 'cash'.tr()),
               ),
             ],
           ),
@@ -1126,7 +1487,7 @@ class _MatchedSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: _Fact(
-                  label: viewModel.liveRideStatus == 'in_progress'
+                  label: isInProgress
                       ? 'distance_to_destination'
                       : 'distance_to_pickup',
                   value: viewModel.etaDistanceLabel,
@@ -1134,9 +1495,7 @@ class _MatchedSheet extends StatelessWidget {
               ),
               Expanded(
                 child: _Fact(
-                  label: viewModel.liveRideStatus == 'in_progress'
-                      ? 'eta_to_destination'
-                      : 'eta_to_pickup',
+                  label: isInProgress ? 'eta_to_destination' : 'eta_to_pickup',
                   value: viewModel.etaLabel,
                   emphasized: true,
                 ),
@@ -1144,8 +1503,47 @@ class _MatchedSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          _RouteSummary(viewModel: viewModel),
+          InkWell(
+            onTap: onFitRoute,
+            borderRadius: BorderRadius.circular(10),
+            child: _RouteSummary(viewModel: viewModel),
+          ),
           const SizedBox(height: 12),
+          // Driver arrived banner — prompt passenger
+          if (isArrived) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: RidonsColors.primarySoft,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: RidonsColors.primary.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.location_on,
+                    color: RidonsColors.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'driver_has_arrived'.tr(),
+                      style: const TextStyle(
+                        color: RidonsColors.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          // Call driver + Cancel ride on same row
           Row(
             children: [
               Expanded(
@@ -1163,16 +1561,13 @@ class _MatchedSheet extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: viewModel.sharingTrip
-                      ? null
-                      : () => _shareTrip(context, viewModel),
-                  icon: const Icon(Icons.share_outlined, size: 16),
-                  label: Text(
-                    viewModel.sharingTrip
-                        ? 'creating_link'.tr()
-                        : 'share_trip'.tr(),
-                  ),
+                  onPressed: () =>
+                      _requestPassengerCancellation(context, viewModel),
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  label: Text('cancel_ride'.tr()),
                   style: OutlinedButton.styleFrom(
+                    foregroundColor: RidonsColors.primary,
+                    side: const BorderSide(color: RidonsColors.primary),
                     minimumSize: const Size.fromHeight(44),
                   ),
                 ),
@@ -1180,36 +1575,10 @@ class _MatchedSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
+          // Send SOS — filled red
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () =>
-                  _requestPassengerCancellation(context, viewModel),
-              icon: const Icon(Icons.close_rounded, size: 16),
-              label: Text('cancel_ride'.tr()),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: RidonsColors.primary,
-                side: const BorderSide(color: RidonsColors.primary),
-                minimumSize: const Size.fromHeight(44),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _openNeedHelpDialog(context, viewModel),
-              icon: const Icon(Icons.help_outline, size: 16),
-              label: Text('need_help'.tr()),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(44),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
+            child: ElevatedButton.icon(
               onPressed: viewModel.sosBusy
                   ? null
                   : () => _confirmSos(context, viewModel),
@@ -1217,10 +1586,27 @@ class _MatchedSheet extends StatelessWidget {
               label: Text(
                 viewModel.sosBusy ? 'sending_sos'.tr() : 'send_sos'.tr(),
               ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: RidonsColors.primary,
-                side: const BorderSide(color: RidonsColors.primary),
-                minimumSize: const Size.fromHeight(44),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: RidonsColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(48),
+                elevation: 0,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Need help — subtle, at the bottom
+          Center(
+            child: TextButton.icon(
+              onPressed: () => _openNeedHelpDialog(context, viewModel),
+              icon: Icon(
+                Icons.help_outline,
+                size: 15,
+                color: context.ridonsMuted,
+              ),
+              label: Text(
+                'need_help'.tr(),
+                style: TextStyle(color: context.ridonsMuted, fontSize: 13),
               ),
             ),
           ),
@@ -1265,14 +1651,8 @@ class _PaymentSheet extends StatelessWidget {
           const SizedBox(height: 14),
           _PaymentOption(
             label: 'cash',
-            selected: viewModel.paymentMethod == 'Cash',
+            selected: true,
             onTap: () => viewModel.selectPayment('Cash'),
-          ),
-          const SizedBox(height: 8),
-          _PaymentOption(
-            label: 'mobile_money',
-            selected: viewModel.paymentMethod == 'Mobile Money',
-            onTap: () => viewModel.selectPayment('Mobile Money'),
           ),
           const SizedBox(height: 16),
           RidonsButton(

@@ -1,33 +1,28 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-/// Maps API failures to copy. Debug builds name the service; release stays
-/// user-facing.
-String apiErrorMessage(
-  DioException error, {
-  required String fallback,
-}) {
+/// Maps API failures to translation keys. Every string returned here will
+/// have .tr() called on it by the caller — never return raw English.
+String apiErrorMessage(DioException error, {required String fallback}) {
   final data = error.response?.data;
   final payload = errorPayload(data);
   final code = payload?['error']?.toString();
   final known = switch (code) {
     'invalid_phone_number' => 'valid_rwanda_phone',
     'otp_service_unavailable' => 'otp_service_unavailable',
-    'otp_mismatch' => 'That code is incorrect.',
-    'otp_expired' => 'That code expired. Request a new one.',
-    'otp_not_found' => 'Request a new code first.',
-    'otp_locked' => 'Too many attempts. Try again later.',
-    'phone_taken' => phoneTakenMessage(payload?['role']?.toString()),
-    'user_not_found' =>
-        'No account found with this phone number. Create one instead.',
-    'legal_consent_required' =>
-        'Please accept the Terms & Conditions and Privacy Policy.',
+    'otp_mismatch' => 'otp_mismatch',
+    'otp_expired' => 'otp_expired',
+    'otp_not_found' => 'otp_not_found',
+    'otp_locked' => 'otp_locked',
+    'phone_taken' => phoneTakenKey(payload?['role']?.toString()),
+    'user_not_found' => 'user_not_found',
+    'legal_consent_required' => 'legal_consent_required',
     _ => null,
   };
   if (known != null) return known;
 
-  final service = _serviceName(error);
-  final unreachable = error.type == DioExceptionType.connectionError ||
+  final unreachable =
+      error.type == DioExceptionType.connectionError ||
       error.type == DioExceptionType.connectionTimeout ||
       error.type == DioExceptionType.receiveTimeout ||
       error.type == DioExceptionType.sendTimeout;
@@ -35,21 +30,25 @@ String apiErrorMessage(
   if (kDebugMode) {
     if (unreachable) {
       final uri = error.requestOptions.uri;
-      return 'Cannot reach gateway at ${uri.host}:${uri.port}. '
-          'Emulator uses 10.0.2.2; USB phone: adb reverse tcp:8100 tcp:8100';
+      debugPrint(
+        '[API] Cannot reach ${uri.host}:${uri.port} — '
+        'emulator: use 10.0.2.2; USB phone: adb reverse tcp:8100 tcp:8100',
+      );
+    } else {
+      final status = error.response?.statusCode;
+      final service = _serviceName(error);
+      debugPrint(
+        '[API] $fallback [$service${status != null ? ' HTTP $status' : ''}]',
+      );
     }
-    final status = error.response?.statusCode;
-    return status == null
-        ? '$fallback [$service]'
-        : '$fallback [$service HTTP $status]';
   }
 
   if (unreachable) {
-    return 'We couldn\'t connect. Check your internet and try again.';
+    return 'no_internet_connection';
   }
   final status = error.response?.statusCode;
   if (status == 502 || status == 503 || status == 504) {
-    return 'Ridons is temporarily unavailable. Please try again shortly.';
+    return 'service_temporarily_unavailable';
   }
   return fallback;
 }
@@ -58,7 +57,8 @@ String _serviceName(DioException error) {
   final status = error.response?.statusCode;
   final path = error.requestOptions.path;
   final downstream = _serviceForPath(path);
-  final unreachable = error.type == DioExceptionType.connectionError ||
+  final unreachable =
+      error.type == DioExceptionType.connectionError ||
       error.type == DioExceptionType.connectionTimeout ||
       error.type == DioExceptionType.receiveTimeout ||
       error.type == DioExceptionType.sendTimeout;
@@ -108,13 +108,12 @@ const _genericHttpErrors = {
   'Internal Server Error',
 };
 
-String phoneTakenMessage(String? role) {
+/// Returns a translation key for a phone-already-taken error.
+String phoneTakenKey(String? role) {
   return switch (role) {
-    'driver' =>
-      'This number already has a driver account. Sign in instead.',
-    'passenger' =>
-      'This number already has a passenger account. Sign in instead.',
-    _ => 'This number is already registered. Sign in instead.',
+    'driver' => 'phone_taken_driver',
+    'passenger' => 'phone_taken_passenger',
+    _ => 'phone_taken',
   };
 }
 

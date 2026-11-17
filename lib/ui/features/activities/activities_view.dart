@@ -37,10 +37,16 @@ class ActivityTrip {
 
 /// Trip history with map snapshots and a filter. Data comes from GET /me/trips.
 class ActivitiesView extends ConsumerStatefulWidget {
-  const ActivitiesView({super.key, this.onRebook, this.isDriver = false});
+  const ActivitiesView({
+    super.key,
+    this.onRebook,
+    this.isDriver = false,
+    this.isActive = false,
+  });
 
   final ValueChanged<ActivityTrip>? onRebook;
   final bool isDriver;
+  final bool isActive;
 
   @override
   ConsumerState<ActivitiesView> createState() => _ActivitiesViewState();
@@ -58,6 +64,14 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant ActivitiesView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _load();
+    }
   }
 
   Future<void> _load({bool pull = false}) async {
@@ -563,7 +577,7 @@ class _TripMapSnapshotState extends State<_TripMapSnapshot> {
                       decoration: BoxDecoration(
                         color: Theme.of(context).brightness == Brightness.dark
                             ? Colors.white
-                            : RidonsColors.navy,
+                            : RidonsColors.primary,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),

@@ -3,7 +3,7 @@ import 'package:easy_localization/easy_localization.dart';
 
 import '../theme/ridons_colors.dart';
 
-enum RidonsButtonVariant { primary, secondary, outline }
+enum RidonsButtonVariant { primary, secondary, outline, danger }
 
 /// Full-width action button used across auth and ride flows.
 class RidonsButton extends StatelessWidget {
@@ -94,6 +94,24 @@ class RidonsButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(100),
           ),
           side: BorderSide(color: context.ridonsLine, width: 1),
+        ),
+        child: child,
+      ),
+      RidonsButtonVariant.danger => ElevatedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: RidonsColors.primary,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: RidonsColors.primary.withValues(alpha: 0.4),
+          disabledForegroundColor: Colors.white,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          minimumSize: const Size.fromHeight(56),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(100),
+          ),
         ),
         child: child,
       ),

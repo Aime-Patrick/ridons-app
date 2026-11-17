@@ -20,7 +20,7 @@ import '../../../../domain/models/session_user.dart';
 
 enum DriverStage { home, locked, arrived, driving }
 
-const _pickupArrivalRadiusM = 60.0;
+const _pickupArrivalRadiusM = 30.0;
 const _journeyStartSpeedKmh = 5.0;
 const _routeDeviationThresholdM = 80.0;
 const _routeRefreshCooldown = Duration(seconds: 10);
@@ -33,7 +33,7 @@ class DriverHomeViewModel extends ChangeNotifier {
     required RoutingService routingService,
     required GeoApi geoApi,
     required TripApi tripApi,
-    required RealtimeClient realtime,
+    required this._realtime,
     required AuthRepository authRepository,
     required this.user,
     required this.onSessionRefreshed,
@@ -42,7 +42,6 @@ class DriverHomeViewModel extends ChangeNotifier {
        _routing = routingService,
        _geo = geoApi,
        _trips = tripApi,
-       _realtime = realtime,
        _auth = authRepository;
 
   final LocationService _location;
@@ -61,6 +60,8 @@ class DriverHomeViewModel extends ChangeNotifier {
   bool hideEarnings = true;
   bool busy = false;
   String? errorMessage;
+  bool passengerCancelled = false;
+  bool offerTakenByOther = false;
   int? counteredAmount;
   DriverStats stats = const DriverStats();
   List<DriverQuest> quests = const [];
@@ -111,7 +112,7 @@ class DriverHomeViewModel extends ChangeNotifier {
   String get etaChip {
     final minutes = etaMinutes;
     if (minutes == null) return 'on_the_way';
-    return 'minutes_to_pickup';
+    return stage == DriverStage.driving ? 'minutes_to_destination' : 'minutes_to_pickup';
   }
 
   int fareFor(RideOffer offer) =>
@@ -202,14 +203,10 @@ class DriverHomeViewModel extends ChangeNotifier {
         }
         await _location.requestNotifications();
       }
-      // Do not go online using the bootstrap/last-known fix when a fresh GPS
-      // reading is available. The first presence coordinate is user-visible.
-      final fix = await _location.freshPosition() ?? _fix;
-      if (value && fix == null) {
-        online = previous;
-        errorMessage = 'turn_on_location';
-        return;
-      }
+      // Use the last known fix immediately so the button responds instantly.
+      // A fresh GPS position is not awaited here — the GPS stream will update
+      // the driver's location in the background shortly after going online.
+      final fix = _fix;
       var error = await _geo.setOnline(
         online: value,
         lat: fix?.latitude,
@@ -293,6 +290,18 @@ class DriverHomeViewModel extends ChangeNotifier {
     } finally {
       _locationPingBusy = false;
     }
+  }
+
+  void clearErrorMessage() {
+    errorMessage = null;
+  }
+
+  void clearPassengerCancelled() {
+    passengerCancelled = false;
+  }
+
+  void clearOfferTakenByOther() {
+    offerTakenByOther = false;
   }
 
   void toggleEarningsHidden() {
@@ -407,6 +416,19 @@ class DriverHomeViewModel extends ChangeNotifier {
         driverRating: stats.avgRating,
         driverAvatarUrl: user.avatarUrl,
       );
+      errorMessage = null;
+      // Passenger marketplace flow — ride not created yet, waiting for
+      // passenger to pick this driver from the list.
+      if (locked.pendingPassengerChoice) {
+        errorMessage = 'waiting_for_passenger_choice';
+        busy = false;
+        // Remove this offer from the list since we've accepted it.
+        offers = offers
+            .where((o) => o.requestId != offer.requestId)
+            .toList(growable: false);
+        notifyListeners();
+        return;
+      }
       if (locked.rideId.isEmpty) {
         throw StateError('missing ride');
       }
@@ -427,7 +449,7 @@ class DriverHomeViewModel extends ChangeNotifier {
         ),
       );
     } catch (_) {
-      errorMessage = 'offer_expired';
+      errorMessage = 'offer_no_longer_available';
     } finally {
       busy = false;
       notifyListeners();
@@ -452,11 +474,12 @@ class DriverHomeViewModel extends ChangeNotifier {
         routeDistanceKm = null;
         _invalidateRouteRequests();
         if (online) await refreshInbox();
+        unawaited(_refreshQuestProgress());
         notifyListeners();
         return;
       }
       await _setRideStatus(
-        stage == DriverStage.arrived ? 'in_progress' : 'en_route',
+        stage == DriverStage.arrived ? 'in_progress' : 'arrived',
       );
     } finally {
       busy = false;
@@ -474,12 +497,8 @@ class DriverHomeViewModel extends ChangeNotifier {
   }) async {
     final current = ride;
     if (current == null) return;
-    await _trips.cancelRide(
-      current.rideId,
-      reasonCode: reasonCode,
-      reasonLabel: reasonLabel,
-      note: note,
-    );
+    // Clear the trip immediately so the UI transitions away at once,
+    // without waiting for the API round-trip.
     ride = null;
     stage = DriverStage.home;
     routePoints = const [];
@@ -488,8 +507,17 @@ class DriverHomeViewModel extends ChangeNotifier {
     routeDeviated = false;
     routeDistanceKm = null;
     _invalidateRouteRequests();
-    if (online) await refreshInbox();
     notifyListeners();
+    // Fire the cancel API in the background — the driver is already home.
+    unawaited(
+      _trips.cancelRide(
+        current.rideId,
+        reasonCode: reasonCode,
+        reasonLabel: reasonLabel,
+        note: note,
+      ),
+    );
+    if (online) unawaited(refreshInbox());
   }
 
   Future<bool> triggerSos() async {
@@ -679,7 +707,7 @@ class DriverHomeViewModel extends ChangeNotifier {
     if (current == null || !onTrip) return;
     final now = DateTime.now();
     final last = _lastEtaRefreshAt;
-    if (last != null && now.difference(last) < const Duration(seconds: 4)) {
+    if (last != null && now.difference(last) < const Duration(seconds: 10)) {
       return;
     }
     _lastEtaRefreshAt = now;
@@ -708,6 +736,19 @@ class DriverHomeViewModel extends ChangeNotifier {
     if (message.event == 'matched') {
       final rideId = '${message.data['rideId'] ?? ''}'.trim();
       if (rideId.isNotEmpty) unawaited(_syncAssignedRide(rideId));
+      return;
+    }
+    // Passenger chose another driver — remove the offer and notify driver.
+    if (message.event == 'bid_rejected') {
+      final requestId = '${message.data['requestId'] ?? ''}';
+      final reason = '${message.data['reason'] ?? ''}';
+      if (reason == 'passenger_chose_another') {
+        offers = offers
+            .where((o) => o.requestId != requestId)
+            .toList(growable: false);
+        offerTakenByOther = true;
+        notifyListeners();
+      }
       return;
     }
     if (message.event == 'incoming_request' && online && !onTrip) {
@@ -757,6 +798,8 @@ class DriverHomeViewModel extends ChangeNotifier {
         routeDeviated = false;
         routeDistanceKm = null;
         _invalidateRouteRequests();
+        passengerCancelled = true;
+        if (online) unawaited(refreshInbox());
         notifyListeners();
       }
       if (status == 'completed') {
@@ -813,7 +856,7 @@ class DriverHomeViewModel extends ChangeNotifier {
     }
     final distance = _distanceMeters(driver, passenger);
     if (stage == DriverStage.locked &&
-        current.status == 'en_route' &&
+        (current.status == 'en_route' || current.status == 'matched') &&
         distance <= _pickupArrivalRadiusM) {
       await _setRideStatus('arrived');
       return;
@@ -891,6 +934,7 @@ class DriverHomeViewModel extends ChangeNotifier {
     passengerRatingComment = '';
     passengerRatingBusy = false;
     passengerRatingError = null;
+    unawaited(_refreshQuestProgress());
     notifyListeners();
   }
 

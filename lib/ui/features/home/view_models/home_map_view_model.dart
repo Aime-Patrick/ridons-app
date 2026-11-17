@@ -59,23 +59,20 @@ class _TrackedDriver {
 /// Passenger home map: permissions, places, offer, match, live geo.
 class HomeMapViewModel extends ChangeNotifier {
   HomeMapViewModel({
-    required LocationService this._locationService,
-    required PlacesService this._placesService,
-    required RoutingService this._routingService,
-    required GeoApi this._geoApi,
-    required RealtimeClient this._realtime,
-    required CoverageApi this._coverageApi,
-    required PrefsStore this._prefsStore,
-    TripApi? tripApi,
-    PricingApi? pricingApi,
-    SupportApi? supportApi,
+    required this._locationService,
+    required this._placesService,
+    required this._routingService,
+    required this._geoApi,
+    required this._realtime,
+    required this._coverageApi,
+    required this._prefsStore,
+    this._tripApi,
+    this._pricingApi,
+    this._supportApi,
     RecentPlacesStore? recentPlacesStore,
     this.passengerName = '',
     this.passengerId = '',
-  }) : _tripApi = tripApi,
-       _pricingApi = pricingApi,
-       _supportApi = supportApi,
-       _recentPlacesStore = recentPlacesStore ?? RecentPlacesStore();
+  }) : _recentPlacesStore = recentPlacesStore ?? RecentPlacesStore();
 
   final LocationService _locationService;
   final PlacesService _placesService;
@@ -124,6 +121,7 @@ class HomeMapViewModel extends ChangeNotifier {
   int agreedFare = 0;
   int driversNotified = 0;
   Duration offerTimer = Duration.zero;
+  Duration offerTtlTotal = Duration.zero;
   String paymentMethod = 'Cash';
   bool loadingRoute = false;
   bool locating = false;
@@ -237,13 +235,22 @@ class HomeMapViewModel extends ChangeNotifier {
       case 'arrived':
         return 'driver_has_arrived';
       case 'in_progress':
-        return 'trip_in_progress';
+        return 'heading_to_destination';
       case 'completed':
         return 'trip_complete';
       default:
         return 'match_found';
     }
   }
+
+  /// During in_progress, returns the destination name so the sheet can show
+  /// it as the title instead of a generic key.
+  String get tripDestinationLabel {
+    final dest = dropoff?.name.trim() ?? '';
+    return dest.isNotEmpty ? dest : '';
+  }
+
+  bool get isInProgress => liveRideStatus == 'in_progress';
 
   bool get hasRoute =>
       pickup != null && dropoff != null && routePoints.length >= 2;
@@ -342,8 +349,9 @@ class HomeMapViewModel extends ChangeNotifier {
     if (origin != null) {
       return LatLng(origin.latitude, origin.longitude);
     }
-    // No embedded city — wait for GPS (map recenters on first fix).
-    return const LatLng(0, 0);
+    // Fall back to Kigali city center while GPS is resolving.
+    // The map will pan to the user's actual location once a fix arrives.
+    return const LatLng(-1.9441, 30.0619);
   }
 
   Future<void> bootstrap() async {
@@ -459,7 +467,6 @@ class HomeMapViewModel extends ChangeNotifier {
     locationFixUnavailable = false;
     _applyGps(position);
     notifyListeners();
-    unawaited(_checkCurrentCoverage(position));
     unawaited(_renamePickup(position.latitude, position.longitude));
   }
 
@@ -477,7 +484,7 @@ class HomeMapViewModel extends ChangeNotifier {
   Future<void> _afterLocationGranted() async {
     locating = true;
     locationHintLoading = false;
-    checkingCoverage = true;
+    checkingCoverage = false;
     notifyListeners();
 
     // Prefer a fresh GPS fix (emulator Extended Controls / real device).
@@ -496,7 +503,6 @@ class HomeMapViewModel extends ChangeNotifier {
       _applyGps(last);
       locating = false;
       notifyListeners();
-      unawaited(_checkCurrentCoverage(last));
     } else {
       checkingCoverage = false;
       locating = false;
@@ -686,9 +692,29 @@ class HomeMapViewModel extends ChangeNotifier {
       unawaited(_pingLocation());
     });
     _gpsSub?.cancel();
-    _gpsSub = _locationService.positionStream().listen((position) {
+        _gpsSub = _locationService.positionStream().listen((position) {
       final firstFix = _lastFix == null;
       _gpsSpeedKmh = LocationService.speedKmh(position, _lastFix);
+
+      // Stationary jitter & accuracy filter:
+      if (!firstFix) {
+        final last = _lastFix!;
+        final driftM = _metersBetween(
+          LatLng(last.latitude, last.longitude),
+          LatLng(position.latitude, position.longitude),
+        );
+        // Ignore micro-drift when stationary (< 5 meters and speed < 1.8 km/h).
+        if (driftM < 5.0 && _gpsSpeedKmh < 1.8) {
+          return;
+        }
+        // Reject sudden inaccurate jumps (> 65m) when we already have a decent fix (< 35m).
+        if (position.accuracy.isFinite &&
+            position.accuracy > 65.0 &&
+            last.accuracy < 35.0) {
+          return;
+        }
+      }
+
       _lastFix = position;
       if (_pickupFollowsGps && firstFix) {
         _applyGps(position);
@@ -741,6 +767,9 @@ class HomeMapViewModel extends ChangeNotifier {
     await _realtime.subscribe('ride:${active.rideId}');
     _startEtaRefresh();
     await _refreshEta();
+    if (dropoff != null && pickup != null) {
+      unawaited(_refreshRoute());
+    }
     notifyListeners();
   }
 
@@ -782,8 +811,8 @@ class HomeMapViewModel extends ChangeNotifier {
       return;
     }
     final point = LatLng(position.latitude, position.longitude);
-    final labelOrigin = _lastPickupLabelPoint ??
-        LatLng(origin.latitude, origin.longitude);
+    final labelOrigin =
+        _lastPickupLabelPoint ?? LatLng(origin.latitude, origin.longitude);
     final metersFromLabel = _metersBetween(labelOrigin, point);
     // Keep the exact GPS coordinate even when the display label stays the
     // same. Reverse geocoding is only used to refresh the label occasionally.
@@ -804,7 +833,8 @@ class HomeMapViewModel extends ChangeNotifier {
       return;
     }
     final routeOrigin = _lastRoutedPickup;
-    if (routeOrigin == null || _metersBetween(routeOrigin, currentPickup) < 100) {
+    if (routeOrigin == null ||
+        _metersBetween(routeOrigin, currentPickup) < 100) {
       return;
     }
 
@@ -857,7 +887,7 @@ class HomeMapViewModel extends ChangeNotifier {
         DateTime.now().difference(checkedAt) < const Duration(seconds: 30)) {
       return;
     }
-    unawaited(_checkCurrentCoverage(position));
+    // Coverage is now only checked at booking time — do not recheck on movement.
   }
 
   void _schedulePickupRename(double lat, double lng) {
@@ -968,7 +998,7 @@ class HomeMapViewModel extends ChangeNotifier {
           (item) => item.bidId != bid.bidId && item.driverId != bid.driverId,
         ),
         bid,
-      ]..sort((a, b) => a.price.compareTo(b.price));
+      ]..sort(_bidRank);
       counterOffers = List.unmodifiable(updated);
       bidError = null;
       notifyListeners();
@@ -1086,19 +1116,34 @@ class HomeMapViewModel extends ChangeNotifier {
           (message.data['driverRating'] as num?)?.toDouble() ?? 0;
       final driverAvatarUrl = message.data['driverAvatarUrl']?.toString();
       driverPhone = '${message.data['driverPhone'] ?? driverPhone}'.trim();
-      matchedDriver = MatchedDriver(
-        name: driverName.isEmpty ? matchedDriver?.name ?? '' : driverName,
-        plate: vehiclePlate.isEmpty ? matchedDriver?.plate ?? '' : vehiclePlate,
-        rating: driverRating > 0 ? driverRating : matchedDriver?.rating ?? 0,
-        avatarUrl: driverAvatarUrl ?? matchedDriver?.avatarUrl,
-      );
       final fare = (message.data['fare'] as num?)?.toInt() ?? 0;
-      if (fare > 0) agreedFare = fare;
-      liveRideStatus = 'matched';
-      if (driverId.isNotEmpty && !_tracked.containsKey(driverId)) {
-        focusedDriverId = driverId;
+      final etaMin = (message.data['etaMin'] as num?)?.toInt() ?? 0;
+      final distanceKm = (message.data['distanceKm'] as num?)?.toDouble() ?? 0;
+      // Don't auto-match — add to the accepted offers list so the passenger
+      // can choose which driver they want.
+      if (driverId.isNotEmpty) {
+        final acceptedBid = RideBid(
+          bidId: id.isNotEmpty ? id : driverId,
+          requestId: liveRequestId ?? '',
+          driverId: driverId,
+          price: fare > 0 ? fare : offeredPrice,
+          isCounter: false,
+          etaMin: etaMin,
+          distanceKm: distanceKm,
+          driverName: driverName,
+          vehiclePlate: vehiclePlate,
+          driverRating: driverRating,
+          driverAvatarUrl: driverAvatarUrl,
+          driverPhone: driverPhone,
+        );
+        final updated = [
+          ...counterOffers.where((item) => item.driverId != driverId),
+          acceptedBid,
+        ]..sort(_bidRank);
+        counterOffers = List.unmodifiable(updated);
+        bidError = null;
+        notifyListeners();
       }
-      showMatch(driverId: driverId, fare: fare);
       return;
     }
     if (message.event == 'status') {
@@ -1134,6 +1179,9 @@ class HomeMapViewModel extends ChangeNotifier {
           etaMinutes = 0;
           etaDistanceKm = 0;
         }
+        if (status == 'in_progress') {
+          unawaited(_refreshRoute());
+        }
       }
       notifyListeners();
       return;
@@ -1159,6 +1207,31 @@ class HomeMapViewModel extends ChangeNotifier {
   bool _isNearUser(LatLng point) {
     final origin = userPoint;
     return origin != null && _metersBetween(origin, point) <= 3000;
+  }
+
+  /// Ranks bids by driver quality for the passenger marketplace list.
+  ///
+  /// Priority:
+  ///   1. Rating — higher is better (weighted 60%)
+  ///   2. ETA    — lower is better (weighted 30%)
+  ///   3. Price  — lower is better for the passenger (weighted 10%)
+  ///
+  /// Drivers with no rating (0.0) go to the bottom since they are unproven.
+  static int _bidRank(RideBid a, RideBid b) {
+    double score(RideBid bid) {
+      // Rating: scale 0–5 → 0–60 points. No rating → 0.
+      final ratingScore = bid.driverRating > 0 ? bid.driverRating * 12.0 : 0;
+      // ETA: 0 min = 30 pts, 10+ min = 0 pts. Clamped.
+      final eta = bid.etaMin > 0 ? bid.etaMin : 10;
+      final etaScore = ((10 - eta.clamp(0, 10)) / 10) * 30;
+      // Price parity: passenger's perspective — accepted price (isCounter=false)
+      // is neutral; counter offers that are higher lose points.
+      final priceScore = bid.isCounter ? 0.0 : 10.0;
+      return ratingScore + etaScore + priceScore;
+    }
+
+    // Higher score = better rank = appears first.
+    return score(b).compareTo(score(a));
   }
 
   void _upsertTracked({
@@ -1197,20 +1270,19 @@ class HomeMapViewModel extends ChangeNotifier {
     final tracked = focusedDriverId == null ? null : _tracked[focusedDriverId!];
     final driver = tracked ?? (_tracked.isEmpty ? null : _tracked.values.first);
     final destination = liveRideStatus == 'in_progress' ? dropoff : origin;
+    // If we have no driver position yet, keep the seeded ETA from the match
+    // event rather than showing '—'. Clear only on arrived.
     if (destination == null || driver == null) {
-      if (liveRideStatus != 'arrived') {
-        final hadValue = etaMinutes != null || etaDistanceKm != null;
-        etaMinutes = null;
-        etaDistanceKm = null;
-        if (hadValue) notifyListeners();
+      if (liveRideStatus == 'arrived') {
+        etaMinutes = 0;
+        etaDistanceKm = 0;
+        notifyListeners();
       }
       return;
     }
 
     final requestGeneration = ++_etaRequestGeneration;
     final quote = await _geoApi.pickupEta(
-      // Use the latest GPS target. `display` is intentionally smoothed for
-      // rendering and can lag behind the driver's real position.
       driver: driver.target,
       pickup: LatLng(destination.latitude, destination.longitude),
       speedKmh: driver.speedKmh > 1 ? driver.speedKmh : 22,
@@ -1262,7 +1334,8 @@ class HomeMapViewModel extends ChangeNotifier {
   void closeSearch() {
     _searchGen++;
     searchingPlaces = false;
-    stage = _stageBeforeSearch ??
+    stage =
+        _stageBeforeSearch ??
         (dropoff == null ? RideStage.route : RideStage.preview);
     _stageBeforeSearch = null;
     notifyListeners();
@@ -1384,9 +1457,6 @@ class HomeMapViewModel extends ChangeNotifier {
     pickCandidate = null;
     notifyListeners();
     final routeRefresh = _refreshRoute();
-    if (choosingPickup) {
-      unawaited(_evaluatePickupCoverage(place));
-    }
     await routeRefresh;
   }
 
@@ -1529,7 +1599,8 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   Future<void> confirmOffer() async {
-    if (checkingCoverage || coverageError != null ||
+    if (checkingCoverage ||
+        coverageError != null ||
         coverageDecision?.allowed == false) {
       return;
     }
@@ -1643,6 +1714,9 @@ class HomeMapViewModel extends ChangeNotifier {
       driverPhone = assignment.driverPhone.isNotEmpty
           ? assignment.driverPhone
           : bid.driverPhone;
+      // Seed ETA from the bid data the passenger just chose.
+      if (bid.etaMin > 0) etaMinutes = bid.etaMin;
+      if (bid.distanceKm > 0) etaDistanceKm = bid.distanceKm;
       counterOffers = const [];
       unawaited(_realtime.unsubscribe('request:$requestId'));
       showMatch(driverId: driverId, fare: agreedFare);
@@ -1726,6 +1800,9 @@ class HomeMapViewModel extends ChangeNotifier {
     }
     _startEtaRefresh();
     unawaited(_refreshEta());
+    if (dropoff != null && pickup != null && routePoints.length < 2) {
+      unawaited(_refreshRoute());
+    }
     notifyListeners();
   }
 
@@ -2042,6 +2119,7 @@ class HomeMapViewModel extends ChangeNotifier {
 
   void _startTimer(Duration duration) {
     offerTimer = duration;
+    offerTtlTotal = duration;
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (offerTimer.inSeconds <= 1) {

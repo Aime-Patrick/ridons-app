@@ -145,6 +145,7 @@ class ActiveRide {
     this.fromName = '',
     this.toName = '',
     this.driverAvatarUrl,
+    this.pendingPassengerChoice = false,
   });
 
   final String rideId;
@@ -165,6 +166,9 @@ class ActiveRide {
   final String fromName;
   final String toName;
   final String? driverAvatarUrl;
+
+  /// True when the driver accepted but the passenger hasn't chosen yet.
+  final bool pendingPassengerChoice;
 
   bool get isDriving => status == 'in_progress';
   bool get isLocked =>

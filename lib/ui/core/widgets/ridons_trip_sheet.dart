@@ -16,12 +16,14 @@ class RidonsTripSheet extends StatelessWidget {
     required this.body,
     this.trailing,
     this.decorate = true,
+    this.translateTitle = true,
   });
 
   final String title;
   final Widget body;
   final Widget? trailing;
   final bool decorate;
+  final bool translateTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +35,7 @@ class RidonsTripSheet extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                title.tr(),
+                translateTitle ? title.tr() : title,
                 style: TextStyle(
                   color: context.ridonsInk,
                   fontSize: 18,
