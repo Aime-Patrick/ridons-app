@@ -1,4 +1,4 @@
-package com.ridons.app
+package com.ridons.mobile
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -68,7 +68,7 @@ class PushNotificationService {
   Future<void> _registerToken(String userId, String token) async {
     await _api.dio.post<void>(
       '/devices/register',
-      data: {'token': token, 'platform': _platform, 'appId': 'com.ridons.app'},
+      data: {'token': token, 'platform': _platform, 'appId': 'com.ridons.mobile'},
     );
   }
 

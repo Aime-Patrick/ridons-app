@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyA_sXWKMXDlPkvwYfJGpgzhAtUiY2WIzKM</string>
+	<string>AIzaSyAshXg-P3EGAupi5YwUeN30g9V663EplEA</string>
 	<key>GCM_SENDER_ID</key>
-	<string>129021314689</string>
+	<string>613066218810</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.ridons.app</string>
+	<string>com.ridons.mobile</string>
 	<key>PROJECT_ID</key>
-	<string>ridons</string>
+	<string>ridons-46d88</string>
 	<key>STORAGE_BUCKET</key>
-	<string>ridons.firebasestorage.app</string>
+	<string>ridons-46d88.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:129021314689:ios:92909ce6483c7886852f80</string>
+	<string>1:613066218810:ios:1522c3ba98aef41b174403</string>
 </dict>
 </plist>
