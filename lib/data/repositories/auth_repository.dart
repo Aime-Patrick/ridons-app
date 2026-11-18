@@ -7,7 +7,7 @@ import '../services/api_client.dart';
 import '../services/token_store.dart';
 
 abstract class AuthRepository {
-  Future<void> sendOtp({
+  Future<bool> sendOtp({
     required String phone,
     String? intent,
     AppRole? role,
@@ -50,7 +50,7 @@ class RemoteAuthRepository implements AuthRepository {
   final TokenStore _tokens;
 
   @override
-  Future<void> sendOtp({
+  Future<bool> sendOtp({
     required String phone,
     String? intent,
     AppRole? role,
@@ -60,7 +60,7 @@ class RemoteAuthRepository implements AuthRepository {
     String consentSource = 'mobile',
   }) async {
     try {
-      await _api.dio.post<Map<String, dynamic>>(
+      final response = await _api.dio.post<Map<String, dynamic>>(
         '/auth/otp/send',
         data: {
           'phone': phone,
@@ -72,6 +72,7 @@ class RemoteAuthRepository implements AuthRepository {
           'consentSource': consentSource,
         },
       );
+      return response.data?['testMode'] == true;
     } on DioException catch (e) {
       throw AuthException(
         apiErrorMessage(e, fallback: 'Could not send the code.'),

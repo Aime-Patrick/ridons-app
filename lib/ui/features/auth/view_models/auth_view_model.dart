@@ -16,6 +16,7 @@ class AuthViewModel extends ChangeNotifier {
   String pendingPhone = '';
   String otpCode = '';
   bool sending = false;
+  bool testOtpMode = false;
   bool verifying = false;
   bool savingProfile = false;
   bool phoneTaken = false;
@@ -65,7 +66,7 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       pendingPhone = e164Phone(localDigits);
-      await _auth.sendOtp(
+      testOtpMode = await _auth.sendOtp(
         phone: pendingPhone,
         role: role,
         termsAccepted: signupTermsAccepted,
@@ -75,11 +76,13 @@ class AuthViewModel extends ChangeNotifier {
       _startResendTimer();
       return true;
     } on AuthException catch (e) {
+      testOtpMode = false;
       errorMessage = e.message;
       phoneTaken = e.isPhoneTaken;
       userNotFound = e.isUserNotFound;
       return false;
     } catch (_) {
+      testOtpMode = false;
       errorMessage = 'could_not_send_code';
       return false;
     } finally {

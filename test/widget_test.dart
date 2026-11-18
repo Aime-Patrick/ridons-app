@@ -77,7 +77,7 @@ class FakeAuthRepository implements AuthRepository {
   AuthException? verifyError;
 
   @override
-  Future<void> sendOtp({
+  Future<bool> sendOtp({
     required String phone,
     String? intent,
     AppRole? role,
@@ -87,6 +87,7 @@ class FakeAuthRepository implements AuthRepository {
     String consentSource = 'mobile',
   }) async {
     lastPhone = phone;
+    return false;
   }
 
   @override

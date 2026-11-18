@@ -140,6 +140,7 @@
   "choose_language": "Choose a language",
   "verification_code_sent": "We'll send a code to sign in or get you started",
   "verification_code_sent_short": "A code was sent to your number",
+  "test_otp_no_sms": "Test account: no SMS was sent. Enter your test code.",
   "already_have_account": "Already have an account? ",
   "no_account": "Don't have an account? ",
   "or": "Or",

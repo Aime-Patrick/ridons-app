@@ -234,7 +234,9 @@ class _SignInViewState extends ConsumerState<SignInView> {
         _buildHeading('enter_the_code'.tr()),
         const SizedBox(height: 24),
         Text(
-          '${'verification_code_sent_short'.tr()}\n${vm.displayPhone}',
+          vm.testOtpMode
+              ? '${'test_otp_no_sms'.tr()}\n${vm.displayPhone}'
+              : '${'verification_code_sent_short'.tr()}\n${vm.displayPhone}',
           style: TextStyle(
             color: context.ridonsInk,
             fontWeight: FontWeight.w400,

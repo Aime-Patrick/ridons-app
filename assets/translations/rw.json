@@ -140,6 +140,7 @@
   "choose_language": "Hitamo ururimi",
   "verification_code_sent": "Tuzakohereza kode izagufasha kwinjira cyangwa gutangira gukoresha Ridons",
   "verification_code_sent_short": "Kode yoherejwe kuri telefoni yawe",
+  "test_otp_no_sms": "Konti yo kugerageza: nta butumwa bwoherejwe. Andika kode yo kugerageza.",
   "already_have_account": "Usanzwe ufite konti? ",
   "no_account": "Nta konti ufite? ",
   "or": "Cyangwa",
