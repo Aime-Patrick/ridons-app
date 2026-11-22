@@ -1,0 +1,57 @@
+workflows:
+  ridons-release:
+    name: Ridons release
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Aivize Labs Ltd
+    environment:
+      android_signing:
+        - ridons-release.jks
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.ridons.mobile
+      groups:
+        - google_play_credentials
+      vars:
+        APP_STORE_APPLE_ID: "6836368405"
+        PACKAGE_NAME: com.ridons.mobile
+        GOOGLE_PLAY_TRACK: beta
+      flutter: stable
+    scripts:
+      - name: Install Flutter dependencies
+        script: flutter pub get
+      - name: Calculate next store build number and build both platforms
+        script: |
+          set -euo pipefail
+          LATEST_IOS_BUILD=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID")
+          LATEST_ANDROID_BUILD=$(google-play get-latest-build-number --package-name "$PACKAGE_NAME")
+          if ! [[ "$LATEST_IOS_BUILD" =~ ^[0-9]+$ && "$LATEST_ANDROID_BUILD" =~ ^[0-9]+$ ]]; then
+            echo "Could not determine the latest build number from both stores." >&2
+            exit 1
+          fi
+          if (( LATEST_IOS_BUILD > LATEST_ANDROID_BUILD )); then
+            BUILD_NUMBER=$((LATEST_IOS_BUILD + 1))
+          else
+            BUILD_NUMBER=$((LATEST_ANDROID_BUILD + 1))
+          fi
+          echo "Latest iOS build: ${LATEST_IOS_BUILD}"
+          echo "Latest Android build: ${LATEST_ANDROID_BUILD}"
+          echo "Building both platforms with build number ${BUILD_NUMBER}"
+          flutter build appbundle --release \
+            --build-number="${BUILD_NUMBER}" \
+            --dart-define=RIDONS_API_URL=https://api.ridons.com
+          flutter build ipa --release \
+            --build-number="${BUILD_NUMBER}" \
+            --dart-define=RIDONS_API_URL=https://api.ridons.com
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: beta
+        submit_as_draft: true
