@@ -820,7 +820,7 @@ class _AboutRidonsViewState extends State<AboutRidonsView> {
               if (snapshot.hasError) return Text('version_unavailable'.tr());
               if (info == null) return const SizedBox.shrink();
               return Text(
-                'version'.tr(args: [info.version, info.buildNumber]),
+                'version'.tr(args: [info.version]),
               );
             },
           ),

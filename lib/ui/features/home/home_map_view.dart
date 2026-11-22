@@ -16,6 +16,7 @@ import '../../../domain/models/session_user.dart';
 import '../account/passenger_avatar.dart';
 import '../notifications/notification_inbox_view.dart';
 import '../../core/widgets/map_marker_info_sheet.dart';
+import '../../core/widgets/ridons_notice.dart';
 import '../../core/widgets/ridons_notification_bell.dart';
 import '../../core/widgets/ridons_animated_marker.dart';
 import '../../core/widgets/ridons_map_view.dart';
@@ -77,6 +78,13 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
   }
 
   void _onViewModel() {
+    if (_viewModel.driverArrivedNotice) {
+      _viewModel.clearDriverArrivedNotice();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        RidonsNotice.info(context, 'driver_has_arrived');
+      });
+    }
     _maybeResizeSheet();
     _centerOnGpsIfNeeded();
 

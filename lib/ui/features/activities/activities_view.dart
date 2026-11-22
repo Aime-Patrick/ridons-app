@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -250,7 +252,7 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
             ),
             Expanded(
               child: _loading && !_refreshing
-                  ? const Center(child: CircularProgressIndicator())
+                  ? _ActivitySkeletonList(showRebook: !widget.isDriver)
                   : RefreshIndicator(
                       color: RidonsColors.primary,
                       onRefresh: () => _load(pull: true),
@@ -326,6 +328,227 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
       ),
     );
   }
+}
+
+class _ActivitySkeletonList extends StatefulWidget {
+  const _ActivitySkeletonList({required this.showRebook});
+
+  final bool showRebook;
+
+  @override
+  State<_ActivitySkeletonList> createState() => _ActivitySkeletonListState();
+}
+
+class _ActivitySkeletonListState extends State<_ActivitySkeletonList>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmer = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1050),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.of(context).disableAnimations) {
+      _shimmer.stop();
+      _shimmer.value = 0.5;
+    } else if (!_shimmer.isAnimating) {
+      _shimmer.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _shimmer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _shimmer,
+      builder: (context, _) {
+        final color = Color.lerp(
+          context.ridonsPage,
+          context.ridonsLine,
+          0.48 + (_shimmer.value * 0.3),
+        )!;
+        return Semantics(
+          label: 'loading_activities'.tr(),
+          liveRegion: true,
+          child: ExcludeSemantics(
+            child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              itemCount: 3,
+              separatorBuilder: (_, _) => const SizedBox(height: 14),
+              itemBuilder: (context, _) => _ActivityTripCardSkeleton(
+                color: color,
+                showRebook: widget.showRebook,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ActivityTripCardSkeleton extends StatelessWidget {
+  const _ActivityTripCardSkeleton({
+    required this.color,
+    required this.showRebook,
+  });
+
+  final Color color;
+  final bool showRebook;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.ridonsSheet,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: context.ridonsLine),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 128,
+            child: Stack(
+              children: [
+                Positioned.fill(child: ColoredBox(color: color)),
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _ActivityMapSkeletonPainter(
+                      color: context.ridonsMuted.withValues(alpha: 0.35),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 28,
+                  top: 55,
+                  child: _SkeletonDot(color: color, size: 12),
+                ),
+                Positioned(
+                  right: 34,
+                  bottom: 28,
+                  child: _SkeletonDot(color: color, size: 16),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _SkeletonDot(color: color, size: 9),
+                    const SizedBox(width: 10),
+                    _SkeletonBar(color: color, width: 142, height: 12),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _SkeletonDot(color: color, size: 9),
+                    const SizedBox(width: 10),
+                    _SkeletonBar(color: color, width: 196, height: 12),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _SkeletonBar(color: color, width: 174, height: 9),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    _SkeletonBar(color: color, width: 104, height: 21),
+                    const Spacer(),
+                    if (showRebook)
+                      _SkeletonBar(
+                        color: color,
+                        width: 92,
+                        height: 40,
+                        radius: 100,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonBar extends StatelessWidget {
+  const _SkeletonBar({
+    required this.color,
+    required this.width,
+    required this.height,
+    this.radius = 6,
+  });
+
+  final Color color;
+  final double width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: width,
+    height: height,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(radius),
+    ),
+  );
+}
+
+class _SkeletonDot extends StatelessWidget {
+  const _SkeletonDot({required this.color, required this.size});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  );
+}
+
+class _ActivityMapSkeletonPainter extends CustomPainter {
+  const _ActivityMapSkeletonPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final route = ui.Path()
+      ..moveTo(size.width * 0.12, size.height * 0.58)
+      ..lineTo(size.width * 0.34, size.height * 0.58)
+      ..lineTo(size.width * 0.45, size.height * 0.34)
+      ..lineTo(size.width * 0.61, size.height * 0.48)
+      ..lineTo(size.width * 0.72, size.height * 0.33)
+      ..lineTo(size.width * 0.88, size.height * 0.42);
+    canvas.drawPath(route, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ActivityMapSkeletonPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class _ActivityTripCard extends StatelessWidget {

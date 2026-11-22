@@ -146,6 +146,7 @@ class HomeMapViewModel extends ChangeNotifier {
   String? shareError;
   bool sosBusy = false;
   String? sosError;
+  bool driverArrivedNotice = false;
   CoverageDecision? coverageDecision;
   String? coverageError;
   bool checkingCoverage = false;
@@ -1166,6 +1167,9 @@ class HomeMapViewModel extends ChangeNotifier {
         }
         return;
       }
+      if (status == 'arrived' && liveRideStatus != 'arrived') {
+        driverArrivedNotice = true;
+      }
       liveRideStatus = status;
       if (status == 'completed') {
         stage = RideStage.payment;
@@ -1904,6 +1908,10 @@ class HomeMapViewModel extends ChangeNotifier {
     }
   }
 
+  void clearDriverArrivedNotice() {
+    driverArrivedNotice = false;
+  }
+
   Future<void> submitRating() async {
     final rideId = liveRideId;
     final api = _tripApi;
@@ -1924,6 +1932,7 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   void resetToHome() {
+    driverArrivedNotice = false;
     final rideId = liveRideId;
     if (rideId != null && rideId.isNotEmpty) {
       unawaited(_realtime.unsubscribe('ride:$rideId'));

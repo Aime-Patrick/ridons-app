@@ -22,7 +22,6 @@ class SignUpView extends ConsumerStatefulWidget {
 }
 
 class _SignUpViewState extends ConsumerState<SignUpView> {
-  bool _accepted = false;
   late final TapGestureRecognizer _termsRecognizer;
   late final TapGestureRecognizer _privacyRecognizer;
 
@@ -51,7 +50,6 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
   }
 
   void _continue() {
-    if (!_accepted) return;
     ref.read(authViewModelProvider).setSignupConsent(accepted: true);
     context.push(AppRoutes.signInPhone);
   }
@@ -104,7 +102,7 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                 const SizedBox(height: 18),
                 RidonsButton(
                   label: 'continue_with_phone',
-                  onPressed: _accepted ? _continue : null,
+                  onPressed: _continue,
                 ),
                 const SizedBox(height: 8),
                 RidonsButton(
@@ -153,42 +151,36 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _accepted,
-                  onChanged: (value) {
-                    setState(() => _accepted = value ?? false);
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: Text.rich(
-                    TextSpan(
-                      text: 'consent_prefix'.tr(),
-                      style: TextStyle(
-                        color: context.ridonsMuted,
-                        fontSize: 13,
-                        height: 18 / 13,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: 'terms_conditions'.tr(),
-                          recognizer: _termsRecognizer,
-                          style: const TextStyle(
-                            color: RidonsColors.primary,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                        TextSpan(text: 'consent_joiner'.tr()),
-                        TextSpan(
-                          text: 'privacy_policy'.tr(),
-                          recognizer: _privacyRecognizer,
-                          style: const TextStyle(
-                            color: RidonsColors.primary,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ],
+                Text.rich(
+                  TextSpan(
+                    text: 'by_continuing'.tr(),
+                    style: TextStyle(
+                      color: context.ridonsMuted,
+                      fontSize: 13,
+                      height: 18 / 13,
                     ),
+                    children: [
+                      TextSpan(
+                        text: 'signup_terms_of_use'.tr(),
+                        recognizer: _termsRecognizer,
+                        style: const TextStyle(
+                          color: RidonsColors.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                      TextSpan(text: 'consent_joiner'.tr()),
+                      TextSpan(
+                        text: 'privacy_policy'.tr(),
+                        recognizer: _privacyRecognizer,
+                        style: const TextStyle(
+                          color: RidonsColors.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                      TextSpan(text: 'signup_consent_end'.tr()),
+                    ],
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
