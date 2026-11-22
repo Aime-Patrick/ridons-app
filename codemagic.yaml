@@ -15,6 +15,7 @@ workflows:
         - google_play_credentials
       vars:
         APP_STORE_APPLE_ID: "6836368405"
+        BUNDLE_ID: com.ridons.mobile
         PACKAGE_NAME: com.ridons.mobile
         GOOGLE_PLAY_TRACK: beta
       flutter: stable
@@ -41,6 +42,13 @@ workflows:
           flutter build appbundle --release \
             --build-number="${BUILD_NUMBER}" \
             --dart-define=RIDONS_API_URL=https://api.ridons.com
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --platform IOS \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
           flutter build ipa --release \
             --build-number="${BUILD_NUMBER}" \
             --dart-define=RIDONS_API_URL=https://api.ridons.com
