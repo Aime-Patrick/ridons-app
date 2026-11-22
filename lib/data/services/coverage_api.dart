@@ -7,6 +7,43 @@ class CoverageApi {
   CoverageApi(this._api);
 
   final ApiClient _api;
+  List<String>? _enabledMarketCodes;
+  DateTime? _enabledMarketsLoadedAt;
+  Future<List<String>>? _enabledMarketsRequest;
+
+  Future<List<String>> enabledMarketCodes() {
+    final cached = _enabledMarketCodes;
+    final loadedAt = _enabledMarketsLoadedAt;
+    if (cached != null &&
+        loadedAt != null &&
+        DateTime.now().difference(loadedAt) < const Duration(minutes: 5)) {
+      return Future.value(cached);
+    }
+    return _enabledMarketsRequest ??= _loadEnabledMarketCodes();
+  }
+
+  Future<List<String>> _loadEnabledMarketCodes() async {
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/coverage/markets/enabled',
+      );
+      final data = response.data?['data'];
+      if (data is! List) {
+        throw const FormatException('Enabled markets response is invalid.');
+      }
+      final codes = data
+          .whereType<String>()
+          .map((code) => code.trim().toUpperCase())
+          .where((code) => RegExp(r'^[A-Z]{2}$').hasMatch(code))
+          .toSet()
+          .toList(growable: false);
+      _enabledMarketCodes = codes;
+      _enabledMarketsLoadedAt = DateTime.now();
+      return codes;
+    } finally {
+      _enabledMarketsRequest = null;
+    }
+  }
 
   Future<CoverageDecision> checkPickup({
     required LatLng location,

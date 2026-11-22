@@ -1431,6 +1431,23 @@ class HomeMapViewModel extends ChangeNotifier {
     final gen = ++_searchGen;
     searchingPlaces = suggestions.isEmpty;
     if (searchingPlaces) notifyListeners();
+    List<String> countryCodes;
+    try {
+      countryCodes = await _coverageApi.enabledMarketCodes();
+    } catch (_) {
+      if (gen != _searchGen) return;
+      suggestions = const [];
+      searchingPlaces = false;
+      notifyListeners();
+      return;
+    }
+    if (gen != _searchGen) return;
+    if (countryCodes.isEmpty) {
+      suggestions = const [];
+      searchingPlaces = false;
+      notifyListeners();
+      return;
+    }
     final origin =
         userPoint ??
         (pickup == null ? null : LatLng(pickup!.latitude, pickup!.longitude));
@@ -1438,6 +1455,7 @@ class HomeMapViewModel extends ChangeNotifier {
       query: query,
       latitude: origin?.latitude,
       longitude: origin?.longitude,
+      countryCodes: countryCodes,
     );
     if (gen != _searchGen) return;
     suggestions = results;

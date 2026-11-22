@@ -7,7 +7,7 @@ workflows:
       app_store_connect: Aivize Labs Ltd
     environment:
       android_signing:
-        - ridons-upload
+        - ridons-upload-new
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.ridons.mobile

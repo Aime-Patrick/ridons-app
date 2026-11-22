@@ -29,25 +29,27 @@ class PlacesService {
     String query = '',
     double? latitude,
     double? longitude,
+    List<String> countryCodes = const [],
   }) async {
-    final fromGateway = await _searchGateway(
+    if (countryCodes.isEmpty) return const [];
+    return _searchGateway(
       query: query,
       latitude: latitude,
       longitude: longitude,
+      countryCodes: countryCodes,
     );
-    if (fromGateway.isNotEmpty) return fromGateway;
-
-    if (query.trim().isEmpty) {
-      return _photonNearby(latitude, longitude);
-    }
-    return _photonSearch(query, latitude, longitude);
   }
 
   Future<List<GeoPlace>> nearby({
     required double latitude,
     required double longitude,
+    List<String> countryCodes = const [],
   }) {
-    return search(latitude: latitude, longitude: longitude);
+    return search(
+      latitude: latitude,
+      longitude: longitude,
+      countryCodes: countryCodes,
+    );
   }
 
   Future<GeoPlace> reverse(double latitude, double longitude) async {
@@ -125,6 +127,7 @@ class PlacesService {
     required String query,
     double? latitude,
     double? longitude,
+    required List<String> countryCodes,
   }) async {
     final api = _api;
     if (api == null) return const [];
@@ -138,6 +141,7 @@ class PlacesService {
           if (query.trim().isNotEmpty) 'q': query.trim(),
           if (latitude != null) 'lat': latitude,
           if (longitude != null) 'lng': longitude,
+          'countryCodes': countryCodes.join(','),
         },
       );
       return _fromGateway(response.data);
@@ -169,52 +173,6 @@ class PlacesService {
       );
     }
     return out;
-  }
-
-  Future<List<GeoPlace>> _photonSearch(
-    String query,
-    double? latitude,
-    double? longitude,
-  ) async {
-    try {
-      final response = await _dio.get<Map<String, dynamic>>(
-        'https://photon.komoot.io/api/',
-        queryParameters: {
-          'q': query.trim(),
-          'limit': 12,
-          if (latitude != null) 'lat': latitude,
-          if (longitude != null) 'lon': longitude,
-        },
-      );
-      return _photonFeatures(response.data, latitude, longitude);
-    } catch (_) {
-      return const [];
-    }
-  }
-
-  Future<List<GeoPlace>> _photonNearby(
-    double? latitude,
-    double? longitude,
-  ) async {
-    if (latitude == null || longitude == null) return const [];
-    const terms = [
-      'supermarket',
-      'hospital',
-      'school',
-      'station',
-      'hotel',
-      'park',
-      'bank',
-      'restaurant',
-    ];
-    final bundles = await Future.wait(
-      terms.map((term) => _photonSearch(term, latitude, longitude)),
-    );
-    return _dedupeByName(
-      bundles.expand((list) => list),
-      latitude,
-      longitude,
-    );
   }
 
   Future<GeoPlace?> _photonReverse(double latitude, double longitude) async {
@@ -276,39 +234,6 @@ class PlacesService {
       _reverseCache.remove(_reverseCache.keys.first);
     }
     _reverseCache[key] = place;
-  }
-
-  List<GeoPlace> _photonFeatures(
-    Map<String, dynamic>? data,
-    double? latitude,
-    double? longitude,
-  ) {
-    final features = data?['features'];
-    if (features is! List) return const [];
-    final out = <GeoPlace>[];
-    for (final raw in features) {
-      if (raw is! Map) continue;
-      final props = raw['properties'];
-      final geometry = raw['geometry'];
-      if (props is! Map || geometry is! Map) continue;
-      final name = '${props['name'] ?? ''}'.trim();
-      if (name.isEmpty) continue;
-      final coords = geometry['coordinates'];
-      if (coords is! List || coords.length < 2) continue;
-      final lng = (coords[0] as num?)?.toDouble();
-      final lat = (coords[1] as num?)?.toDouble();
-      if (lat == null || lng == null) continue;
-      out.add(
-        GeoPlace(
-          name: name,
-          subtitle: _photonSubtitle(Map<String, dynamic>.from(props)),
-          latitude: lat,
-          longitude: lng,
-        ),
-      );
-    }
-    if (latitude == null || longitude == null) return out;
-    return _dedupeByName(out, latitude, longitude);
   }
 
   String _photonSubtitle(Map<String, dynamic> props) {
@@ -419,26 +344,6 @@ class PlacesService {
         lower.contains(' highway');
   }
 
-  List<GeoPlace> _dedupeByName(
-    Iterable<GeoPlace> places,
-    double latitude,
-    double longitude,
-  ) {
-    final seen = <String>{};
-    final unique = <GeoPlace>[];
-    for (final place in places) {
-      final key = place.name.toLowerCase();
-      if (!seen.add(key)) continue;
-      unique.add(place);
-    }
-    unique.sort((a, b) {
-      final da = _meters(latitude, longitude, a.latitude, a.longitude);
-      final db = _meters(latitude, longitude, b.latitude, b.longitude);
-      return da.compareTo(db);
-    });
-    if (unique.length <= 12) return unique;
-    return unique.take(12).toList();
-  }
 }
 
 double _meters(double lat1, double lng1, double lat2, double lng2) {
