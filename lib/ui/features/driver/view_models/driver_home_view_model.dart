@@ -66,6 +66,7 @@ class DriverHomeViewModel extends ChangeNotifier {
   DriverStats stats = const DriverStats();
   List<DriverQuest> quests = const [];
   List<RideOffer> offers = const [];
+  List<RideOffer> pendingChoices = const [];
   final Map<String, int> localFares = {};
   ActiveRide? ride;
   String? pendingRatingRideId;
@@ -313,8 +314,8 @@ class DriverHomeViewModel extends ChangeNotifier {
     if (!online || onTrip || _inboxRefreshing) return;
     _inboxRefreshing = true;
     try {
-      final next = await _trips.inbox();
-      for (final offer in next) {
+      final inbox = await _trips.inbox();
+      for (final offer in [...inbox.offers, ...inbox.pendingChoices]) {
         if (offer.fromName.isEmpty) {
           final place = await _places.reverse(
             offer.from.latitude,
@@ -344,7 +345,8 @@ class DriverHomeViewModel extends ChangeNotifier {
           );
         }
       }
-      offers = next;
+      pendingChoices = inbox.pendingChoices;
+      offers = pendingChoices.isEmpty ? inbox.offers : const [];
     } catch (_) {
       if (online && !onTrip) {
         errorMessage = 'keep_trying_offers';
@@ -389,7 +391,7 @@ class DriverHomeViewModel extends ChangeNotifier {
   }
 
   Future<void> accept(RideOffer offer) async {
-    if (busy) return;
+    if (busy || pendingChoices.isNotEmpty) return;
     busy = true;
     errorMessage = null;
     notifyListeners();
@@ -420,7 +422,8 @@ class DriverHomeViewModel extends ChangeNotifier {
       // Passenger marketplace flow — ride not created yet, waiting for
       // passenger to pick this driver from the list.
       if (locked.pendingPassengerChoice) {
-        errorMessage = 'waiting_for_passenger_choice';
+        offer.offeredPrice = locked.fare > 0 ? locked.fare : price;
+        pendingChoices = [offer];
         busy = false;
         // Remove this offer from the list since we've accepted it.
         offers = offers
@@ -638,6 +641,7 @@ class DriverHomeViewModel extends ChangeNotifier {
         longitude: end.longitude,
       ),
       steps: true,
+      alternatives: false,
       useCache: false,
     );
     // A newer location/status update may have requested another route while

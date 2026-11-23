@@ -305,6 +305,21 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
                   sheetFraction: sheetFraction,
                   followLocation:
                       _followLocation && _shouldFollowPassengerLocation,
+                  topTrailingControl: Material(
+                    color: context.ridonsSheet,
+                    elevation: 4,
+                    shape: const CircleBorder(),
+                    child: RidonsNotificationBell(
+                      unreadCount: ref
+                          .watch(notificationCenterProvider)
+                          .unreadCount,
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const NotificationInboxView(),
+                        ),
+                      ),
+                    ),
+                  ),
                   onRecenter:
                       askingLocation || searching ? null : _recenterOnYou,
                   onMapInteraction: _pauseLocationFollow,
@@ -321,14 +336,6 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
               // Fixed crosshair shown while the user is picking a location
               // by dragging the map. The pin sits at the screen center and
               // the map moves under it — no tapping required.
-              if (_viewModel.stage == RideStage.pickOnMap)
-                const Positioned.fill(
-                  child: IgnorePointer(
-                    child: Center(
-                      child: _MapCrosshair(),
-                    ),
-                  ),
-                ),
               Positioned(
                 top: 0,
                 left: 0,
@@ -336,27 +343,6 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
                 child: RouteHeaderChip(
                   viewModel: _viewModel,
                   visible: showDestinationChip,
-                ),
-              ),
-              Positioned(
-                top:
-                    MediaQuery.paddingOf(context).top +
-                    (showDestinationChip ? 64 : 8),
-                right: 12,
-                child: Material(
-                  color: context.ridonsSheet,
-                  elevation: 4,
-                  shape: const CircleBorder(),
-                  child: RidonsNotificationBell(
-                    unreadCount: ref
-                        .watch(notificationCenterProvider)
-                        .unreadCount,
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const NotificationInboxView(),
-                      ),
-                    ),
-                  ),
                 ),
               ),
               if (showRideSheet)
@@ -370,6 +356,7 @@ class HomeMapViewState extends ConsumerState<HomeMapView> {
                     // Keep initial size stable so didUpdateWidget does not
                     // replace extent mid-build.
                     child: RideFlowPanel(
+                      key: ValueKey(_viewModel.stage),
                       viewModel: _viewModel,
                       decorate: false,
                       onFitRoute: _fitRoute,
@@ -593,6 +580,7 @@ class _PassengerMap extends StatelessWidget {
     required this.sheetFraction,
     required this.followLocation,
     required this.deviceHeadingStream,
+    required this.topTrailingControl,
     this.onRecenter,
     this.user,
     this.token,
@@ -606,6 +594,7 @@ class _PassengerMap extends StatelessWidget {
   final double sheetFraction;
   final bool followLocation;
   final Stream<double> deviceHeadingStream;
+  final Widget topTrailingControl;
   final VoidCallback? onRecenter;
   final SessionUser? user;
   final String? token;
@@ -639,20 +628,18 @@ class _PassengerMap extends StatelessWidget {
       followLocation: followLocation,
       followPoint: you,
       bottomControlsOffset: _mapControlBottom(context, sheetFraction),
+      topTrailingControl: topTrailingControl,
       onRecenter: onRecenter,
       deviceHeadingStream: deviceHeadingStream,
       onMapReady: onMapReady,
       onMapInteraction: () {
         onMapInteraction?.call();
-        if (viewModel.stage == RideStage.pickOnMap) {
-          viewModel.pickOnMap(controller.camera.center);
-        }
       },
       onTap: (point) {
         if (viewModel.stage == RideStage.pickOnMap) {
-          // Crosshair mode: use the map center, not the tap point.
-          // The user drags the map; tapping confirms the center position.
-          viewModel.pickOnMap(controller.camera.center);
+          // Place the pin exactly where the passenger taps. Panning only
+          // moves the map; it must not silently change the selected location.
+          viewModel.pickOnMap(point);
           return;
         }
         onMapTap?.call();
@@ -676,9 +663,9 @@ class _PassengerMap extends StatelessWidget {
           PolylineLayer(
             polylines: [
               for (final alt in viewModel.routeAlternatives)
-                if (alt.length >= 2)
+                if (alt.points.length >= 2)
                   Polyline(
-                    points: alt,
+                    points: alt.points,
                     color: Theme.of(context).brightness == Brightness.dark
                         ? const Color(0x66FBBF24)
                         : RidonsColors.primary.withValues(alpha: 0.28),
@@ -746,16 +733,45 @@ class _PassengerMap extends StatelessWidget {
                     : RidonsColors.primary,
               ),
             if (dropoff != null) _pinMarker(dropoff, RidonsColors.primary),
-            if (candidate != null && viewModel.stage != RideStage.pickOnMap)
+            if (candidate != null)
               _pinMarker(candidate, RidonsColors.primary),
+            for (var index = 0;
+                index < viewModel.routeAlternatives.length;
+                index++)
+              if (viewModel.routeAlternatives[index].points.length >= 2)
+                Marker(
+                  point:
+                      viewModel.routeAlternatives[index].midpoint ??
+                      viewModel.routeAlternatives[index].points.first,
+                  width: 116,
+                  height: 34,
+                  alignment: Alignment.center,
+                  child: IgnorePointer(
+                    child: RouteEtaMapBadge(
+                      key: ValueKey('alternative-route-badge-$index'),
+                      durationMin:
+                          viewModel.routeAlternatives[index].durationMin,
+                      distanceKm:
+                          viewModel.routeAlternatives[index].distanceKm,
+                      isAlternative: true,
+                    ),
+                  ),
+                ),
             if (etaMid != null)
               Marker(
                 point: etaMid,
-                width: 156,
-                height: 40,
+                width: 116,
+                height: 34,
                 alignment: Alignment.center,
                 child: IgnorePointer(
-                  child: RouteEtaMapBadge(viewModel: viewModel),
+                  child: RouteEtaMapBadge(
+                    key: const ValueKey('primary-route-badge'),
+                    durationMin: viewModel.tripDurationMin,
+                    distanceKm: viewModel.tripKm,
+                    isLoading:
+                        viewModel.loadingRoute &&
+                        viewModel.tripDurationMin < 1,
+                  ),
                 ),
               ),
           ],
@@ -833,7 +849,8 @@ class _PassengerMap extends StatelessWidget {
       point: LatLng(place.latitude, place.longitude),
       width: 44,
       height: 44,
-      alignment: Alignment.topCenter,
+      // Anchor the pin tip—not the icon box—to the selected coordinates.
+      alignment: Alignment.bottomCenter,
       child: Icon(Icons.location_on, color: color, size: 40),
     );
   }
@@ -871,32 +888,4 @@ double _mapControlBottom(BuildContext context, double sheetFraction) {
   final topSafe = media.padding.top + 80;
   final raw = height * sheetFraction + 12;
   return raw.clamp(16.0, (height - topSafe - 56).clamp(16.0, height));
-}
-
-/// Fixed crosshair pinned to the screen center during "pick from map" mode.
-/// The map moves under it; the crosshair always marks the selected point.
-class _MapCrosshair extends StatelessWidget {
-  const _MapCrosshair();
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).brightness == Brightness.dark
-        ? Colors.white
-        : RidonsColors.primary;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.location_on, color: color, size: 40),
-        // Shadow dot so the pin tip is easy to read against any tile color.
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.35),
-            shape: BoxShape.circle,
-          ),
-        ),
-      ],
-    );
-  }
 }

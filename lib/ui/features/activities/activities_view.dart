@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:easy_localization/easy_localization.dart';
@@ -35,6 +36,16 @@ class ActivityTrip {
   final int fareRwf;
   final LatLng pickupPoint;
   final LatLng dropoffPoint;
+
+  ActivityTrip copyWith({String? pickup, String? dropoff}) => ActivityTrip(
+    pickup: pickup ?? this.pickup,
+    dropoff: dropoff ?? this.dropoff,
+    when: when,
+    driverName: driverName,
+    fareRwf: fareRwf,
+    pickupPoint: pickupPoint,
+    dropoffPoint: dropoffPoint,
+  );
 }
 
 /// Trip history with map snapshots and a filter. Data comes from GET /me/trips.
@@ -55,17 +66,26 @@ class ActivitiesView extends ConsumerStatefulWidget {
 }
 
 class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
+  static const _cacheDuration = Duration(minutes: 2);
+
   _ActivityFilter _filter = _ActivityFilter.all;
   List<ActivityTrip> _trips = const [];
   var _loading = true;
   var _refreshing = false;
+  var _hasLoaded = false;
+  var _requestInFlight = false;
+  DateTime? _lastFetchedAt;
   String? _error;
   final _places = PlacesService();
+  final Map<String, String> _placeLabels = {};
+  final Map<String, Future<String?>> _placeLabelRequests = {};
 
   @override
   void initState() {
     super.initState();
-    _load();
+    // IndexedStack creates this screen before it is first opened. Wait until
+    // the Activities tab is selected so we don't fetch it in the background.
+    if (widget.isActive) _load();
   }
 
   @override
@@ -76,70 +96,131 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
     }
   }
 
-  Future<void> _load({bool pull = false}) async {
-    if (pull) {
-      setState(() => _refreshing = true);
-    } else {
+  Future<void> _load({bool pull = false, bool force = false}) async {
+    if (_requestInFlight) return;
+    final lastFetchedAt = _lastFetchedAt;
+    if (!force &&
+        lastFetchedAt != null &&
+        DateTime.now().difference(lastFetchedAt) < _cacheDuration) {
+      return;
+    }
+
+    _requestInFlight = true;
+    // Preserve the current list when revalidating stale cached data; only the
+    // first load uses the skeleton state.
+    if (mounted) {
       setState(() {
-        _loading = true;
-        _error = null;
+        _refreshing = pull;
+        if (!_hasLoaded) {
+          _loading = true;
+          _error = null;
+        }
       });
     }
     try {
-      final period = switch (_filter) {
-        _ActivityFilter.all => 'all',
-        _ActivityFilter.today => 'today',
-        _ActivityFilter.week => 'week',
-      };
-      final items = await ref.read(tripApiProvider).myTrips(period: period);
-      final trips = <ActivityTrip>[];
-      for (final item in items) {
-        var pickup = _coordinateLabel(item.from);
-        var dropoff = _coordinateLabel(item.to);
-        try {
-          final pickupPlace = await _places.reverse(
-            item.from.latitude,
-            item.from.longitude,
-          );
-          final dropoffPlace = await _places.reverse(
-            item.to.latitude,
-            item.to.longitude,
-          );
-          if (pickupPlace.name.trim().isNotEmpty) pickup = pickupPlace.name;
-          if (dropoffPlace.name.trim().isNotEmpty) {
-            dropoff = dropoffPlace.name;
-          }
-        } catch (_) {}
-        trips.add(
-          ActivityTrip(
-            pickup: pickup,
-            dropoff: dropoff,
-            when: item.when,
-            driverName: widget.isDriver ? 'passenger' : 'driver',
-            fareRwf: item.fare,
-            pickupPoint: item.from,
-            dropoffPoint: item.to,
-          ),
-        );
-      }
+      // Fetch the server's latest 50 once; the filter tabs are applied locally
+      // so switching filters doesn't generate another history request.
+      final items = await ref.read(tripApiProvider).myTrips(period: 'all');
+      final trips = items
+          .map(
+            (item) => ActivityTrip(
+              pickup:
+                  _placeLabels[_locationKey(item.from)] ??
+                  _coordinateLabel(item.from),
+              dropoff:
+                  _placeLabels[_locationKey(item.to)] ??
+                  _coordinateLabel(item.to),
+              when: item.when,
+              driverName: widget.isDriver ? 'passenger' : 'driver',
+              fareRwf: item.fare,
+              pickupPoint: item.from,
+              dropoffPoint: item.to,
+            ),
+          )
+          .toList(growable: false);
       if (!mounted) return;
       setState(() {
         _trips = trips;
         _error = null;
+        _hasLoaded = true;
+        _lastFetchedAt = DateTime.now();
         _loading = false;
         _refreshing = false;
       });
+      // Render trips as soon as the API responds. Place-name lookups are
+      // enrichment only; show coordinate fallbacks until each one completes.
+      unawaited(_resolvePlaceLabels(trips));
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'could_not_load_trips';
+        // Keep the cached history visible if a background refresh fails.
+        if (!_hasLoaded) _error = 'could_not_load_trips';
+        // Back off automatic re-attempts; the retry button and pull-to-refresh
+        // still bypass the cache window.
+        _lastFetchedAt = DateTime.now();
         _loading = false;
         _refreshing = false;
+      });
+    } finally {
+      _requestInFlight = false;
+    }
+  }
+
+  List<ActivityTrip> get _visible {
+    final now = DateTime.now();
+    return switch (_filter) {
+      _ActivityFilter.all => _trips,
+      _ActivityFilter.today => _trips
+          .where(
+            (trip) =>
+                trip.when.year == now.year &&
+                trip.when.month == now.month &&
+                trip.when.day == now.day,
+          )
+          .toList(growable: false),
+      _ActivityFilter.week => _trips
+          .where(
+            (trip) =>
+                !trip.when.isBefore(now.subtract(const Duration(days: 7))),
+          )
+          .toList(growable: false),
+    };
+  }
+
+  Future<String?> _placeLabel(LatLng point) {
+    final key = _locationKey(point);
+    final cached = _placeLabels[key];
+    if (cached != null) return Future.value(cached);
+    return _placeLabelRequests.putIfAbsent(key, () async {
+      final place = await _places.reverseFast(point.latitude, point.longitude);
+      final name = place?.name.trim();
+      if (name == null || name.isEmpty) return null;
+      _placeLabels[key] = name;
+      return name;
+    });
+  }
+
+  Future<void> _resolvePlaceLabels(List<ActivityTrip> trips) async {
+    for (final trip in trips) {
+      final labels = await Future.wait([
+        _placeLabel(trip.pickupPoint),
+        _placeLabel(trip.dropoffPoint),
+      ]);
+      if (!mounted || (labels[0] == null && labels[1] == null)) continue;
+      setState(() {
+        _trips = [
+          for (final current in _trips)
+            current.copyWith(
+              pickup: _placeLabels[_locationKey(current.pickupPoint)],
+              dropoff: _placeLabels[_locationKey(current.dropoffPoint)],
+            ),
+        ];
       });
     }
   }
 
-  List<ActivityTrip> get _visible => _trips;
+  static String _locationKey(LatLng point) =>
+      '${point.latitude.toStringAsFixed(4)},${point.longitude.toStringAsFixed(4)}';
 
   static String _coordinateLabel(LatLng point) {
     return '${point.latitude.toStringAsFixed(5)}, '
@@ -202,9 +283,7 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
     if (selected != null && mounted) {
       setState(() {
         _filter = selected;
-        _loading = true;
       });
-      await _load();
     }
   }
 
@@ -255,7 +334,7 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
                   ? _ActivitySkeletonList(showRebook: !widget.isDriver)
                   : RefreshIndicator(
                       color: RidonsColors.primary,
-                      onRefresh: () => _load(pull: true),
+                      onRefresh: () => _load(pull: true, force: true),
                       child: _error != null
                           ? ListView(
                               physics: const AlwaysScrollableScrollPhysics(),
@@ -274,7 +353,7 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
                                 const SizedBox(height: 16),
                                 Center(
                                   child: OutlinedButton(
-                                    onPressed: () => _load(),
+                                    onPressed: () => _load(force: true),
                                     child: Text('retry'.tr()),
                                   ),
                                 ),

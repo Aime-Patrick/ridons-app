@@ -210,6 +210,21 @@ class _DriverIdleHome extends ConsumerWidget {
                   ],
               ],
               const SizedBox(height: 22),
+              if (viewModel.pendingChoices.isNotEmpty) ...[
+                Text(
+                  'pending_passenger_choice'.tr(),
+                  style: TextStyle(
+                    color: context.ridonsInk,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (final pending in viewModel.pendingChoices) ...[
+                  _PendingChoiceCard(offer: pending),
+                  const SizedBox(height: 12),
+                ],
+              ],
               Text(
                 'available_offers'.tr(),
                 style: TextStyle(
@@ -233,7 +248,9 @@ class _DriverIdleHome extends ConsumerWidget {
                   child: Column(
                     children: [
                       Text(
-                        'no_offers_yet'.tr(),
+                        viewModel.pendingChoices.isNotEmpty
+                            ? 'other_offers_paused_pending_choice'.tr()
+                            : 'no_offers_yet'.tr(),
                         style: TextStyle(color: context.ridonsMuted),
                       ),
                       const SizedBox(height: 6),
@@ -275,6 +292,71 @@ class _DriverIdleHome extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PendingChoiceCard extends StatelessWidget {
+  const _PendingChoiceCard({required this.offer});
+
+  final RideOffer offer;
+
+  static final _money = NumberFormat('#,###');
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.ridonsFill,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: RidonsColors.primary.withValues(alpha: .35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.hourglass_top, color: RidonsColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'waiting_for_passenger_choice'.tr(),
+                  style: TextStyle(
+                    color: context.ridonsInk,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (offer.timerLabel.isNotEmpty)
+                Text(
+                  offer.timerLabel,
+                  style: const TextStyle(
+                    color: RidonsColors.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${offer.fromName.isEmpty ? 'pickup'.tr() : offer.fromName}  →  '
+            '${offer.toName.isEmpty ? 'dropoff'.tr() : offer.toName}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.ridonsInk,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${'accepted_fare'.tr()}: ${_money.format(offer.offeredPrice)} RWF',
+            style: TextStyle(color: context.ridonsMuted),
+          ),
+        ],
       ),
     );
   }

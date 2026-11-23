@@ -151,76 +151,114 @@ class RouteHeaderChip extends StatelessWidget {
 
 /// Google-style ETA chip for the route polyline midpoint.
 class RouteEtaMapBadge extends StatelessWidget {
-  const RouteEtaMapBadge({super.key, required this.viewModel});
+  const RouteEtaMapBadge({
+    super.key,
+    required this.durationMin,
+    required this.distanceKm,
+    this.isLoading = false,
+    this.isAlternative = false,
+  });
 
-  final HomeMapViewModel viewModel;
-
-  bool get _visible {
-    if (viewModel.dropoff == null) return false;
-    return viewModel.stage == RideStage.preview ||
-        viewModel.stage == RideStage.estimate ||
-        viewModel.stage == RideStage.offering ||
-        viewModel.stage == RideStage.matched ||
-        viewModel.loadingRoute;
-  }
+  final int durationMin;
+  final double distanceKm;
+  final bool isLoading;
+  final bool isAlternative;
 
   @override
   Widget build(BuildContext context) {
-    if (!_visible) return const SizedBox.shrink();
-
-    final loading = viewModel.loadingRoute && viewModel.tripDurationMin < 1;
-    final eta = viewModel.tripEtaLabel;
-    final km = viewModel.tripDistanceLabel;
     final ink = context.ridonsInk;
     final muted = context.ridonsMuted;
+    final motionDuration = MediaQuery.of(context).disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 240);
 
-    return Material(
-      color: context.ridonsSheet,
-      elevation: 6,
-      shadowColor: const Color(0x33000000),
-      shape: StadiumBorder(side: BorderSide(color: context.ridonsLine)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        child: loading
-            ? SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: RidonsColors.primary,
+    final content = isLoading
+        ? SizedBox(
+            key: const ValueKey('route-badge-loading'),
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: RidonsColors.primary,
+            ),
+          )
+        : Row(
+            key: ValueKey(
+              'route-badge-$durationMin-${distanceKm.toStringAsFixed(1)}',
+            ),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$durationMin min',
+                style: TextStyle(
+                  color: ink,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  height: 1,
                 ),
-              )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    eta,
-                    style: TextStyle(
-                      color: ink,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                      height: 1,
-                    ),
-                  ),
-                  if (viewModel.tripKm > 0) ...[
-                    Container(
-                      width: 1,
-                      height: 13,
-                      margin: const EdgeInsets.symmetric(horizontal: 9),
-                      color: context.ridonsLine,
-                    ),
-                    Text(
-                      km,
-                      style: TextStyle(
-                        color: muted,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        height: 1,
-                      ),
-                    ),
-                  ],
-                ],
               ),
+              if (distanceKm > 0) ...[
+                Container(
+                  width: 1,
+                  height: 12,
+                  margin: const EdgeInsets.symmetric(horizontal: 7),
+                  color: context.ridonsLine,
+                ),
+                Text(
+                  '${distanceKm.toStringAsFixed(1)} km',
+                  style: TextStyle(
+                    color: muted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ],
+          );
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.88, end: 1),
+      duration: motionDuration,
+      curve: Curves.easeOutCubic,
+      builder: (context, scale, child) => Opacity(
+        opacity: scale,
+        child: Transform.scale(scale: scale, child: child),
+      ),
+      child: Material(
+        color: isAlternative
+            ? RidonsColors.primary.withValues(alpha: 0.06)
+            : context.ridonsSheet,
+        elevation: isAlternative ? 3 : 5,
+        shadowColor: const Color(0x33000000),
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: isAlternative
+                ? RidonsColors.primary.withValues(alpha: 0.3)
+                : context.ridonsLine,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+          child: AnimatedSwitcher(
+            duration: motionDuration,
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: animation.drive(
+                  Tween<Offset>(
+                    begin: const Offset(0, 0.12),
+                    end: Offset.zero,
+                  ),
+                ),
+                child: child,
+              ),
+            ),
+            child: content,
+          ),
+        ),
       ),
     );
   }
@@ -647,10 +685,6 @@ class _EstimateSheet extends StatelessWidget {
                 : 'market_fair_price'.tr(),
             style: TextStyle(color: context.ridonsMuted, fontSize: 11),
           ),
-          if (viewModel.hasRouteAlternatives) ...[
-            const SizedBox(height: 12),
-            _RouteChoices(viewModel: viewModel),
-          ],
           const SizedBox(height: 10),
           RidonsPriceAdjuster(
             amountRwf: viewModel.offeredPrice,
@@ -805,15 +839,16 @@ class _OfferingSheet extends StatelessWidget {
           ],
           const SizedBox(height: 12),
           // Change my price — always available
-          OutlinedButton(
-            onPressed: () => viewModel.retryFareEstimate(),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              side: BorderSide(color: context.ridonsLine),
-              foregroundColor: context.ridonsInk,
+          if (!viewModel.hasAcceptedOffer)
+            OutlinedButton(
+              onPressed: viewModel.retryFareEstimate,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+                side: BorderSide(color: context.ridonsLine),
+                foregroundColor: context.ridonsInk,
+              ),
+              child: Text('change_my_price'.tr()),
             ),
-            child: Text('change_my_price'.tr()),
-          ),
           if (!hasOffers) ...[
             const SizedBox(height: 8),
             InkWell(
@@ -2041,111 +2076,6 @@ class _RouteSummary extends StatelessWidget {
           text: viewModel.dropoffLabel.isEmpty
               ? 'choose_dropoff_location'
               : viewModel.dropoffLabel,
-        ),
-      ],
-    );
-  }
-}
-
-class _RouteChoices extends StatelessWidget {
-  const _RouteChoices({required this.viewModel});
-
-  final HomeMapViewModel viewModel;
-
-  @override
-  Widget build(BuildContext context) {
-    final routes = viewModel.routeOptions;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'choose_route'.tr(),
-          style: TextStyle(
-            color: context.ridonsInk,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 72,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: routes.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final route = routes[index];
-              final selected = index == viewModel.selectedRouteIndex;
-              final label = index == 0
-                  ? 'fastest_route'.tr()
-                  : 'alternative_route'.tr(namedArgs: {'number': '$index'});
-              return SizedBox(
-                width: 156,
-                child: Material(
-                  color: selected ? context.ridonsSoft : context.ridonsFill,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    onTap: () => viewModel.selectRoute(index),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(11, 9, 9, 8),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: selected
-                              ? RidonsColors.primary
-                              : context.ridonsLine,
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: selected
-                                        ? RidonsColors.primary
-                                        : context.ridonsInk,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  '${route.durationMin} min · ${route.distanceKm.toStringAsFixed(1)} km',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: context.ridonsMuted,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            selected
-                                ? Icons.check_circle
-                                : Icons.circle_outlined,
-                            size: 17,
-                            color: selected
-                                ? RidonsColors.primary
-                                : context.ridonsLine,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
         ),
       ],
     );

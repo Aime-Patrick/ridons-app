@@ -23,6 +23,7 @@ class RidonsMapView extends StatefulWidget {
     required this.layers,
     this.initialZoom = 15,
     this.bottomControlsOffset = 0,
+    this.topTrailingControl,
     this.onRecenter,
     this.onTap,
     this.onMapReady,
@@ -36,6 +37,7 @@ class RidonsMapView extends StatefulWidget {
   final LatLng center;
   final double initialZoom;
   final double bottomControlsOffset;
+  final Widget? topTrailingControl;
   final VoidCallback? onRecenter;
   final List<Widget> layers;
   final ValueChanged<LatLng>? onTap;
@@ -105,7 +107,72 @@ class _RidonsMapViewState extends State<RidonsMapView> {
 
   @override
   Widget build(BuildContext context) {
-    final hasLocationControl = widget.onRecenter != null;
+    final media = MediaQuery.of(context);
+    final controlAnimationDuration = media.disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 240);
+    final controlIds = <String>[];
+    final controls = <Widget>[];
+    if (widget.topTrailingControl != null) {
+      controlIds.add('notifications');
+      controls.add(widget.topTrailingControl!);
+    }
+    controlIds.add('compass');
+    controls.add(
+      _MapControlButton(
+        tooltip: 'reset_map_north'.tr(),
+        onPressed: () {
+          try {
+            widget.controller.rotate(0);
+          } catch (_) {}
+        },
+        icon: _NorthCompass(
+          controller: widget.controller,
+          deviceHeadingStream: widget.deviceHeadingStream,
+        ),
+      ),
+    );
+    if (widget.onRecenter != null) {
+      controlIds.add('recenter');
+      controls.add(
+        _MapControlButton(
+          tooltip: 'my_location'.tr(),
+          onPressed: _recenter,
+          icon: Icon(
+            Icons.my_location_rounded,
+            color: RidonsColors.primary,
+          ),
+        ),
+      );
+    }
+    final controlsExtent = controls.length * 56.0 - 8.0;
+    final rowControlsWidth = controlsExtent;
+    final visibleMapHeight = media.size.height - widget.bottomControlsOffset;
+    final useRowControls =
+        visibleMapHeight - controlsExtent < media.padding.top + 8;
+    final controlLayout = AnimatedContainer(
+      duration: controlAnimationDuration,
+      curve: Curves.easeInOutCubic,
+      width: useRowControls ? rowControlsWidth : 48,
+      height: useRowControls ? 48 : controlsExtent,
+      child: Stack(
+        clipBehavior: Clip.none,
+        fit: StackFit.expand,
+        children: [
+          for (var index = 0; index < controls.length; index++)
+            AnimatedPositioned(
+              key: ValueKey(controlIds[index]),
+              duration: controlAnimationDuration,
+              curve: Curves.easeInOutCubic,
+              width: 48,
+              height: 48,
+              top: useRowControls ? 0 : index * 56.0,
+              right: useRowControls ? (controls.length - index - 1) * 56.0 : 0,
+              child: controls[index],
+            ),
+        ],
+      ),
+    );
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -124,37 +191,10 @@ class _RidonsMapViewState extends State<RidonsMapView> {
           ),
           children: [...RidonsMapTiles.layers(context), ...widget.layers],
         ),
-        if (hasLocationControl)
-          Positioned(
-            bottom: widget.bottomControlsOffset,
-            right: 12,
-            child: _MapControlButton(
-              tooltip: 'my_location'.tr(),
-              onPressed: _recenter,
-              icon: Icon(
-                Icons.my_location_rounded,
-                color: RidonsColors.primary,
-              ),
-            ),
-          ),
         Positioned(
-          top: hasLocationControl
-              ? null
-              : MediaQuery.paddingOf(context).top + 12,
-          bottom: hasLocationControl ? widget.bottomControlsOffset + 64 : null,
           right: 12,
-          child: _MapControlButton(
-            tooltip: 'reset_map_north'.tr(),
-            onPressed: () {
-              try {
-                widget.controller.rotate(0);
-              } catch (_) {}
-            },
-            icon: _NorthCompass(
-              controller: widget.controller,
-              deviceHeadingStream: widget.deviceHeadingStream,
-            ),
-          ),
+          bottom: widget.bottomControlsOffset,
+          child: controlLayout,
         ),
       ],
     );

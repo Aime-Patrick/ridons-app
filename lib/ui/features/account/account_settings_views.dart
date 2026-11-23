@@ -623,14 +623,13 @@ class AppearanceSettingsView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(themeModeProvider).asData?.value ?? ThemeMode.system;
+    final preference =
+        ref.watch(themeModeProvider).asData?.value ?? ThemeMode.system;
+    final mode = resolveThemeMode(
+      preference,
+      MediaQuery.platformBrightnessOf(context),
+    );
     const options = <(ThemeMode, IconData, String, String)>[
-      (
-        ThemeMode.system,
-        Icons.brightness_auto_rounded,
-        'system',
-        'system_theme',
-      ),
       (ThemeMode.light, Icons.light_mode_outlined, 'light', 'always_light'),
       (ThemeMode.dark, Icons.dark_mode_outlined, 'dark', 'always_dark'),
     ];

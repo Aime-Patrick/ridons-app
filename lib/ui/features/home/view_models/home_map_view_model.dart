@@ -108,9 +108,7 @@ class HomeMapViewModel extends ChangeNotifier {
   List<GeoPlace> recentDestinations = const [];
   bool searchingPlaces = false;
   List<LatLng> routePoints = const [];
-  List<List<LatLng>> routeAlternatives = const [];
-  List<RouteResult> routeOptions = const [];
-  int selectedRouteIndex = 0;
+  List<RouteResult> routeAlternatives = const [];
   List<RouteStep> routeSteps = const [];
   List<LatLng> driverTrackPoints = const [];
   List<LiveMapMarker> nearbyDrivers = const [];
@@ -256,23 +254,7 @@ class HomeMapViewModel extends ChangeNotifier {
   bool get hasRoute =>
       pickup != null && dropoff != null && routePoints.length >= 2;
 
-  bool get hasRouteAlternatives => routeOptions.length > 1;
-
-  void selectRoute(int index) {
-    if (index < 0 || index >= routeOptions.length) return;
-    selectedRouteIndex = index;
-    final selected = routeOptions[index];
-    routePoints = selected.points;
-    routeSteps = selected.steps;
-    tripKm = selected.distanceKm;
-    tripDurationMin = selected.durationMin;
-    routeMethod = selected.method;
-    routeAlternatives = [
-      for (var i = 0; i < routeOptions.length; i++)
-        if (i != index) routeOptions[i].points,
-    ];
-    notifyListeners();
-  }
+  bool get hasAcceptedOffer => counterOffers.any((bid) => !bid.isCounter);
 
   String get timerLabel {
     if (offerTimer == Duration.zero) return '';
@@ -1616,7 +1598,12 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   void retryFareEstimate() {
-    if (loadingFareEstimate || pickup == null || dropoff == null) return;
+    if (loadingFareEstimate ||
+        pickup == null ||
+        dropoff == null ||
+        (stage == RideStage.offering && hasAcceptedOffer)) {
+      return;
+    }
     startEstimate();
   }
 
@@ -1962,8 +1949,6 @@ class HomeMapViewModel extends ChangeNotifier {
     pickCandidate = null;
     routePoints = const [];
     routeAlternatives = const [];
-    routeOptions = const [];
-    selectedRouteIndex = 0;
     routeSteps = const [];
     driverTrackPoints = const [];
     offeredPrice = 0;
@@ -2034,8 +2019,6 @@ class HomeMapViewModel extends ChangeNotifier {
     pickCandidate = null;
     routePoints = const [];
     routeAlternatives = const [];
-    routeOptions = const [];
-    selectedRouteIndex = 0;
     routeSteps = const [];
     driverTrackPoints = const [];
     _pickupFollowsGps = true;
@@ -2087,8 +2070,6 @@ class HomeMapViewModel extends ChangeNotifier {
       _routingService.cancelInFlight();
       routePoints = const [];
       routeAlternatives = const [];
-      routeOptions = const [];
-      selectedRouteIndex = 0;
       routeSteps = const [];
       tripKm = 0;
       tripDurationMin = 0;
@@ -2109,31 +2090,24 @@ class HomeMapViewModel extends ChangeNotifier {
     routeMethod = '';
     routePoints = const [];
     routeAlternatives = const [];
-    routeOptions = const [];
-    selectedRouteIndex = 0;
     routeSteps = const [];
     notifyListeners();
 
     try {
       final result = await _routingService.route(from, to);
       if (gen != _routeGen) return;
-      routeOptions = [result, ...result.alternatives];
-      selectedRouteIndex = 0;
-      final selected = routeOptions.first;
-      routePoints = selected.points;
-      routeAlternatives = [
-        for (var i = 1; i < routeOptions.length; i++) routeOptions[i].points,
-      ];
-      routeSteps = selected.steps;
-      tripKm = selected.distanceKm;
-      tripDurationMin = selected.durationMin;
-      routeMethod = selected.method;
+      // RoutingService sorts by duration and returns the fastest route first.
+      // Use it automatically; retain alternatives for map context only.
+      routePoints = result.points;
+      routeAlternatives = result.alternatives;
+      routeSteps = result.steps;
+      tripKm = result.distanceKm;
+      tripDurationMin = result.durationMin;
+      routeMethod = result.method;
     } catch (_) {
       if (gen != _routeGen) return;
       // Only fall back to a straight line if OSRM truly failed.
       routePoints = quick.points;
-      routeOptions = [quick];
-      selectedRouteIndex = 0;
       routeAlternatives = const [];
       routeSteps = quick.steps;
       routeMethod = quick.method;

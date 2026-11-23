@@ -23,6 +23,12 @@ class AccountView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(authSessionProvider).asData?.value;
     final user = session?.user;
+    final savedThemeMode =
+        ref.watch(themeModeProvider).asData?.value ?? ThemeMode.system;
+    final effectiveThemeMode = resolveThemeMode(
+      savedThemeMode,
+      MediaQuery.platformBrightnessOf(context),
+    );
 
     return ColoredBox(
       color: context.ridonsPage,
@@ -93,12 +99,9 @@ class AccountView extends ConsumerWidget {
               _OutlineTile(
                 icon: Icons.dark_mode_outlined,
                 label: 'appearance',
-                subtitle: switch (ref.watch(themeModeProvider).asData?.value ??
-                    ThemeMode.system) {
-                  ThemeMode.light => 'light',
-                  ThemeMode.dark => 'dark',
-                  ThemeMode.system => 'system',
-                },
+                subtitle: effectiveThemeMode == ThemeMode.dark
+                    ? 'dark'
+                    : 'light',
                 onTap: () => _open(context, const AppearanceSettingsView()),
               ),
               const SizedBox(height: 10),

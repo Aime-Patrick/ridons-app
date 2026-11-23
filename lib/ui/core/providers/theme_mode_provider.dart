@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'session_providers.dart';
 
+ThemeMode resolveThemeMode(ThemeMode preference, Brightness systemBrightness) {
+  if (preference != ThemeMode.system) return preference;
+  return systemBrightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light;
+}
+
 final themeModeProvider =
     AsyncNotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
 

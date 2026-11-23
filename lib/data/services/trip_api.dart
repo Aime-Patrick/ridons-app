@@ -106,21 +106,24 @@ class TripApi {
     );
   }
 
-  Future<List<RideOffer>> inbox() async {
-    try {
-      final response = await _api.dio.get<Map<String, dynamic>>(
-        '/driver/requests/inbox',
-      );
-      final raw = response.data?['requests'];
-      if (raw is! List) return const [];
-      return raw
-          .whereType<Map>()
-          .map((item) => RideOffer.fromJson(Map<String, dynamic>.from(item)))
-          .where((offer) => offer.requestId.isNotEmpty)
-          .toList(growable: false);
-    } on DioException {
-      return const [];
-    }
+  Future<DriverInbox> inbox() async {
+    final response = await _api.dio.get<Map<String, dynamic>>(
+      '/driver/requests/inbox',
+    );
+    final data = response.data ?? const {};
+    return DriverInbox(
+      offers: _rideOffers(data['requests']),
+      pendingChoices: _rideOffers(data['pendingRequests']),
+    );
+  }
+
+  List<RideOffer> _rideOffers(Object? raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((item) => RideOffer.fromJson(Map<String, dynamic>.from(item)))
+        .where((offer) => offer.requestId.isNotEmpty)
+        .toList(growable: false);
   }
 
   Future<ActiveRide> accept(
@@ -459,4 +462,11 @@ class TripApi {
         )
         .toList(growable: false);
   }
+}
+
+class DriverInbox {
+  const DriverInbox({this.offers = const [], this.pendingChoices = const []});
+
+  final List<RideOffer> offers;
+  final List<RideOffer> pendingChoices;
 }
