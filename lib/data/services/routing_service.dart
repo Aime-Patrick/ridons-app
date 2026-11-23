@@ -316,21 +316,29 @@ class RoutingService {
 
   /// Geographic point halfway along [points] by road length.
   static LatLng? midpointAlong(List<LatLng> points) {
+    return pointAlong(points, 0.5);
+  }
+
+  /// Geographic point at [fraction] of the route length, measured along roads.
+  static LatLng? pointAlong(List<LatLng> points, double fraction) {
     if (points.length < 2) return null;
     const distance = Distance();
     double total = 0;
     for (var i = 1; i < points.length; i++) {
       total += distance(points[i - 1], points[i]);
     }
-    if (total <= 0) return points[points.length ~/ 2];
-    final half = total / 2;
+    if (total <= 0) {
+      final index = (fraction.clamp(0.0, 1.0) * (points.length - 1)).round();
+      return points[index];
+    }
+    final target = total * fraction.clamp(0.0, 1.0);
     var acc = 0.0;
     for (var i = 1; i < points.length; i++) {
       final a = points[i - 1];
       final b = points[i];
       final seg = distance(a, b);
-      if (acc + seg >= half) {
-        final t = seg <= 0 ? 0.0 : (half - acc) / seg;
+      if (acc + seg >= target) {
+        final t = seg <= 0 ? 0.0 : (target - acc) / seg;
         return LatLng(
           a.latitude + (b.latitude - a.latitude) * t,
           a.longitude + (b.longitude - a.longitude) * t,

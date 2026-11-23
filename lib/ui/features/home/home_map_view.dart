@@ -616,6 +616,15 @@ class _PassengerMap extends StatelessWidget {
             pickup.longitude != you.longitude);
     final showDrivers = viewModel.nearbyDrivers.isNotEmpty;
     final etaMid = RoutingService.midpointAlong(viewModel.routePoints);
+    final routeHasPoints =
+        viewModel.routePoints.length >= 2 &&
+        viewModel.stage != RideStage.pickOnMap;
+    final destinationCoord = routeHasPoints
+        ? viewModel.routePoints.last
+        : (dropoff != null ? LatLng(dropoff.latitude, dropoff.longitude) : null);
+    final pickupCoord = routeHasPoints
+        ? viewModel.routePoints.first
+        : (pickup != null ? LatLng(pickup.latitude, pickup.longitude) : null);
     final showDriverTrack =
         viewModel.stage == RideStage.matched &&
         !viewModel.isInProgress &&
@@ -666,9 +675,7 @@ class _PassengerMap extends StatelessWidget {
                 if (alt.points.length >= 2)
                   Polyline(
                     points: alt.points,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? const Color(0x66FBBF24)
-                        : RidonsColors.primary.withValues(alpha: 0.28),
+                    color: RidonsColors.primary.withValues(alpha: 0.35),
                     strokeWidth: 4,
                   ),
               Polyline(
@@ -677,17 +684,13 @@ class _PassengerMap extends StatelessWidget {
                     ? (Theme.of(context).brightness == Brightness.dark
                           ? const Color(0x88FFFFFF)
                           : const Color(0x66515A6B))
-                    : Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFFFBBF24)
-                    : RidonsColors.primaryDark,
+                    : RidonsColors.primary,
                 strokeWidth: 5,
               ),
               if (showDriverTrack)
                 Polyline(
                   points: viewModel.driverTrackPoints,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xFFFBBF24)
-                      : RidonsColors.primary,
+                  color: RidonsColors.primary,
                   strokeWidth: 5,
                 ),
             ],
@@ -731,8 +734,14 @@ class _PassengerMap extends StatelessWidget {
                 Theme.of(context).brightness == Brightness.dark
                     ? Colors.white
                     : RidonsColors.primary,
+                coordinate: pickupCoord,
               ),
-            if (dropoff != null) _pinMarker(dropoff, RidonsColors.primary),
+            if (dropoff != null)
+              _pinMarker(
+                dropoff,
+                RidonsColors.primary,
+                coordinate: destinationCoord,
+              ),
             if (candidate != null)
               _pinMarker(candidate, RidonsColors.primary),
             for (var index = 0;
@@ -844,14 +853,34 @@ class _PassengerMap extends StatelessWidget {
     );
   }
 
-  Marker _pinMarker(GeoPlace place, Color color) {
+  Marker _pinMarker(
+    GeoPlace place,
+    Color color, {
+    LatLng? coordinate,
+  }) {
     return Marker(
-      point: LatLng(place.latitude, place.longitude),
-      width: 44,
-      height: 44,
-      // Anchor the pin tip—not the icon box—to the selected coordinates.
-      alignment: Alignment.bottomCenter,
-      child: Icon(Icons.location_on, color: color, size: 40),
+      point: coordinate ?? LatLng(place.latitude, place.longitude),
+      width: 40,
+      height: 40,
+      // In flutter_map, Alignment.topCenter places the marker widget ABOVE the
+      // coordinate, so its bottom edge (the pin tip) is anchored directly to the point.
+      alignment: Alignment.topCenter,
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.bottomCenter,
+          children: [
+            Positioned(
+              // Material location glyph has ~3px padding below its painted tip.
+              // Shift it down so the tip touches the exact coordinate.
+              bottom: -3,
+              child: Icon(Icons.location_on, color: color, size: 40),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

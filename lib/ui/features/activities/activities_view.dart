@@ -5,7 +5,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../data/services/routing_service.dart';
@@ -862,9 +861,7 @@ class _TripMapSnapshotState extends State<_TripMapSnapshot> {
                   polylines: [
                     Polyline(
                       points: route,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? const Color(0xFFFBBF24)
-                          : RidonsColors.primaryDark,
+                      color: RidonsColors.primary,
                       strokeWidth: 4,
                     ),
                   ],
@@ -872,7 +869,7 @@ class _TripMapSnapshotState extends State<_TripMapSnapshot> {
               MarkerLayer(
                 markers: [
                   Marker(
-                    point: widget.pickup,
+                    point: route.length >= 2 ? route.first : widget.pickup,
                     width: 18,
                     height: 18,
                     child: Container(
@@ -886,7 +883,7 @@ class _TripMapSnapshotState extends State<_TripMapSnapshot> {
                     ),
                   ),
                   Marker(
-                    point: widget.dropoff,
+                    point: route.length >= 2 ? route.last : widget.dropoff,
                     width: 18,
                     height: 18,
                     child: Container(

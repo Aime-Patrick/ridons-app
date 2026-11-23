@@ -141,7 +141,9 @@ class _TripMapState extends State<_TripMap> {
     final ride = widget.ride;
     final you = viewModel.driverPoint ?? ride.from;
     final dest = viewModel.stage == DriverStage.driving
-        ? ride.to
+        ? (viewModel.routePoints.length >= 2
+            ? viewModel.routePoints.last
+            : ride.to)
         : (viewModel.passengerPoint ?? ride.from);
     final points = viewModel.routePoints.length >= 2
         ? viewModel.routePoints
@@ -166,17 +168,13 @@ class _TripMapState extends State<_TripMap> {
                   ? (Theme.of(context).brightness == Brightness.dark
                         ? const Color(0x88FFFFFF)
                         : const Color(0x66515A6B))
-                  : Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFFFBBF24)
-                  : const Color(0xFF7A1014),
+                  : RidonsColors.primary,
               strokeWidth: 6,
             ),
             if (showActualTrack)
               Polyline(
                 points: viewModel.actualTrackPoints,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFFFBBF24)
-                    : RidonsColors.primary,
+                color: RidonsColors.primary,
                 strokeWidth: 5,
               ),
           ],
@@ -192,6 +190,11 @@ class _TripMapState extends State<_TripMap> {
         if (viewModel.stage == DriverStage.driving)
           RidonsAnimatedMarker(
             point: dest,
+            width: 40,
+            height: 40,
+            // In flutter_map, Alignment.topCenter places the marker widget ABOVE the
+            // coordinate, so its bottom edge (the pin tip) is anchored directly to the point.
+            alignment: Alignment.topCenter,
             child: _destinationMarkerChild(ride: ride),
           )
         else
@@ -218,11 +221,22 @@ class _TripMapState extends State<_TripMap> {
           'ride': ride.rideId,
         },
       ),
-      child: const Center(
-        child: Icon(
-          Icons.location_on,
-          color: RidonsColors.primary,
-          size: 36,
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.bottomCenter,
+          children: [
+            const Positioned(
+              bottom: -3,
+              child: Icon(
+                Icons.location_on,
+                color: RidonsColors.primary,
+                size: 40,
+              ),
+            ),
+          ],
         ),
       ),
     );

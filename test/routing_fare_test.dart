@@ -60,6 +60,17 @@ void main() {
     expect(mid.longitude, closeTo(1, 0.0001));
   });
 
+  test('pointAlong places alternative badges along their own route', () {
+    final point = RoutingService.pointAlong(const [
+      LatLng(0, 0),
+      LatLng(0, 1),
+      LatLng(0, 2),
+    ], 0.35);
+    expect(point, isNotNull);
+    expect(point!.latitude, closeTo(0, 0.0001));
+    expect(point.longitude, closeTo(0.7, 0.01));
+  });
+
   test('distanceToPolylineMeters measures the nearest route segment', () {
     final distance = RoutingService.distanceToPolylineMeters(
       const LatLng(0.001, 0.5),

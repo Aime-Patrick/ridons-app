@@ -183,6 +183,9 @@ class _RidonsMapViewState extends State<RidonsMapView> {
             // reset the map without entering a navigation/follow mode.
             initialCenter: widget.center,
             initialZoom: widget.initialZoom,
+            // The OSM raster source loses sharpness when users over-zoom past
+            // its street-detail level. Keep gestures and camera fits capped.
+            maxZoom: 18,
             onMapReady: _handleMapReady,
             onPositionChanged: _handlePositionChanged,
             onTap: widget.onTap == null

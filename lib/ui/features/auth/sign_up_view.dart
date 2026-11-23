@@ -191,8 +191,6 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
   }
 }
 
-/// Remaps the light-grey Sign-up art onto dark surfaces without washing out
-/// brand red or navy ink.
 class _SignupArtColorMapper extends ColorMapper {
   const _SignupArtColorMapper();
 

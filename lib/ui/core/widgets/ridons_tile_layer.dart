@@ -3,8 +3,9 @@ import 'package:flutter_map/flutter_map.dart';
 
 /// Basemap tiles that follow the phone light/dark setting.
 ///
-/// Light: OpenStreetMap streets with an Esri street-map fallback.
-/// Dark: Esri's dark-gray base with its dark-gray reference overlay.
+/// Both themes use the same detailed OpenStreetMap street tiles. Dark mode
+/// applies a restrained slate color treatment to the tiles only, keeping map
+/// content consistent while leaving route and location overlays untouched.
 ///
 /// On high-DPI phones, retina mode requests extra zoom so streets stay sharp
 /// instead of stretching 256px tiles.
@@ -26,14 +27,28 @@ abstract final class RidonsMapTiles {
   static const _light = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   static const _lightFallback =
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
-  static const _darkBase =
-      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
-  static const _darkBaseFallback =
-      'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
-  static const _darkReference =
-      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}';
-  static const _darkReferenceFallback =
-      'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}';
+  static const _darkMapFilter = ColorFilter.matrix([
+    -0.144568,
+    -0.486336,
+    -0.049096,
+    0,
+    189.4,
+    -0.140316,
+    -0.472032,
+    -0.047652,
+    0,
+    188.3,
+    -0.133938,
+    -0.450576,
+    -0.045486,
+    0,
+    187.65,
+    0,
+    0,
+    0,
+    1,
+    0,
+  ]);
 
   static TileLayer _layer({
     required Key key,
@@ -62,19 +77,16 @@ abstract final class RidonsMapTiles {
     final dark = Theme.of(context).brightness == Brightness.dark;
     if (dark) {
       return [
-        _layer(
-          key: const ValueKey('ridons-map-dark-base'),
-          context: context,
-          url: _darkBase,
-          fallbackUrl: _darkBaseFallback,
-          maxNativeZoom: 16,
-        ),
-        _layer(
-          key: const ValueKey('ridons-map-dark-reference'),
-          context: context,
-          url: _darkReference,
-          fallbackUrl: _darkReferenceFallback,
-          maxNativeZoom: 16,
+        ColorFiltered(
+          key: const ValueKey('ridons-map-dark-osm'),
+          colorFilter: _darkMapFilter,
+          child: _layer(
+            key: const ValueKey('ridons-map-dark-osm-tiles'),
+            context: context,
+            url: _light,
+            fallbackUrl: _lightFallback,
+            maxNativeZoom: 19,
+          ),
         ),
       ];
     }

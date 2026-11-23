@@ -226,16 +226,16 @@ class RouteEtaMapBadge extends StatelessWidget {
         child: Transform.scale(scale: scale, child: child),
       ),
       child: Material(
-        color: isAlternative
-            ? RidonsColors.primary.withValues(alpha: 0.06)
-            : context.ridonsSheet,
-        elevation: isAlternative ? 3 : 5,
+        color: context.ridonsSheet,
+        elevation: 5,
         shadowColor: const Color(0x33000000),
-        shape: StadiumBorder(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
           side: BorderSide(
             color: isAlternative
-                ? RidonsColors.primary.withValues(alpha: 0.3)
+                ? RidonsColors.primary
                 : context.ridonsLine,
+            width: isAlternative ? 1.5 : 1,
           ),
         ),
         child: Padding(
@@ -2412,6 +2412,13 @@ Future<void> _requestPassengerCancellation(
   BuildContext context,
   HomeMapViewModel viewModel,
 ) async {
+  // Cancellation reasons are for a confirmed/locked ride. Before a driver is
+  // selected, this action simply abandons the route or open offer request.
+  if (viewModel.stage != RideStage.matched) {
+    viewModel.cancelRide();
+    return;
+  }
+
   final selection = await showCancellationReasonSheet(
     context: context,
     actor: 'passenger',

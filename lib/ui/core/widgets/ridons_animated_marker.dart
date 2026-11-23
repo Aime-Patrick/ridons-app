@@ -3,9 +3,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 /// Animates a moving map marker between real location fixes.
-///
-/// The animation is visual only: the target remains the exact GPS coordinate
-/// received from the device, while the transition prevents visible jumps.
 class RidonsAnimatedMarker extends StatefulWidget {
   const RidonsAnimatedMarker({
     super.key,
