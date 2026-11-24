@@ -200,18 +200,24 @@ class RemoteAuthRepository implements AuthRepository {
   @override
   Future<AuthSession?> restore() async {
     final access = await _tokens.readAccess();
-    if (access == null || access.isEmpty) return null;
+    if (access == null || access.isEmpty) return refreshSession();
     try {
       final response = await _api.dio.get<Map<String, dynamic>>('/me');
       final userMap =
           (response.data?['user'] as Map<String, dynamic>?) ?? const {};
-      return AuthSession(token: access, user: SessionUser.fromJson(userMap));
+      final currentAccess = await _tokens.readAccess() ?? access;
+      return AuthSession(
+        token: currentAccess,
+        user: SessionUser.fromJson(userMap),
+      );
     } on DioException catch (e) {
       // Only drop the session on auth failure — keep tokens on network/5xx.
       if (e.response?.statusCode == 401) {
-        final refreshed = await refreshSession();
-        if (refreshed != null) return refreshed;
-        await _tokens.clear();
+        if (e.requestOptions.extra['sessionRefreshRetried'] != true) {
+          final refreshed = await refreshSession();
+          if (refreshed != null) return refreshed;
+        }
+        if (_api.lastRefreshWasRejected) await _tokens.clear();
       }
       return null;
     }
@@ -220,12 +226,14 @@ class RemoteAuthRepository implements AuthRepository {
   @override
   Future<void> logout() async {
     final refresh = await _tokens.readRefresh();
-    try {
-      await _api.dio.post<void>(
-        '/auth/logout',
-        data: {'refreshToken': refresh},
-      );
-    } catch (_) {}
+    if (refresh != null && refresh.isNotEmpty) {
+      try {
+        await _api.dio.post<void>(
+          '/auth/logout',
+          data: {'refreshToken': refresh},
+        );
+      } catch (_) {}
+    }
     await _tokens.clear();
   }
 
@@ -233,18 +241,11 @@ class RemoteAuthRepository implements AuthRepository {
   /// status changes). Returns the updated session or null on failure.
   @override
   Future<AuthSession?> refreshSession() async {
-    final refresh = await _tokens.readRefresh();
-    if (refresh == null || refresh.isEmpty) return null;
     try {
-      final response = await _api.dio.post<Map<String, dynamic>>(
-        '/auth/refresh',
-        data: {'refreshToken': refresh},
-      );
-      final json = response.data ?? const {};
+      final json = await _api.refreshSessionTokens();
+      if (json == null) return null;
       final token = '${json['token'] ?? ''}';
-      final newRefresh = json['refreshToken']?.toString();
       if (token.isEmpty) return null;
-      await _tokens.save(access: token, refresh: newRefresh ?? refresh);
       final userMap = (json['user'] as Map<String, dynamic>?) ?? const {};
       return AuthSession(token: token, user: SessionUser.fromJson(userMap));
     } on DioException {

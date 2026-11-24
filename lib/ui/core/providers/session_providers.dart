@@ -28,10 +28,12 @@ final tokenStoreProvider = Provider<TokenStore>((ref) => TokenStore());
 final prefsStoreProvider = Provider<PrefsStore>((ref) => PrefsStore());
 
 final apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient(
+  final client = ApiClient(
     baseUrl: defaultGatewayUrl(),
     tokenStore: ref.watch(tokenStoreProvider),
   );
+  ref.onDispose(() => unawaited(client.dispose()));
+  return client;
 });
 
 final geoApiProvider = Provider<GeoApi>((ref) {
@@ -105,9 +107,23 @@ final authSessionProvider =
     );
 
 class AuthSessionNotifier extends AsyncNotifier<AuthSession?> {
+  bool _readyForSessionEvents = false;
+
   @override
   Future<AuthSession?> build() async {
+    final expirationSubscription = ref
+        .read(apiClientProvider)
+        .sessionExpired
+        .listen((_) {
+          if (_readyForSessionEvents) {
+            _readyForSessionEvents = false;
+            unawaited(clear());
+          }
+        });
+    ref.onDispose(() => unawaited(expirationSubscription.cancel()));
+
     final session = await ref.read(authRepositoryProvider).restore();
+    _readyForSessionEvents = true;
     if (session != null) {
       ref.read(appRoleProvider.notifier).state = session.user.role;
     } else {
@@ -120,12 +136,14 @@ class AuthSessionNotifier extends AsyncNotifier<AuthSession?> {
   }
 
   Future<void> setSession(AuthSession session) async {
+    _readyForSessionEvents = true;
     state = AsyncData(session);
     ref.read(appRoleProvider.notifier).state = session.user.role;
   }
 
   Future<AuthSession> switchMode(AppRole mode) async {
     final session = await ref.read(authRepositoryProvider).switchMode(mode);
+    _readyForSessionEvents = true;
     state = AsyncData(session);
     ref.read(appRoleProvider.notifier).state = session.user.role;
     return session;
