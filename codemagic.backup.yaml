@@ -1,0 +1,113 @@
+workflows:
+  ridons-release:
+    name: Ridons release
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Aivize Labs Ltd
+    environment:
+      android_signing:
+        - Ridons_Release
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.ridons.mobile
+      groups:
+        - google_play_credentials
+      vars:
+        APP_STORE_APPLE_ID: "6836368405"
+        BUNDLE_ID: com.ridons.mobile
+        PACKAGE_NAME: com.ridons.mobile
+        GOOGLE_PLAY_TRACK: beta
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: production
+      tag_patterns:
+        - pattern: 'v*'
+      cancel_previous_builds: true
+    scripts:
+      - name: Install Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Calculate next store build number
+        script: |
+          set -eo pipefail
+
+          echo "Querying store build numbers..."
+
+          # 1. Fetch iOS latest build number (check TestFlight first, then App Store)
+          LATEST_IOS_BUILD=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+          if ! [[ "$LATEST_IOS_BUILD" =~ ^[0-9]+$ ]]; then
+            LATEST_IOS_BUILD=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+          fi
+          if ! [[ "$LATEST_IOS_BUILD" =~ ^[0-9]+$ ]]; then
+            echo "No existing iOS build number found from App Store Connect / TestFlight."
+            LATEST_IOS_BUILD=0
+          else
+            echo "Latest iOS build number: ${LATEST_IOS_BUILD}"
+          fi
+
+          # 2. Fetch Android latest build number from Google Play
+          LATEST_ANDROID_BUILD=$(google-play get-latest-build-number --package-name "$PACKAGE_NAME" 2>/dev/null || true)
+          if ! [[ "$LATEST_ANDROID_BUILD" =~ ^[0-9]+$ ]]; then
+            echo "No existing Android build number found from Google Play."
+            LATEST_ANDROID_BUILD=0
+          else
+            echo "Latest Android build number: ${LATEST_ANDROID_BUILD}"
+          fi
+
+          # 3. Determine highest existing build across both stores
+          if (( LATEST_IOS_BUILD > LATEST_ANDROID_BUILD )); then
+            MAX_STORE_BUILD=$LATEST_IOS_BUILD
+          else
+            MAX_STORE_BUILD=$LATEST_ANDROID_BUILD
+          fi
+
+          # 4. Calculate next build number with fallback to Codemagic $BUILD_NUMBER
+          if (( MAX_STORE_BUILD > 0 )); then
+            NEXT_BUILD_NUMBER=$(( MAX_STORE_BUILD + 1 ))
+            echo "Incrementing highest store build (${MAX_STORE_BUILD}) -> Next build number: ${NEXT_BUILD_NUMBER}"
+          else
+            NEXT_BUILD_NUMBER=${BUILD_NUMBER:-1}
+            echo "No store builds detected. Falling back to Codemagic BUILD_NUMBER: ${NEXT_BUILD_NUMBER}"
+          fi
+
+          # Export NEXT_BUILD_NUMBER and BUILD_NUMBER to subsequent steps via $CM_ENV
+          echo "BUILD_NUMBER=${NEXT_BUILD_NUMBER}" >> $CM_ENV
+          echo "NEXT_BUILD_NUMBER=${NEXT_BUILD_NUMBER}" >> $CM_ENV
+      - name: Build Android App Bundle
+        script: |
+          flutter build appbundle --release \
+            --build-number="${BUILD_NUMBER}" \
+            --dart-define=RIDONS_API_URL=https://api.ridons.com
+      - name: Set up iOS code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --platform IOS \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Build iOS IPA
+        script: |
+          flutter build ipa --release \
+            --build-number="${BUILD_NUMBER}" \
+            --dart-define=RIDONS_API_URL=https://api.ridons.com
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        expire_build_submitted_for_review: true
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: beta
+        submit_as_draft: true
