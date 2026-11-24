@@ -21,15 +21,6 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
-    triggering:
-      events:
-        - push
-        - tag
-      branch_patterns:
-        - pattern: production
-      tag_patterns:
-        - pattern: 'v*'
-      cancel_previous_builds: true
     scripts:
       - name: Install Flutter dependencies
         script: |
@@ -111,3 +102,70 @@ workflows:
         credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
         track: beta
         submit_as_draft: true
+
+  ridons-apple-only:
+    name: Ridons Apple only
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Aivize Labs Ltd
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.ridons.mobile
+      vars:
+        APP_STORE_APPLE_ID: "6836368405"
+        BUNDLE_ID: com.ridons.mobile
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: production
+      cancel_previous_builds: true
+    scripts:
+      - name: Install Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Calculate next iOS build number
+        script: |
+          set -eo pipefail
+
+          LATEST_IOS_BUILD=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+          if ! [[ "$LATEST_IOS_BUILD" =~ ^[0-9]+$ ]]; then
+            LATEST_IOS_BUILD=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+          fi
+
+          if [[ "$LATEST_IOS_BUILD" =~ ^[0-9]+$ ]]; then
+            NEXT_BUILD_NUMBER=$(( LATEST_IOS_BUILD + 1 ))
+            echo "Latest iOS build: ${LATEST_IOS_BUILD}; using ${NEXT_BUILD_NUMBER}."
+          else
+            NEXT_BUILD_NUMBER=${BUILD_NUMBER:-1}
+            echo "No iOS store build found; using Codemagic build number ${NEXT_BUILD_NUMBER}."
+          fi
+
+          echo "BUILD_NUMBER=${NEXT_BUILD_NUMBER}" >> "$CM_ENV"
+          echo "NEXT_BUILD_NUMBER=${NEXT_BUILD_NUMBER}" >> "$CM_ENV"
+      - name: Set up iOS code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --platform IOS \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Build iOS IPA
+        script: |
+          flutter build ipa --release \
+            --build-number="${BUILD_NUMBER}" \
+            --dart-define=RIDONS_API_URL=https://api.ridons.com
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        expire_build_submitted_for_review: true
