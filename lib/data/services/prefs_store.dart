@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models/app_role.dart';
+import '../../domain/models/fare_pricing_config.dart';
 
 class PrefsStore {
   static const _onboarded = 'ridons.onboarded';
@@ -12,6 +15,32 @@ class PrefsStore {
   static const _emergency = 'ridons.emergency.contacts';
   static const _themeMode = 'ridons.themeMode';
   static const _locationPromptDismissed = 'ridons.location.promptDismissed';
+  static const _offlineFarePricing = 'ridons.pricing.offlineConfig';
+
+  Future<FarePricingConfig?> readOfflineFarePricing() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_offlineFarePricing);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final json = jsonDecode(raw);
+      if (json is! Map<String, dynamic>) return null;
+      final config = FarePricingConfig.fromJson(json);
+      if (config.baseFareRwf <= 0 ||
+          config.perKmRwf <= 0 ||
+          config.minFareRwf <= 0 ||
+          config.fareMultiplier <= 0) {
+        return null;
+      }
+      return config;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveOfflineFarePricing(FarePricingConfig config) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_offlineFarePricing, jsonEncode(config.toJson()));
+  }
 
   Future<bool> locationPromptDismissed() async {
     final prefs = await SharedPreferences.getInstance();

@@ -10,7 +10,7 @@ import '../../../../data/services/coverage_api.dart';
 import '../../../../data/services/geo_api.dart';
 import '../../../../data/services/location_service.dart';
 import '../../../../data/services/places_service.dart';
-import '../../../../data/services/pricing_api.dart';
+import '../../../../data/repositories/pricing_repository.dart';
 import '../../../../data/services/prefs_store.dart';
 import '../../../../data/services/recent_places_store.dart';
 import '../../../../data/services/realtime_client.dart';
@@ -67,7 +67,7 @@ class HomeMapViewModel extends ChangeNotifier {
     required this._coverageApi,
     required this._prefsStore,
     this._tripApi,
-    this._pricingApi,
+    this._pricingRepository,
     this._supportApi,
     RecentPlacesStore? recentPlacesStore,
     this.passengerName = '',
@@ -82,7 +82,7 @@ class HomeMapViewModel extends ChangeNotifier {
   final CoverageApi _coverageApi;
   final PrefsStore _prefsStore;
   final TripApi? _tripApi;
-  final PricingApi? _pricingApi;
+  final PricingRepository? _pricingRepository;
   final SupportApi? _supportApi;
   final RecentPlacesStore _recentPlacesStore;
   final String passengerName;
@@ -615,11 +615,13 @@ class HomeMapViewModel extends ChangeNotifier {
       return;
     }
     if (!allowed) {
-      unawaited(fareRequest);
-      loadingFareEstimate = false;
-      if (coverageError == null) stage = RideStage.preview;
-      notifyListeners();
-      return;
+      if (coverageError == null) {
+        unawaited(fareRequest);
+        loadingFareEstimate = false;
+        stage = RideStage.preview;
+        notifyListeners();
+        return;
+      }
     }
     await fareRequest;
   }
@@ -675,7 +677,7 @@ class HomeMapViewModel extends ChangeNotifier {
       unawaited(_pingLocation());
     });
     _gpsSub?.cancel();
-        _gpsSub = _locationService.positionStream().listen((position) {
+    _gpsSub = _locationService.positionStream().listen((position) {
       final firstFix = _lastFix == null;
       _gpsSpeedKmh = LocationService.speedKmh(position, _lastFix);
 
@@ -834,7 +836,6 @@ class HomeMapViewModel extends ChangeNotifier {
       final to = dropoff;
       if (from == null || to == null) return;
       final wasEstimating = stage == RideStage.estimate;
-      unawaited(_refreshRoute());
       if (wasEstimating) {
         // A moving pickup changes both route and fare; invalidate the old
         // quote immediately so it cannot be offered for a stale location.
@@ -843,8 +844,18 @@ class HomeMapViewModel extends ChangeNotifier {
         loadingFareEstimate = true;
         fareEstimateError = null;
         notifyListeners();
-        unawaited(_checkCoverageThenLoadFare(from, to));
       }
+      unawaited(() async {
+        await _refreshRoute();
+        if (!wasEstimating || stage != RideStage.estimate || loadingRoute) {
+          return;
+        }
+        final latestFrom = pickup;
+        final latestTo = dropoff;
+        if (latestFrom != null && latestTo != null) {
+          await _checkCoverageThenLoadFare(latestFrom, latestTo);
+        }
+      }());
     });
   }
 
@@ -1460,8 +1471,7 @@ class HomeMapViewModel extends ChangeNotifier {
     }
     pickCandidate = null;
     notifyListeners();
-    final routeRefresh = _refreshRoute();
-    await routeRefresh;
+    await _refreshRoute();
   }
 
   Future<void> _rememberRecentDestination(GeoPlace place) async {
@@ -1545,18 +1555,28 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   Future<void> _loadFareEstimate(GeoPlace from, GeoPlace to) async {
-    final api = _pricingApi;
-    if (api == null) {
+    final repository = _pricingRepository;
+    if (repository == null) {
       loadingFareEstimate = false;
       fareEstimateError = 'price_service_unavailable';
       notifyListeners();
       return;
     }
     try {
-      final estimate = await api.estimate(
-        from: LatLng(from.latitude, from.longitude),
-        to: LatLng(to.latitude, to.longitude),
-      );
+      final isRoadRoute = routeMethod.startsWith('osrm_');
+      final estimate = isRoadRoute
+          ? await repository.estimate(
+              from: LatLng(from.latitude, from.longitude),
+              to: LatLng(to.latitude, to.longitude),
+              roadDistanceKm: tripKm,
+              routeDurationMin: tripDurationMin,
+              vehicleType: 'boda',
+            )
+          : await repository.estimateOffline(
+              roadDistanceKm: tripKm,
+              routeDurationMin: tripDurationMin,
+              vehicleType: 'boda',
+            );
       if (!_samePlace(from, pickup) || !_samePlace(to, dropoff)) return;
       fareEstimate = estimate;
       offeredPrice = estimate.suggestedPrice;
@@ -1608,6 +1628,30 @@ class HomeMapViewModel extends ChangeNotifier {
   }
 
   Future<void> confirmOffer() async {
+    if (fareEstimate?.isProvisional == true) {
+      final from = pickup;
+      final to = dropoff;
+      if (from == null || to == null) return;
+      loadingFareEstimate = true;
+      fareEstimateError = null;
+      notifyListeners();
+      await _refreshRoute();
+      if (!routeMethod.startsWith('osrm_')) {
+        loadingFareEstimate = false;
+        fareEstimateError = 'connect_to_confirm_offer';
+        notifyListeners();
+        return;
+      }
+      final refreshedFrom = pickup;
+      final refreshedTo = dropoff;
+      if (refreshedFrom == null || refreshedTo == null) return;
+      await _checkCoverageThenLoadFare(refreshedFrom, refreshedTo);
+      if (fareEstimate?.isProvisional == true || loadingFareEstimate) {
+        fareEstimateError = 'connect_to_confirm_offer';
+        notifyListeners();
+        return;
+      }
+    }
     if (checkingCoverage ||
         coverageError != null ||
         coverageDecision?.allowed == false) {
@@ -2115,7 +2159,7 @@ class HomeMapViewModel extends ChangeNotifier {
     if (gen != _routeGen) return;
     loadingRoute = false;
     notifyListeners();
-    await _refreshNearby();
+    unawaited(_refreshNearby());
   }
 
   void _startTimer(Duration duration) {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/config/api_config.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/repositories/pricing_repository.dart';
 import '../../../data/services/api_client.dart';
 import '../../../data/services/coverage_api.dart';
 import '../../../data/services/geo_api.dart';
@@ -50,6 +51,13 @@ final tripApiProvider = Provider<TripApi>((ref) {
 
 final pricingApiProvider = Provider<PricingApi>((ref) {
   return PricingApi(ref.watch(apiClientProvider));
+});
+
+final pricingRepositoryProvider = Provider<PricingRepository>((ref) {
+  return PricingRepository(
+    api: ref.watch(pricingApiProvider),
+    prefs: ref.watch(prefsStoreProvider),
+  );
 });
 
 final supportApiProvider = Provider<SupportApi>((ref) {
