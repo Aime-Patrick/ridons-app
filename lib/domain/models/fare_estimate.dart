@@ -1,3 +1,5 @@
+import 'fare_pricing_config.dart';
+
 class FareEstimate {
   const FareEstimate({
     required this.suggestedPrice,
@@ -6,6 +8,10 @@ class FareEstimate {
     required this.distanceKm,
     required this.durationMin,
     required this.surge,
+    this.fareMultiplier = 1,
+    this.vehicleType = 'boda',
+    this.pricingConfig,
+    this.isProvisional = false,
   });
 
   final int suggestedPrice;
@@ -14,6 +20,10 @@ class FareEstimate {
   final double distanceKm;
   final int durationMin;
   final double surge;
+  final double fareMultiplier;
+  final String vehicleType;
+  final FarePricingConfig? pricingConfig;
+  final bool isProvisional;
 
   factory FareEstimate.fromJson(Map<String, dynamic> json) {
     return FareEstimate(
@@ -23,6 +33,13 @@ class FareEstimate {
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0,
       durationMin: (json['durationMin'] as num?)?.toInt() ?? 0,
       surge: (json['surge'] as num?)?.toDouble() ?? 1,
+      fareMultiplier: (json['fareMultiplier'] as num?)?.toDouble() ?? 1,
+      vehicleType: json['vehicleType'] as String? ?? 'boda',
+      pricingConfig: json['pricingConfig'] is Map<String, dynamic>
+          ? FarePricingConfig.fromJson(
+              json['pricingConfig'] as Map<String, dynamic>,
+            )
+          : null,
     );
   }
 }

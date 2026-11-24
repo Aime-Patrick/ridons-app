@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -675,6 +674,9 @@ class _EstimateSheet extends StatelessWidget {
                 ? (viewModel.lastOfferHadRiders
                       ? 'nobody_took_fare'.tr()
                       : 'no_nearby_riders'.tr())
+                : viewModel.tripKm > 0 &&
+                      viewModel.routeMethod == 'haversine_fallback'
+                ? 'approx_distance_without_route'.tr()
                 : viewModel.tripKm > 0
                 ? 'about_route_by_road'.tr(
                     namedArgs: {
@@ -685,6 +687,51 @@ class _EstimateSheet extends StatelessWidget {
                 : 'market_fair_price'.tr(),
             style: TextStyle(color: context.ridonsMuted, fontSize: 11),
           ),
+          if (viewModel.fareEstimate?.isProvisional == true) ...[
+            const SizedBox(height: 8),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: context.ridonsMuted.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.cloud_off, size: 16, color: context.ridonsMuted),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'offline_fare_estimate'.tr(
+                          namedArgs: {
+                            'updatedAt': DateFormat.yMMMd().add_jm().format(
+                              (viewModel
+                                          .fareEstimate!
+                                          .pricingConfig!
+                                          .lastSyncedAt ??
+                                      viewModel
+                                          .fareEstimate!
+                                          .pricingConfig!
+                                          .updatedAt)
+                                  .toLocal(),
+                            ),
+                          },
+                        ),
+                        style: TextStyle(
+                          color: context.ridonsMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           RidonsPriceAdjuster(
             amountRwf: viewModel.offeredPrice,
