@@ -9,10 +9,8 @@ workflows:
       android_signing:
         - Ridons_Release
       ios_signing:
-        provisioning_profiles:
-          - ridons-appstore-push
-        certificates:
-          - "apple profiling"
+        distribution_type: app_store
+        bundle_identifier: com.ridons.mobile
       groups:
         - google_play_credentials
       vars:
@@ -80,6 +78,11 @@ workflows:
             --dart-define=RIDONS_API_URL=https://api.ridons.com
       - name: Set up iOS code signing
         script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
           xcode-project use-profiles
       - name: Build iOS IPA
         script: |
@@ -107,10 +110,8 @@ workflows:
       app_store_connect: Aivize Labs Ltd
     environment:
       ios_signing:
-        provisioning_profiles:
-          - ridons-appstore-push
-        certificates:
-          - "apple profiling"
+        distribution_type: app_store
+        bundle_identifier: com.ridons.mobile
       vars:
         APP_STORE_APPLE_ID: "6836368405"
         BUNDLE_ID: com.ridons.mobile
@@ -148,6 +149,11 @@ workflows:
           echo "NEXT_BUILD_NUMBER=${NEXT_BUILD_NUMBER}" >> "$CM_ENV"
       - name: Set up iOS code signing
         script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
           xcode-project use-profiles
       - name: Build iOS IPA
         script: |
