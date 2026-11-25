@@ -13,6 +13,7 @@ workflows:
         bundle_identifier: com.ridons.mobile
       groups:
         - google_play_credentials
+        - app_store_signing
       vars:
         APP_STORE_APPLE_ID: "6836368405"
         BUNDLE_ID: com.ridons.mobile
@@ -112,6 +113,8 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.ridons.mobile
+      groups:
+        - app_store_signing
       vars:
         APP_STORE_APPLE_ID: "6836368405"
         BUNDLE_ID: com.ridons.mobile
