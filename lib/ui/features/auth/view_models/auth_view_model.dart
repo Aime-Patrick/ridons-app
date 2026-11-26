@@ -1,27 +1,38 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../data/config/api_config.dart';
 import '../../../../data/repositories/auth_repository.dart';
+import '../../../../data/services/google_sign_in_service.dart';
 import '../../../../domain/models/app_role.dart';
+import '../../../../domain/models/phone_country.dart';
 import '../../../../domain/models/session_user.dart';
 
 class AuthViewModel extends ChangeNotifier {
-  AuthViewModel({required AuthRepository authRepository})
-    : _auth = authRepository;
+  AuthViewModel({
+    required AuthRepository authRepository,
+    required GoogleSignInService googleSignIn,
+  }) : _auth = authRepository,
+       _googleSignIn = googleSignIn;
 
   final AuthRepository _auth;
+  final GoogleSignInService _googleSignIn;
 
+  PhoneCountry selectedCountry = PhoneCountry.rwanda;
+  bool _userPickedCountry = false;
   String pendingPhone = '';
   String otpCode = '';
   bool sending = false;
   bool testOtpMode = false;
   bool verifying = false;
   bool savingProfile = false;
+  bool googleSigningIn = false;
   bool phoneTaken = false;
   bool userNotFound = false;
   String? errorMessage;
+  String? googlePhoneLinkToken;
   int resendInSec = 0;
   bool signupTermsAccepted = false;
   bool signupPrivacyAccepted = false;
@@ -40,7 +51,91 @@ class AuthViewModel extends ChangeNotifier {
 
   Timer? _resendTimer;
 
-  String get displayPhone => pendingPhone.isEmpty ? '+250' : pendingPhone;
+  String get displayPhone =>
+      pendingPhone.isEmpty ? selectedCountry.dialCode : pendingPhone;
+
+  Future<AuthSession?> signInWithGoogle({required AppRole role}) async {
+    if (googleSigningIn) return null;
+    errorMessage = null;
+    googlePhoneLinkToken = null;
+    googleSigningIn = true;
+    notifyListeners();
+    try {
+      final idToken = await _googleSignIn.signInForIdToken();
+      if (idToken == null) return null;
+      final result = await _auth.googleLogin(
+        idToken: idToken,
+        role: role,
+        termsAccepted: true,
+        privacyAccepted: true,
+        policyVersion: signupPolicyVersion,
+      );
+      if (result.requiresPhone) {
+        googlePhoneLinkToken = result.pendingToken;
+        pendingPhone = '';
+        _clearSignupConsent();
+        return null;
+      }
+      final session = result.session;
+      if (session == null) {
+        errorMessage = 'google_signin_failed';
+        return null;
+      }
+      _clearSignupConsent();
+      return session;
+    } on AuthException catch (e) {
+      errorMessage = e.message;
+      return null;
+    } on PlatformException catch (e) {
+      errorMessage = e.code == 'sign_in_canceled'
+          ? null
+          : 'google_signin_failed';
+      return null;
+    } catch (_) {
+      errorMessage = 'google_signin_failed';
+      return null;
+    } finally {
+      googleSigningIn = false;
+      notifyListeners();
+    }
+  }
+
+  void setSelectedCountry(PhoneCountry country) {
+    _userPickedCountry = true;
+    selectedCountry = country;
+    errorMessage = null;
+    notifyListeners();
+  }
+
+  void updatePhoneInput(String localDigits) {
+    if (errorMessage == null || errorMessage == 'country_not_allowed') return;
+    final isValid = isValidPhoneForCountry(
+      localDigits,
+      iso2: selectedCountry.iso2,
+      dialCode: selectedCountry.dialCode,
+      minLength: selectedCountry.minLength,
+      maxLength: selectedCountry.maxLength,
+    );
+    if (!isValid) return;
+    errorMessage = null;
+    phoneTaken = false;
+    userNotFound = false;
+    notifyListeners();
+  }
+
+  void syncAllowedCountries(PhoneCountriesConfig config) {
+    final countries = config.countries;
+    if (countries.isEmpty) return;
+    final stillAllowed = countries.any((c) => c.iso2 == selectedCountry.iso2);
+    if (!_userPickedCountry || !stillAllowed) {
+      final next = config.resolvedDefault;
+      if (next.iso2 != selectedCountry.iso2 ||
+          next.dialCode != selectedCountry.dialCode) {
+        selectedCountry = next;
+        notifyListeners();
+      }
+    }
+  }
 
   void updateOtp(String code) {
     otpCode = code;
@@ -56,8 +151,16 @@ class AuthViewModel extends ChangeNotifier {
     errorMessage = null;
     phoneTaken = false;
     userNotFound = false;
-    if (!isValidRwandaLocal(localDigits)) {
-      errorMessage = 'valid_rwanda_phone';
+    if (!isValidPhoneForCountry(
+      localDigits,
+      iso2: selectedCountry.iso2,
+      dialCode: selectedCountry.dialCode,
+      minLength: selectedCountry.minLength,
+      maxLength: selectedCountry.maxLength,
+    )) {
+      errorMessage = selectedCountry.iso2 == 'RW'
+          ? 'valid_rwanda_phone'
+          : 'valid_phone_number';
       notifyListeners();
       return false;
     }
@@ -65,13 +168,17 @@ class AuthViewModel extends ChangeNotifier {
     sending = true;
     notifyListeners();
     try {
-      pendingPhone = e164Phone(localDigits);
+      pendingPhone = e164Phone(
+        localDigits,
+        countryCode: selectedCountry.dialCode,
+      );
       testOtpMode = await _auth.sendOtp(
         phone: pendingPhone,
         role: role,
         termsAccepted: signupTermsAccepted,
         privacyAccepted: signupPrivacyAccepted,
         policyVersion: signupPolicyVersion,
+        googleLinkToken: googlePhoneLinkToken,
       );
       _startResendTimer();
       return true;
@@ -111,8 +218,10 @@ class AuthViewModel extends ChangeNotifier {
         termsAccepted: signupTermsAccepted,
         privacyAccepted: signupPrivacyAccepted,
         policyVersion: signupPolicyVersion,
+        googleLinkToken: googlePhoneLinkToken,
       );
       _clearSignupConsent();
+      googlePhoneLinkToken = null;
       return session;
     } on AuthException catch (e) {
       errorMessage = e.message;
@@ -214,7 +323,10 @@ class AuthViewModel extends ChangeNotifier {
 
   Future<void> resend({AppRole? role}) async {
     if (resendInSec > 0 || pendingPhone.isEmpty) return;
-    await sendCode(pendingPhone.replaceFirst('+250', ''), role: role);
+    final local = pendingPhone.startsWith(selectedCountry.dialCode)
+        ? pendingPhone.substring(selectedCountry.dialCode.length)
+        : pendingPhone;
+    await sendCode(local, role: role);
   }
 
   void _startResendTimer() {

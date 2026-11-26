@@ -142,8 +142,8 @@ class _TripMapState extends State<_TripMap> {
     final you = viewModel.driverPoint ?? ride.from;
     final dest = viewModel.stage == DriverStage.driving
         ? (viewModel.routePoints.length >= 2
-            ? viewModel.routePoints.last
-            : ride.to)
+              ? viewModel.routePoints.last
+              : ride.to)
         : (viewModel.passengerPoint ?? ride.from);
     final points = viewModel.routePoints.length >= 2
         ? viewModel.routePoints
@@ -212,8 +212,9 @@ class _TripMapState extends State<_TripMap> {
       onTap: () => showMapMarkerInfoSheet(
         context,
         title: 'dropoff_location',
-        subtitle:
-            ride.toName.isNotEmpty ? ride.toName : 'dropoff_location'.tr(),
+        subtitle: ride.toName.isNotEmpty
+            ? ride.toName
+            : 'dropoff_location'.tr(),
         details: {
           'destination': ride.toName.isNotEmpty
               ? ride.toName
@@ -391,6 +392,13 @@ class _TripSheetState extends State<_TripSheet> {
                 variant: RidonsButtonVariant.secondary,
                 onPressed: () => _requestDriverCancellation(context, viewModel),
               ),
+              const SizedBox(height: 10),
+              RidonsButton(
+                label: viewModel.sosBusy ? 'sending_sos' : 'send_sos',
+                variant: RidonsButtonVariant.danger,
+                isLoading: viewModel.sosBusy,
+                onPressed: () => _confirmSos(context, viewModel),
+              ),
             ] else ...[
               const SizedBox(height: 12),
               Row(
@@ -412,26 +420,52 @@ class _TripSheetState extends State<_TripSheet> {
                 ],
               ),
               const SizedBox(height: 12),
-              RidonsButton(
-                label: arrived ? 'start_ride' : 'i_have_arrived',
-                isLoading: viewModel.busy,
-                onPressed: viewModel.startTrip,
-              ),
-
-              const SizedBox(height: 10),
-              RidonsButton(
-                label: 'trip_was_canceled',
-                variant: RidonsButtonVariant.secondary,
-                onPressed: () => _requestDriverCancellation(context, viewModel),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          _requestDriverCancellation(context, viewModel),
+                      icon: const Icon(Icons.close_rounded, size: 17),
+                      label: Text(
+                        'trip_was_canceled'.tr(),
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: viewModel.busy ? null : viewModel.startTrip,
+                      icon: Icon(
+                        arrived
+                            ? Icons.play_arrow_rounded
+                            : Icons.location_on_outlined,
+                        size: 18,
+                      ),
+                      label: Text(
+                        arrived ? 'start_ride'.tr() : 'i_have_arrived'.tr(),
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: RidonsColors.primary,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
-            const SizedBox(height: 10),
-            RidonsButton(
-              label: viewModel.sosBusy ? 'sending_sos' : 'send_sos',
-              variant: RidonsButtonVariant.danger,
-              isLoading: viewModel.sosBusy,
-              onPressed: () => _confirmSos(context, viewModel),
-            ),
           ],
         ),
       ),

@@ -80,15 +80,13 @@ class _AccountDetailsViewState extends ConsumerState<AccountDetailsView> {
                   textInputAction: TextInputAction.next,
                   autofocus: true,
                   enabled: !vm.savingProfile,
-                  large: true,
                 ),
-                const SizedBox(height: 26),
+                const SizedBox(height: 20),
                 RidonsTextField(
                   controller: _lastName,
                   label: 'last_name',
                   textInputAction: TextInputAction.done,
                   enabled: !vm.savingProfile,
-                  large: true,
                 ),
                 if (vm.errorMessage != null) ...[
                   const SizedBox(height: 12),

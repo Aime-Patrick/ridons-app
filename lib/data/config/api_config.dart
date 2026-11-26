@@ -18,6 +18,10 @@ abstract final class RidonsEnv {
   static String termsUrl = 'https://www.ridons.com/terms-and-conditions';
   static String privacyUrl = 'https://www.ridons.com/privacy-policy';
   static String policyVersion = '2026-10-17';
+  static const googleIosClientId =
+      '88632290482-0sthj8vu62emi08opr5q75bjr2dgbc3q.apps.googleusercontent.com';
+  static const googleWebClientId =
+      '88632290482-gtgqkg2rfim2g1d4t5o7t2kcok4e2jdi.apps.googleusercontent.com';
 
   static Future<void> load() async {
     try {
@@ -103,12 +107,32 @@ String e164Phone(String localDigits, {String countryCode = '+250'}) {
 }
 
 bool isValidRwandaLocal(String localDigits) {
+  return isValidPhoneForCountry(
+    localDigits,
+    iso2: 'RW',
+    dialCode: '+250',
+    minLength: 9,
+    maxLength: 9,
+  );
+}
+
+bool isValidPhoneForCountry(
+  String localDigits, {
+  required String iso2,
+  required String dialCode,
+  int minLength = 4,
+  int maxLength = 14,
+}) {
   var digits = localDigits.replaceAll(RegExp(r'\D'), '');
-  if (digits.startsWith('250')) {
-    digits = digits.substring(3);
+  final callingCode = dialCode.replaceAll('+', '');
+  if (digits.startsWith(callingCode)) {
+    digits = digits.substring(callingCode.length);
   }
   if (digits.startsWith('0')) {
     digits = digits.substring(1);
   }
-  return RegExp(r'^7\d{8}$').hasMatch(digits);
+  if (iso2.toUpperCase() == 'RW') {
+    return RegExp(r'^7\d{8}$').hasMatch(digits);
+  }
+  return digits.length >= minLength && digits.length <= maxLength;
 }

@@ -231,9 +231,7 @@ class RouteEtaMapBadge extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
           side: BorderSide(
-            color: isAlternative
-                ? RidonsColors.primary
-                : context.ridonsLine,
+            color: isAlternative ? RidonsColors.primary : context.ridonsLine,
             width: isAlternative ? 1.5 : 1,
           ),
         ),
@@ -247,10 +245,7 @@ class RouteEtaMapBadge extends StatelessWidget {
               opacity: animation,
               child: SlideTransition(
                 position: animation.drive(
-                  Tween<Offset>(
-                    begin: const Offset(0, 0.12),
-                    end: Offset.zero,
-                  ),
+                  Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero),
                 ),
                 child: child,
               ),
@@ -874,7 +869,7 @@ class _OfferingSheet extends StatelessWidget {
               onIncrement: () {},
             ),
           ] else ...[
-            // Marketplace — list of drivers who accepted
+            // Show both direct acceptances and driver counteroffers.
             _AnimatedBidList(viewModel: viewModel),
           ],
           if (viewModel.bidError != null) ...[
@@ -884,25 +879,13 @@ class _OfferingSheet extends StatelessWidget {
               style: TextStyle(color: context.ridonsMuted, fontSize: 12),
             ),
           ],
-          const SizedBox(height: 12),
-          // Change my price — always available
-          if (!viewModel.hasAcceptedOffer)
-            OutlinedButton(
-              onPressed: viewModel.retryFareEstimate,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(44),
-                side: BorderSide(color: context.ridonsLine),
-                foregroundColor: context.ridonsInk,
-              ),
-              child: Text('change_my_price'.tr()),
-            ),
           if (!hasOffers) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             InkWell(
-            onTap: onFitRoute,
-            borderRadius: BorderRadius.circular(10),
-            child: _RouteSummary(viewModel: viewModel),
-          ),
+              onTap: onFitRoute,
+              borderRadius: BorderRadius.circular(10),
+              child: _RouteSummary(viewModel: viewModel),
+            ),
           ],
         ],
       ),
@@ -910,7 +893,7 @@ class _OfferingSheet extends StatelessWidget {
   }
 }
 
-/// Animates each driver card sliding in from the bottom as they accept.
+/// Animates each accepted offer or counteroffer into the marketplace list.
 class _AnimatedBidList extends StatefulWidget {
   const _AnimatedBidList({required this.viewModel});
   final HomeMapViewModel viewModel;
@@ -1479,7 +1462,11 @@ class _CounterPrice extends StatelessWidget {
 }
 
 class _MatchedSheet extends StatelessWidget {
-  const _MatchedSheet({required this.viewModel, this.decorate = true, this.onFitRoute});
+  const _MatchedSheet({
+    required this.viewModel,
+    this.decorate = true,
+    this.onFitRoute,
+  });
 
   final VoidCallback? onFitRoute;
 

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ridons/app.dart';
 import 'package:ridons/data/repositories/auth_repository.dart';
 import 'package:ridons/domain/models/app_role.dart';
+import 'package:ridons/domain/models/google_auth_result.dart';
 import 'package:ridons/domain/models/session_user.dart';
 import 'package:ridons/ui/core/providers/session_providers.dart';
 import 'package:ridons/ui/core/widgets/ridons_role_card.dart';
@@ -77,6 +78,15 @@ class FakeAuthRepository implements AuthRepository {
   AuthException? verifyError;
 
   @override
+  Future<GoogleAuthResult> googleLogin({
+    required String idToken,
+    required AppRole role,
+    required bool termsAccepted,
+    required bool privacyAccepted,
+    required String policyVersion,
+  }) async => const GoogleAuthResult();
+
+  @override
   Future<bool> sendOtp({
     required String phone,
     String? intent,
@@ -85,6 +95,7 @@ class FakeAuthRepository implements AuthRepository {
     bool privacyAccepted = false,
     String? policyVersion,
     String consentSource = 'mobile',
+    String? googleLinkToken,
   }) async {
     lastPhone = phone;
     return false;
@@ -100,6 +111,7 @@ class FakeAuthRepository implements AuthRepository {
     bool privacyAccepted = false,
     String? policyVersion,
     String consentSource = 'mobile',
+    String? googleLinkToken,
   }) async {
     lastCode = code;
     lastIntent = intent;

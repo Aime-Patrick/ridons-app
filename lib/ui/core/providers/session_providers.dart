@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/config/api_config.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/repositories/phone_countries_repository.dart';
 import '../../../data/repositories/pricing_repository.dart';
 import '../../../data/services/api_client.dart';
+import '../../../data/services/google_sign_in_service.dart';
 import '../../../data/services/coverage_api.dart';
 import '../../../data/services/geo_api.dart';
 import '../../../data/services/driver_documents_service.dart';
@@ -18,6 +21,7 @@ import '../../../data/services/token_store.dart';
 import '../../../data/services/trip_api.dart';
 import '../../../data/services/support_api.dart';
 import '../../../domain/models/app_role.dart';
+import '../../../domain/models/phone_country.dart';
 import '../../../domain/models/session_user.dart';
 import '../../features/auth/view_models/auth_view_model.dart';
 import '../../features/account/view_models/driver_documents_view_model.dart';
@@ -59,6 +63,49 @@ final pricingRepositoryProvider = Provider<PricingRepository>((ref) {
     prefs: ref.watch(prefsStoreProvider),
   );
 });
+
+class PhoneCountriesController extends ChangeNotifier {
+  PhoneCountriesController(this._repo);
+
+  final PhoneCountriesRepository _repo;
+  PhoneCountriesConfig _config = PhoneCountriesConfig.fallback;
+  bool _loaded = false;
+
+  PhoneCountriesConfig get config => _config;
+  List<PhoneCountry> get countries => _config.countries;
+  PhoneCountry get defaultCountry => _config.resolvedDefault;
+  bool get loaded => _loaded;
+
+  Future<void> syncOnStartup() async {
+    final cached = await _repo.loadCachedOrFallback();
+    _config = cached;
+    notifyListeners();
+    await refresh();
+  }
+
+  Future<void> refresh() async {
+    _config = await _repo.refresh();
+    _loaded = true;
+    notifyListeners();
+  }
+}
+
+final phoneCountriesRepositoryProvider = Provider<PhoneCountriesRepository>((
+  ref,
+) {
+  return PhoneCountriesRepository(
+    apiClient: ref.watch(apiClientProvider),
+    prefs: ref.watch(prefsStoreProvider),
+  );
+});
+
+final phoneCountriesProvider = ChangeNotifierProvider<PhoneCountriesController>(
+  (ref) {
+    return PhoneCountriesController(
+      ref.watch(phoneCountriesRepositoryProvider),
+    );
+  },
+);
 
 final supportApiProvider = Provider<SupportApi>((ref) {
   return SupportApi(ref.watch(apiClientProvider));
@@ -217,7 +264,10 @@ final restoredRoleProvider = FutureProvider<AppRole?>((ref) {
 });
 
 final authViewModelProvider = ChangeNotifierProvider<AuthViewModel>((ref) {
-  return AuthViewModel(authRepository: ref.watch(authRepositoryProvider));
+  return AuthViewModel(
+    authRepository: ref.watch(authRepositoryProvider),
+    googleSignIn: GoogleSignInService(),
+  );
 });
 
 final notificationCenterProvider =

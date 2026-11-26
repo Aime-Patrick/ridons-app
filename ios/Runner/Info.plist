@@ -2,6 +2,19 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
+		<key>GIDClientID</key>
+		<string>88632290482-0sthj8vu62emi08opr5q75bjr2dgbc3q.apps.googleusercontent.com</string>
+		<key>GIDServerClientID</key>
+		<string>88632290482-gtgqkg2rfim2g1d4t5o7t2kcok4e2jdi.apps.googleusercontent.com</string>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.googleusercontent.apps.88632290482-0sthj8vu62emi08opr5q75bjr2dgbc3q</string>
+				</array>
+			</dict>
+		</array>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Ridons uses your photos so you can set a profile picture.</string>
 		<key>NSCameraUsageDescription</key>

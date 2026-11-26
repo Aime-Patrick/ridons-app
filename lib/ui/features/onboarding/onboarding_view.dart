@@ -13,6 +13,7 @@ import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/widgets.dart';
 
 const _brandTopFactor = 0.51;
+const _compactLayoutHeight = 820.0;
 
 /// Two-phase Onboarding flow:
 /// 1. Language Selection (Kinyarwanda / English).
@@ -136,6 +137,18 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
             : constraints.maxWidth;
         final contentLeft = (constraints.maxWidth - contentWidth) / 2;
 
+        if (_needsCompactLayout(context, constraints)) {
+          return _buildCompactLayout(
+            context: context,
+            constraints: constraints,
+            contentWidth: contentWidth,
+            sheet: _buildSheet(
+              child: _buildLanguageStep(context),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            ),
+          );
+        }
+
         return Stack(
           children: [
             // Keep the language and role brand lockup on the same baseline.
@@ -174,6 +187,32 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
         final roleScale = roleRowWidth / 380;
         final roleHeight = 197 * roleScale;
 
+        if (_needsCompactLayout(context, constraints)) {
+          return _buildCompactLayout(
+            context: context,
+            constraints: constraints,
+            contentWidth: contentWidth,
+            sheet: _buildSheet(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: roleRowWidth,
+                    height: roleHeight,
+                    child: _buildRoleCards(
+                      scale: roleScale,
+                      height: roleHeight,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRoleActions(context),
+                ],
+              ),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            ),
+          );
+        }
+
         return Stack(
           children: [
             Positioned(
@@ -201,6 +240,43 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
           ],
         );
       },
+    );
+  }
+
+  bool _needsCompactLayout(BuildContext context, BoxConstraints constraints) {
+    return constraints.maxHeight < _compactLayoutHeight ||
+        MediaQuery.textScalerOf(context).scale(1) > 1.15;
+  }
+
+  Widget _buildCompactLayout({
+    required BuildContext context,
+    required BoxConstraints constraints,
+    required double contentWidth,
+    required Widget sheet,
+  }) {
+    return SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+        child: IntrinsicHeight(
+          child: Column(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 32, 16, 20),
+                    child: SizedBox(
+                      width: contentWidth,
+                      child: _buildBrandHeader(context),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: contentWidth, child: sheet),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

@@ -12,6 +12,7 @@ import '../../../domain/models/geo_place.dart';
 import '../../core/theme/ridons_colors.dart';
 import '../../core/widgets/ridons_tile_layer.dart';
 import '../../core/widgets/ridons_route_endpoints.dart';
+import '../../core/widgets/ridons_modal_sheet_content.dart';
 import '../../core/providers/session_providers.dart';
 import '../../../data/services/places_service.dart';
 
@@ -169,20 +170,22 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
     final now = DateTime.now();
     return switch (_filter) {
       _ActivityFilter.all => _trips,
-      _ActivityFilter.today => _trips
-          .where(
-            (trip) =>
-                trip.when.year == now.year &&
-                trip.when.month == now.month &&
-                trip.when.day == now.day,
-          )
-          .toList(growable: false),
-      _ActivityFilter.week => _trips
-          .where(
-            (trip) =>
-                !trip.when.isBefore(now.subtract(const Duration(days: 7))),
-          )
-          .toList(growable: false),
+      _ActivityFilter.today =>
+        _trips
+            .where(
+              (trip) =>
+                  trip.when.year == now.year &&
+                  trip.when.month == now.month &&
+                  trip.when.day == now.day,
+            )
+            .toList(growable: false),
+      _ActivityFilter.week =>
+        _trips
+            .where(
+              (trip) =>
+                  !trip.when.isBefore(now.subtract(const Duration(days: 7))),
+            )
+            .toList(growable: false),
     };
   }
 
@@ -234,7 +237,7 @@ class _ActivitiesViewState extends ConsumerState<ActivitiesView> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        return SafeArea(
+        return RidonsModalSheetContent(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
             child: Column(

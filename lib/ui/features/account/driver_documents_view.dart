@@ -79,7 +79,9 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
     }
   }
 
-  Future<void> _refreshVerificationStatus({bool reloadDocuments = false}) async {
+  Future<void> _refreshVerificationStatus({
+    bool reloadDocuments = false,
+  }) async {
     if (!mounted || !widget.onboarding || _statusRefreshBusy) return;
     _statusRefreshBusy = true;
     try {
@@ -113,7 +115,7 @@ class _DriverDocumentsViewState extends ConsumerState<DriverDocumentsView> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (sheetContext) => SafeArea(
+      builder: (sheetContext) => RidonsModalSheetContent(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: Column(
@@ -408,9 +410,7 @@ class _VerificationBanner extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
-              ready
-                  ? Icons.verified_outlined
-                  : Icons.shield_outlined,
+              ready ? Icons.verified_outlined : Icons.shield_outlined,
               color: accent,
             ),
             const SizedBox(width: 10),
@@ -487,9 +487,11 @@ class _DocumentTile extends StatelessWidget {
             DriverDocumentStatus.rejected => _DocumentVisualState.rejected,
             _ => _DocumentVisualState.uploaded,
           };
-    final isGreen = visualState == _DocumentVisualState.uploaded ||
+    final isGreen =
+        visualState == _DocumentVisualState.uploaded ||
         visualState == _DocumentVisualState.approved;
-    final isRed = visualState == _DocumentVisualState.missing ||
+    final isRed =
+        visualState == _DocumentVisualState.missing ||
         visualState == _DocumentVisualState.rejected ||
         visualState == _DocumentVisualState.queued;
     final statusColor = isGreen
@@ -500,9 +502,7 @@ class _DocumentTile extends StatelessWidget {
               : RidonsColors.primary)
         : context.ridonsMuted;
     final backgroundColor = isGreen
-        ? RidonsColors.success.withValues(
-            alpha: context.ridonsDark ? .14 : .07,
-          )
+        ? RidonsColors.success.withValues(alpha: context.ridonsDark ? .14 : .07)
         : isRed
         ? (context.ridonsDark
               ? RidonsColors.primary.withValues(alpha: .14)
@@ -517,11 +517,12 @@ class _DocumentTile extends StatelessWidget {
     };
     final detail = switch (visualState) {
       _DocumentVisualState.missing => 'required_not_uploaded'.tr(),
-      _DocumentVisualState.rejected =>
-        _documentStatusLabel(status, document?.rejectReason),
-      _DocumentVisualState.queued => uploading
-          ? 'document_uploading'.tr()
-          : 'document_upload_waiting'.tr(),
+      _DocumentVisualState.rejected => _documentStatusLabel(
+        status,
+        document?.rejectReason,
+      ),
+      _DocumentVisualState.queued =>
+        uploading ? 'document_uploading'.tr() : 'document_upload_waiting'.tr(),
       _DocumentVisualState.uploaded => 'document_uploaded'.tr(),
       _DocumentVisualState.approved => _documentStatusLabel(status, null),
     };
@@ -529,7 +530,8 @@ class _DocumentTile extends StatelessWidget {
     final expiryLabel = expiry == null
         ? null
         : '${'expires_on'.tr()}: ${expiry.toLocal().toIso8601String().split('T').first}';
-    final motionDuration = MediaQuery.maybeOf(context)?.disableAnimations == true
+    final motionDuration =
+        MediaQuery.maybeOf(context)?.disableAnimations == true
         ? Duration.zero
         : const Duration(milliseconds: 240);
     return AnimatedContainer(
@@ -556,11 +558,7 @@ class _DocumentTile extends StatelessWidget {
             duration: motionDuration,
             switchInCurve: Curves.easeOut,
             switchOutCurve: Curves.easeIn,
-            child: Icon(
-              icon,
-              key: ValueKey(visualState),
-              color: statusColor,
-            ),
+            child: Icon(icon, key: ValueKey(visualState), color: statusColor),
           ),
           title: Text(
             _documentTypeLabel(type),

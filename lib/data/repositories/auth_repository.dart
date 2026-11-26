@@ -1,12 +1,20 @@
 import 'package:dio/dio.dart';
 
 import '../../domain/models/app_role.dart';
+import '../../domain/models/google_auth_result.dart';
 import '../../domain/models/session_user.dart';
 import '../config/api_errors.dart';
 import '../services/api_client.dart';
 import '../services/token_store.dart';
 
 abstract class AuthRepository {
+  Future<GoogleAuthResult> googleLogin({
+    required String idToken,
+    required AppRole role,
+    required bool termsAccepted,
+    required bool privacyAccepted,
+    required String policyVersion,
+  });
   Future<bool> sendOtp({
     required String phone,
     String? intent,
@@ -15,6 +23,7 @@ abstract class AuthRepository {
     bool privacyAccepted = false,
     String? policyVersion,
     String consentSource = 'mobile',
+    String? googleLinkToken,
   });
   Future<AuthSession> verifyOtp({
     required String phone,
@@ -25,6 +34,7 @@ abstract class AuthRepository {
     bool privacyAccepted = false,
     String? policyVersion,
     String consentSource = 'mobile',
+    String? googleLinkToken,
   });
   Future<AuthSession> updateProfile({
     String? firstName,
@@ -50,6 +60,42 @@ class RemoteAuthRepository implements AuthRepository {
   final TokenStore _tokens;
 
   @override
+  Future<GoogleAuthResult> googleLogin({
+    required String idToken,
+    required AppRole role,
+    required bool termsAccepted,
+    required bool privacyAccepted,
+    required String policyVersion,
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/google',
+        data: {
+          'idToken': idToken,
+          'role': role.name,
+          'termsAccepted': termsAccepted,
+          'privacyAccepted': privacyAccepted,
+          'policyVersion': policyVersion,
+        },
+      );
+      final json = response.data ?? const {};
+      if (json['requiresPhone'] == true) {
+        final pendingToken = '${json['pendingToken'] ?? ''}';
+        if (pendingToken.isEmpty) {
+          throw const AuthException('Could not start phone verification.');
+        }
+        return GoogleAuthResult(pendingToken: pendingToken);
+      }
+      return GoogleAuthResult(session: await _sessionFrom(json));
+    } on DioException catch (e) {
+      throw AuthException(
+        apiErrorMessage(e, fallback: 'Could not sign in with Google.'),
+        code: errorCodeOf(e),
+      );
+    }
+  }
+
+  @override
   Future<bool> sendOtp({
     required String phone,
     String? intent,
@@ -58,18 +104,20 @@ class RemoteAuthRepository implements AuthRepository {
     bool privacyAccepted = false,
     String? policyVersion,
     String consentSource = 'mobile',
+    String? googleLinkToken,
   }) async {
     try {
       final response = await _api.dio.post<Map<String, dynamic>>(
         '/auth/otp/send',
         data: {
           'phone': phone,
-          if (intent != null) 'intent': intent,
-          if (role != null) 'role': role.name,
+          'intent': ?intent,
+          'role': ?role?.name,
           'termsAccepted': termsAccepted,
           'privacyAccepted': privacyAccepted,
-          if (policyVersion != null) 'policyVersion': policyVersion,
+          'policyVersion': ?policyVersion,
           'consentSource': consentSource,
+          'googleLinkToken': ?googleLinkToken,
         },
       );
       return response.data?['testMode'] == true;
@@ -91,6 +139,7 @@ class RemoteAuthRepository implements AuthRepository {
     bool privacyAccepted = false,
     String? policyVersion,
     String consentSource = 'mobile',
+    String? googleLinkToken,
   }) async {
     try {
       final response = await _api.dio.post<Map<String, dynamic>>(
@@ -99,11 +148,12 @@ class RemoteAuthRepository implements AuthRepository {
           'phone': phone,
           'code': code,
           'role': role.name,
-          if (intent != null) 'intent': intent,
+          'intent': ?intent,
           'termsAccepted': termsAccepted,
           'privacyAccepted': privacyAccepted,
-          if (policyVersion != null) 'policyVersion': policyVersion,
+          'policyVersion': ?policyVersion,
           'consentSource': consentSource,
+          'googleLinkToken': ?googleLinkToken,
         },
       );
       return await _sessionFrom(response.data ?? const {});
