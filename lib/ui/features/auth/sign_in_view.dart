@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/app_role.dart';
@@ -30,14 +29,23 @@ class _SignInViewState extends ConsumerState<SignInView> {
   void initState() {
     super.initState();
     _phoneController = TextEditingController();
-    if (widget.showCode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final countriesCtrl = ref.read(phoneCountriesProvider);
+      if (!countriesCtrl.loaded) {
+        countriesCtrl.syncOnStartup();
+      } else {
+        ref
+            .read(authViewModelProvider)
+            .syncAllowedCountries(countriesCtrl.config);
+      }
+      if (widget.showCode) {
         final phone = ref.read(authViewModelProvider).pendingPhone;
         if (phone.isEmpty && mounted) {
           context.go(AppRoutes.signInPhone);
         }
-      });
-    }
+      }
+    });
   }
 
   @override
@@ -63,10 +71,6 @@ class _SignInViewState extends ConsumerState<SignInView> {
     ref.read(appRoleProvider.notifier).state = session.user.role;
     if (!mounted) return;
     context.go(session.needsProfile ? AppRoutes.signUpAccount : AppRoutes.home);
-  }
-
-  void _googleSoon() {
-    RidonsNotice.info(context, 'google_coming_soon'.tr());
   }
 
   TextStyle _bodyStyle({
@@ -167,6 +171,8 @@ class _SignInViewState extends ConsumerState<SignInView> {
   }
 
   Widget _buildPhoneStep(BuildContext context, AuthViewModel vm) {
+    final countriesCtrl = ref.watch(phoneCountriesProvider);
+    vm.syncAllowedCountries(countriesCtrl.config);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -174,7 +180,9 @@ class _SignInViewState extends ConsumerState<SignInView> {
         _buildHeading('enter_your_number'.tr(), centered: true),
         const SizedBox(height: 8),
         Text(
-          'verification_code_sent'.tr(),
+          vm.googlePhoneLinkToken != null
+              ? 'verify_phone_to_finish_google_signup'.tr()
+              : 'verification_code_sent'.tr(),
           textAlign: TextAlign.center,
           style: TextStyle(
             color: context.ridonsMuted,
@@ -187,6 +195,10 @@ class _SignInViewState extends ConsumerState<SignInView> {
         const SizedBox(height: 20),
         RidonsPhoneField(
           controller: _phoneController,
+          countries: countriesCtrl.countries,
+          selectedCountry: vm.selectedCountry,
+          onCountryChanged: vm.setSelectedCountry,
+          onChanged: vm.updatePhoneInput,
           autofocus: true,
           enabled: !vm.sending,
         ),
@@ -203,24 +215,6 @@ class _SignInViewState extends ConsumerState<SignInView> {
           label: 'continue',
           isLoading: vm.sending,
           onPressed: _continueToCode,
-        ),
-        const SizedBox(height: 32),
-        Center(
-          child: Text(
-            'or'.tr(),
-            style: TextStyle(color: context.ridonsMuted, fontSize: 11),
-          ),
-        ),
-        const SizedBox(height: 12),
-        RidonsButton(
-          label: 'continue_with_google',
-          variant: RidonsButtonVariant.outline,
-          leading: SvgPicture.asset(
-            'assets/brand/google_g.svg',
-            width: 20,
-            height: 20,
-          ),
-          onPressed: _googleSoon,
         ),
       ],
     );

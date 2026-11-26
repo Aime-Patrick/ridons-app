@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../domain/models/cancellation_reason.dart';
 import '../theme/ridons_colors.dart';
+import 'ridons_modal_sheet_content.dart';
 
 Future<CancellationSelection?> showCancellationReasonSheet({
   required BuildContext context,
@@ -46,7 +47,7 @@ class _CancellationReasonSheetState extends State<_CancellationReasonSheet> {
     final requiresNote = selected?.requiresNote == true;
     final canSubmit =
         selected != null && (!requiresNote || note.text.trim().isNotEmpty);
-    return SafeArea(
+    return RidonsModalSheetContent(
       child: Material(
         color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),

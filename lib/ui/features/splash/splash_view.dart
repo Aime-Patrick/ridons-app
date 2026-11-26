@@ -28,6 +28,7 @@ class _SplashViewState extends ConsumerState<SplashView> {
   @override
   void initState() {
     super.initState();
+    unawaited(ref.read(phoneCountriesProvider).syncOnStartup());
     _leaveTimer = Timer(const Duration(milliseconds: 1550), _leave);
   }
 

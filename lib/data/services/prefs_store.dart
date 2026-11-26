@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models/app_role.dart';
 import '../../domain/models/fare_pricing_config.dart';
+import '../../domain/models/phone_country.dart';
 
 class PrefsStore {
   static const _onboarded = 'ridons.onboarded';
@@ -16,6 +17,25 @@ class PrefsStore {
   static const _themeMode = 'ridons.themeMode';
   static const _locationPromptDismissed = 'ridons.location.promptDismissed';
   static const _offlineFarePricing = 'ridons.pricing.offlineConfig';
+  static const _phoneCountries = 'ridons.auth.phoneCountries';
+
+  Future<PhoneCountriesConfig?> readPhoneCountries() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_phoneCountries);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final json = jsonDecode(raw);
+      if (json is! Map<String, dynamic>) return null;
+      return PhoneCountriesConfig.fromJson(json);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> savePhoneCountries(PhoneCountriesConfig config) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_phoneCountries, jsonEncode(config.toJson()));
+  }
 
   Future<FarePricingConfig?> readOfflineFarePricing() async {
     final prefs = await SharedPreferences.getInstance();

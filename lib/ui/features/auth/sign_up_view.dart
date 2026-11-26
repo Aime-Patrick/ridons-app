@@ -8,6 +8,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../data/config/api_config.dart';
+import '../../../domain/models/app_role.dart';
+import '../../core/providers/app_role_provider.dart';
 import '../../core/providers/session_providers.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/ridons_colors.dart';
@@ -52,6 +54,32 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
   void _continue() {
     ref.read(authViewModelProvider).setSignupConsent(accepted: true);
     context.push(AppRoutes.signInPhone);
+  }
+
+  Future<void> _continueWithGoogle() async {
+    final vm = ref.read(authViewModelProvider);
+    vm.setSignupConsent(accepted: true);
+    final session = await vm.signInWithGoogle(
+      role: ref.read(appRoleProvider) ?? AppRole.passenger,
+    );
+    if (!mounted) return;
+    if (vm.googlePhoneLinkToken != null) {
+      context.push(AppRoutes.signInPhone);
+      return;
+    }
+    if (session != null) {
+      await ref.read(authSessionProvider.notifier).setSession(session);
+      ref.read(appRoleProvider.notifier).state = session.user.role;
+      if (mounted) {
+        context.go(
+          session.needsProfile ? AppRoutes.signUpAccount : AppRoutes.home,
+        );
+      }
+      return;
+    }
+    if (vm.errorMessage != null) {
+      RidonsNotice.error(context, vm.errorMessage!.tr());
+    }
   }
 
   @override
@@ -100,21 +128,22 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                RidonsButton(
-                  label: 'continue_with_phone',
-                  onPressed: _continue,
-                ),
+                RidonsButton(label: 'continue', onPressed: _continue),
                 const SizedBox(height: 8),
-                RidonsButton(
-                  label: 'continue_with_google',
-                  variant: RidonsButtonVariant.outline,
-                  leading: SvgPicture.asset(
-                    'assets/brand/google_g.svg',
-                    width: 20,
-                    height: 20,
-                  ),
-                  onPressed: () {
-                    RidonsNotice.info(context, 'google_coming_soon'.tr());
+                Consumer(
+                  builder: (context, ref, _) {
+                    final vm = ref.watch(authViewModelProvider);
+                    return RidonsButton(
+                      label: 'continue_with_google',
+                      variant: RidonsButtonVariant.outline,
+                      isLoading: vm.googleSigningIn,
+                      leading: SvgPicture.asset(
+                        'assets/brand/google_g.svg',
+                        width: 20,
+                        height: 20,
+                      ),
+                      onPressed: _continueWithGoogle,
+                    );
                   },
                 ),
                 const SizedBox(height: 22),

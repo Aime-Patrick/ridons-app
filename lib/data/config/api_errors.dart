@@ -8,7 +8,8 @@ String apiErrorMessage(DioException error, {required String fallback}) {
   final payload = errorPayload(data);
   final code = payload?['error']?.toString();
   final known = switch (code) {
-    'invalid_phone_number' => 'valid_rwanda_phone',
+    'invalid_phone_number' => 'valid_phone_number',
+    'country_not_allowed' => 'country_not_allowed',
     'otp_service_unavailable' => 'otp_service_unavailable',
     'otp_mismatch' => 'otp_mismatch',
     'otp_expired' => 'otp_expired',
@@ -17,6 +18,10 @@ String apiErrorMessage(DioException error, {required String fallback}) {
     'phone_taken' => phoneTakenKey(payload?['role']?.toString()),
     'user_not_found' => 'user_not_found',
     'legal_consent_required' => 'legal_consent_required',
+    'invalid_google_token' => 'google_signin_failed',
+    'google_signin_unavailable' => 'google_signin_unavailable',
+    'google_account_already_linked' => 'google_account_link_conflict',
+    'google_account_link_conflict' => 'google_account_link_conflict',
     _ => null,
   };
   if (known != null) return known;
