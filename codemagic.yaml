@@ -21,6 +21,15 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: production
+      tag_patterns:
+        - pattern: 'v*'
+      cancel_previous_builds: true
     scripts:
       - name: Install Flutter dependencies
         script: |
@@ -113,12 +122,6 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: production
-      cancel_previous_builds: true
     scripts:
       - name: Install Flutter dependencies
         script: |
